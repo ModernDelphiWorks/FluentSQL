@@ -1,4 +1,4 @@
-program PTestFluentCQLFirebird;
+program PTestFluentSQLFirebird;
 
 {$IFNDEF TESTINSIGHT}
 {$APPTYPE CONSOLE}
