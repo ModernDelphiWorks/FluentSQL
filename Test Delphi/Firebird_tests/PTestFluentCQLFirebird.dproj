@@ -56,7 +56,7 @@
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <Icon_MainIcon>$(BDS)\bin\delphi_PROJECTICON.ico</Icon_MainIcon>
         <Icns_MainIcns>$(BDS)\bin\delphi_PROJECTICNS.icns</Icns_MainIcns>
-        <DCC_UnitSearchPath>$(DUnitX);..\..\..\CQuery4D\Source\Core;..\..\..\CQuery4D\Source\Drivers;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>$(DUnitX);..\..\..\FluentQuery\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <SanitizedProjectName>PTestFluentCQLFirebird</SanitizedProjectName>
         <VerInfo_Locale>1046</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
@@ -101,45 +101,66 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="UTestFluent.CQLFirebird.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Adapters.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Cast.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Chunk.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Collections.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Concat.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Core.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Distinct.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Exclude.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.GroupBy.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.GroupJoin.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Helpers.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Intersect.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Join.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Json.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Json.Provider.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.OfType.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Order.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.OrderBy.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Select.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SelectIndexed.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SelectMany.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SelectManyCollection.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SelectManyCollectionIndexed.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SelectManyIndexed.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Skip.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SkipWhile.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.SkipWhileIndexed.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Take.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.TakeWhile.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.TakeWhileIndexed.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.ThenBy.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Union.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Where.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Xml.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Xml.Provider.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Zip.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Query.Provider.pas"/>
-        <DCCReference Include="..\..\..\Fluent4D\Source\System.Fluent.Queryable.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Ast.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Cases.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Core.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Delete.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Expression.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Functions.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.FunctionsAbstract.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.GroupBy.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Having.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Insert.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Interfaces.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Joins.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Name.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.NameValue.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Operators.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.OrderBy.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Qualifier.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Register.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Section.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Select.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Serialize.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Update.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Utils.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Where.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsDB2.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsFirebird.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsInterbase.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsMSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsMySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsOracle.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsPostgreSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsSQLite.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierDB2.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierFirebird.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierInterbase.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierMongoDB.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierMSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierMySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierOracle.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierPostgreSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierSQLite.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.SQLite.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectDB2.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectFirebird.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectInterbase.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectMongoDB.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectMSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectMySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectOracle.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectPostgreSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeDB2.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeFirebird.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeInterbase.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeMongoDB.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeMSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeMySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeOracle.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializePostgreSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
