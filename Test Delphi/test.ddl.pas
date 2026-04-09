@@ -60,6 +60,29 @@ type
     procedure TestAlterTableDropColumn_UnsupportedDialect_MessageReferencesESP020;
   end;
 
+  [TestFixture]
+  TTestDDLCreateIndex = class
+  public
+    [Test]
+    procedure TestCreateIndex_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_Firebird_Unique_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_PostgreSQL_Unique_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_MultiColumn_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_NoColumns_RaisesArgumentException;
+    [Test]
+    procedure TestCreateIndex_SecondUnique_RaisesArgumentException;
+    [Test]
+    procedure TestCreateIndex_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestCreateIndex_UnsupportedDialect_MessageReferencesESP022;
+  end;
+
 implementation
 
 uses
@@ -267,6 +290,115 @@ begin
   end;
   Assert.IsTrue(LRaised);
   Assert.IsTrue(Pos('ESP-020', LMsg) > 0);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLCreateIndex(dbnFirebird, 'IX_CLI_NOME', 'CLIENTES')
+    .Column('NOME')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX IX_CLI_NOME ON CLIENTES (NOME)', LSql);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_Firebird_Unique_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLCreateIndex(dbnFirebird, 'UQ_CLI_EMAIL', 'CLIENTES')
+    .Unique
+    .Column('EMAIL')
+    .AsString;
+  Assert.AreEqual('CREATE UNIQUE INDEX UQ_CLI_EMAIL ON CLIENTES (EMAIL)', LSql);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLCreateIndex(dbnPostgreSQL, 'ix_orders_status', 'orders')
+    .Column('status')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX ix_orders_status ON orders (status)', LSql);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_PostgreSQL_Unique_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLCreateIndex(dbnPostgreSQL, 'uq_orders_code', 'orders')
+    .Unique
+    .Column('code')
+    .AsString;
+  Assert.AreEqual('CREATE UNIQUE INDEX uq_orders_code ON orders (code)', LSql);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_MultiColumn_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLCreateIndex(dbnPostgreSQL, 'ix_evt', 'events')
+    .Column('tenant_id')
+    .Column('created_at')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX ix_evt ON events (tenant_id, created_at)', LSql);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_NoColumns_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLCreateIndex(dbnFirebird, 'IX_X', 'T').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_SecondUnique_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLCreateIndex(dbnFirebird, 'IX_X', 'T')
+        .Unique
+        .Unique
+        .Column('A')
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLCreateIndex(dbnMySQL, 'IX_X', 'T')
+        .Column('A')
+        .AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_UnsupportedDialect_MessageReferencesESP022;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLCreateIndex(dbnMySQL, 'IX_X', 'T').Column('A').AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-022', LMsg) > 0);
 end;
 
 end.

@@ -27,6 +27,7 @@ function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
 function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
 function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef): string;
 function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
+function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
 
 implementation
 
@@ -184,6 +185,43 @@ begin
   else
     raise ENotSupportedException.CreateFmt(
       'DDL ALTER TABLE DROP COLUMN (ESP-020) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
+  end;
+end;
+
+function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
+var
+  I: Integer;
+  LCols: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if Trim(ADef.IndexName) = '' then
+    raise EArgumentException.Create('DDL: index name is required');
+  if Trim(ADef.TableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if ADef.GetColumnCount <= 0 then
+    raise EArgumentException.Create('DDL CREATE INDEX: at least one column is required');
+
+  LCols := '';
+  for I := 0 to ADef.GetColumnCount - 1 do
+  begin
+    if LCols <> '' then
+      LCols := LCols + ', ';
+    LCols := LCols + ADef.GetColumnName(I);
+  end;
+
+  case ADef.Dialect of
+    dbnFirebird, dbnPostgreSQL:
+      begin
+        if ADef.IsUnique then
+          Result := 'CREATE UNIQUE INDEX ' + ADef.IndexName + ' ON ' + ADef.TableName + ' (' + LCols + ')'
+        else
+          Result := 'CREATE INDEX ' + ADef.IndexName + ' ON ' + ADef.TableName + ' (' + LCols + ')';
+      end;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL CREATE INDEX (ESP-022) is not implemented for dialect %d in this build',
       [Ord(ADef.Dialect)]);
   end;
 end;

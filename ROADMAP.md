@@ -83,7 +83,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-018** — DDL alargado (1ª vertical): **`DROP TABLE`** com **ADR-018** — entregue **v1.1.0** **2026-04-09** ([#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)).
 - [x] **ESP-019** — DDL alargado (2ª vertical): **`ALTER TABLE … ADD COLUMN`** com **ADR-019** — entregue **v1.1.0** **2026-04-09** ([#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)).
 - [ ] **ESP-020** — DDL alargado (3ª vertical): **`ALTER TABLE … DROP COLUMN`** com **ADR-020**, testes Firebird + PostgreSQL e guia em `docs-src`; detalhe em `.claude/pipeline/esp.md` / `plan.md`.
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column), índices (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; esta linha cobre o restante alargamento.*
+- [ ] **ESP-022** — DDL alargado (4ª vertical): **`CREATE INDEX`** (API fluente + serialização **Firebird** e **PostgreSQL**, **ADR-022**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column), **DROP INDEX** e restantes índices/alterações (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; esta linha cobre o restante alargamento.*
 
 ### Meta — Governança do roadmap (contínuo)
 
@@ -147,6 +148,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-09 | **`/architect`:** renovados artefactos **ESP-020** / **ADR-020** (DROP COLUMN); **Estado atual** alinhado — código no repo, fecho versionado via **`/release`**; **ADR-021** mantido no mesmo `adr.md`. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `ROADMAP.md` |
 | 2026-04-09 | **`/architect`:** ficheiros `esp.md`, `adr.md`, `plan.md`, `task-input.md` **materializados** no repositório (ESP-020 / ADR-020 + ADR-021); checklist rodada 7; próximo passo oficial **`/task`** para `task.md` e **#34**. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md` |
 | 2026-04-09 | **`/architect` (próxima demanda):** **ESP-020** — artefactos e `task.md` reconciliados (`review-report.md` marcado cumprido); remanescente **`/develop`** + **`/release`** (issue **#34**); checklist rodada 9. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `task.md`, `checklist.md` |
+| 2026-04-09 | **`/architect` (próxima demanda de produto):** planeada **ESP-022** — **`CREATE INDEX`** (Firebird + PostgreSQL, **ADR-022**); *nota:* **ESP-021** já usada no pipeline para trabalho documental (non-goals / **ADR-021**). Pendente **`/release`** para fecho versionado de **ESP-020** (**#34**) antes ou em paralelo à esteira de implementação, conforme política. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 
 ---
 
