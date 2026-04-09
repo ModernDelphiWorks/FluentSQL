@@ -1,6 +1,8 @@
 # Roadmap — FluentSQL
 
-> Framework agnóstico de Fluent API para construção de **strings SQL** em Delphi e Lazarus: **uma sintaxe fluente** no código, serialização por **driver** (`dbn*`), núcleo alinhado a **SQL amplamente portável**. O FluentSQL **não acede a dados** — só compõe texto. Recursos específicos de um motor moderno entram por **extensão explícita opt-in** (responsabilidade do desenvolvedor ao mudar de SGBD/versão). Segurança (parametrização, etc.) continua no âmbito do projeto.
+> **Contrato do produto — só `string` via POO:** o FluentSQL existe para **gerar texto**: scripts **SQL** (e, onde o driver for outro formato, **string** equivalente — ex. MQL/JSON como **saída textual**). **CRUD, DDL e o que a API cobrir** traduzem-se sempre em **uma ou mais strings** obtidas por **API fluente orientada a objetos** (classes/interfaces, encadeamento), com serialização por **driver** (`dbn*`) e núcleo alinhado a **SQL amplamente portável** onde aplicável.
+>
+> **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
 **Última atualização:** 2026-04-09
 
@@ -20,7 +22,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 ## Estado atual (foco)
 
 - **Fase 0 (identidade / rebranding, âmbito consumidor):** encerrada no roadmap após auditoria **ESP-008** (evidências e matriz em `.claude/pipeline/implement-report.md`). Issue: [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17).
-- **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)). **Fase 3 — DDL (ESP-017 … ESP-019):** entregues em **v1.1.0** (**2026-04-09**, `CHANGELOG.md`): `CREATE TABLE` (**ESP-017**, [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)), `DROP TABLE` (**ESP-018**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)), `ALTER TABLE ADD COLUMN` (**ESP-019**, [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); guias em `docs-src`. **Próxima entrega planeada — ESP-020** (`ALTER TABLE DROP COLUMN`, **ADR-020**): artefactos em `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`; próximo passo: **`/task`**. Ver `.claude/pipeline/esp.md`. **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
+- **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)). **Fase 3 — DDL (ESP-017 … ESP-019):** entregues em **v1.1.0** (**2026-04-09**, `CHANGELOG.md`): `CREATE TABLE` (**ESP-017**, [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)), `DROP TABLE` (**ESP-018**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)), `ALTER TABLE ADD COLUMN` (**ESP-019**, [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); guias em `docs-src`. **ESP-020** (`ALTER TABLE DROP COLUMN`, **ADR-020**, issue [#34](https://github.com/ModernDelphiWorks/FluentSQL/issues/34):** implementação e documentação no repositório; artefactos renovados em `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`; **próximo passo:** **`/task`** (reconciliar issue/`task.md`) e **`/release`** (entrada em `CHANGELOG`/versão — contrato do pipeline). **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
 
@@ -71,20 +73,17 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 
 ### Fase 3 — Ecossistema e DDL
 
-**Objetivo:** Expandir o **gerador de sintaxe** para além do DML onde fizer sentido, sem confundir com execução ou leitura de catálogo **dentro** do FluentSQL.
+**Objetivo:** Expandir o **gerador de strings** (sintaxe SQL/MQL como texto) para além do DML onde fizer sentido — sempre **só texto via POO**, sem **acesso a dados**, execução ou leitura de catálogo **dentro** do FluentSQL.
 
 **Previsão:** Q4 2026
 
-**Nota:** Inspeção de metadados e execução via componentes de acesso a dados são **fora do núcleo só-string**; se constarem no roadmap, referem-se a **ecossistema / exemplos / camadas da aplicação**, não a responsabilidade do pacote FluentSQL em si.
+**Não objetivos (não constam como fases nem backlog de produto):** **API ou camada de acesso a dados**; substituir FireDAC/UniDAC/Zeos; **inspecionar ou validar** metadados reais no motor (catálogo vs catálogo, classe vs BD) — o FluentSQL **só emite strings** que *tu* pediste na fluent API (incluindo DDL: ainda é **texto**, não é “ir buscar” o esquema à base). Executar SQL, abrir conexões ou “serializador REST” como produto — **fora**. Quem fala com o SGBD ou HTTP é sempre o consumidor.
 
 - [x] **ESP-017** — DDL fluente (vertical inicial): fundação + **`CREATE TABLE`** com **ADR-017** — entregue **v1.1.0** **2026-04-09** ([#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)); detalhe histórico em `CHANGELOG.md` / `.claude/pipeline/`.
 - [x] **ESP-018** — DDL alargado (1ª vertical): **`DROP TABLE`** com **ADR-018** — entregue **v1.1.0** **2026-04-09** ([#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)).
 - [x] **ESP-019** — DDL alargado (2ª vertical): **`ALTER TABLE … ADD COLUMN`** com **ADR-019** — entregue **v1.1.0** **2026-04-09** ([#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)).
 - [ ] **ESP-020** — DDL alargado (3ª vertical): **`ALTER TABLE … DROP COLUMN`** com **ADR-020**, testes Firebird + PostgreSQL e guia em `docs-src`; detalhe em `.claude/pipeline/esp.md` / `plan.md`.
 - [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column), índices (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; esta linha cobre o restante alargamento.*
-- [ ] Metadata Inspection *(opcional / ecossistema):* validação por metadados **não** é núcleo do FluentSQL — documentar como padrão externo.
-- [ ] REST API Serializer: Gerar representações para consumo em APIs (alinhado ao desenho só-texto / JSON onde aplicável).
-- [ ] Execução Direta *(opcional / ecossistema):* ligação a FireDAC, UniDAC, Zeos **fora** do núcleo de montagem de string.
 
 ### Meta — Governança do roadmap (contínuo)
 
@@ -105,7 +104,6 @@ Itens identificados mas não priorizados:
 - Política de compatibilidade opcional (alias deprecated) para `CQuery` — só se a comunidade exigir janela de migração; caso contrário, remoção direta conforme Fase 0.
 - Suporte a Dialetos NoSQL adicionais.
 - Integração nativa com frameworks ORM leves.
-- Gerador de código (Scaffolding) a partir do banco de dados.
 - Revisão de **`WithAlias`** legado vs política de núcleo portável (deprecação documentada ou manutenção mínima), após **ESP-016**.
 
 ---
@@ -144,6 +142,11 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-09 | **`/architect` (renovação)** — **ESP-018**: `esp.md` / `plan.md` / `task-input.md` alinhados ao estado do repositório (implementação + `test.ddl` + `ddl-drop-table.md`); checklist com próximos passos **`/task`** → **`/test`** → **`/develop`**. | `.claude/pipeline/esp.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 | 2026-04-09 | **`/architect`** — **ESP-019** planeada: **`ALTER TABLE ADD COLUMN`** (**ADR-019**); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; checklist nova rodada; roadmap Fase 3 atualizado. Próximo passo: **`/task`**. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 | 2026-04-09 | **`/architect`** — **ESP-017–019** reconciliados como entregues **v1.1.0**; **ESP-020** planeada: **`ALTER TABLE DROP COLUMN`** (**ADR-020**); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; checklist nova rodada. Próximo passo: **`/task`**. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-09 | **Alinhamento de escopo:** removidos do roadmap itens que sugeriam validação por metadados, “REST API serializer” ou execução via suites (FireDAC/UniDAC/Zeos) como direção de produto; consolidada secção **Não objetivos** na Fase 3. Ajuste pontual em `CHANGELOG.md` **[0.2.0]** (texto histórico). | `ROADMAP.md`, `CHANGELOG.md`, `.claude/pipeline/esp.md` (**ESP-021**) |
+| 2026-04-09 | **Identidade e contrato:** produto = **só geração de `string` (scripts) via POO** (CRUD, DDL, etc. — “metadados” no sentido de **texto** gerado pela API, não validação nem I/O ao SGBD); **Não objetivos** e abertura reforçam que **não** há camada de acesso a dados. | `ROADMAP.md` |
+| 2026-04-09 | **`/architect`:** renovados artefactos **ESP-020** / **ADR-020** (DROP COLUMN); **Estado atual** alinhado — código no repo, fecho versionado via **`/release`**; **ADR-021** mantido no mesmo `adr.md`. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `ROADMAP.md` |
+| 2026-04-09 | **`/architect`:** ficheiros `esp.md`, `adr.md`, `plan.md`, `task-input.md` **materializados** no repositório (ESP-020 / ADR-020 + ADR-021); checklist rodada 7; próximo passo oficial **`/task`** para `task.md` e **#34**. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md` |
+| 2026-04-09 | **`/architect` (próxima demanda):** **ESP-020** — artefactos renovados; `task.md` / `review-report.md` / `test-report.md` presentes; remanescente **`/develop`** + **`/release`** (issue **#34**); checklist rodada 8. | `.claude/pipeline/esp.md`, `plan.md`, `task-input.md`, `checklist.md` |
 
 ---
 

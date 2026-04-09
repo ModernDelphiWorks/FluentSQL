@@ -3,10 +3,10 @@
   FluentSQL
   ESP-017: CREATE TABLE string generation per dialect (no execution).
 
-  SPDX-License-Identifier: Apache-2.0
-  Copyright (c) 2025-2026 Isaque Pinheiro
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
 
-  Licensed under the Apache License, Version 2.0.
+  Licensed under the MIT License.
   See the LICENSE file in the project root for full license information.
   ------------------------------------------------------------------------------
 }
