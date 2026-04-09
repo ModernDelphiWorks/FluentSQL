@@ -5,7 +5,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'doc',
       id: 'intro',
-      label: 'Portal',
+      label: 'Documentation portal',
     },
     {
       type: 'category',

@@ -3,31 +3,32 @@ displayed_sidebar: fluentsqlSidebar
 title: FluentSQL
 ---
 
-**FluentSQL** é uma Fluent API para Delphi e Lazarus que monta consultas SQL (SELECT, INSERT, UPDATE, DELETE) de forma **agnóstica ao SGBD**, com serialização por driver e árvore sintática interna.
+**FluentSQL** is a fluent API for Delphi and Lazarus that builds SQL (SELECT, INSERT, UPDATE, DELETE) in a **database-agnostic** way, with per-driver serialization and an internal AST. Since **v1.1.0**, the same repository also documents **DDL string builders** (`CREATE` / `DROP` / `ALTER TABLE ADD COLUMN`) for selected dialects — still **SQL text only**, no execution in the library.
 
-## Por onde começar
+## Where to start
 
-- [Introdução](introduction.md)
-- [Instalação](getting-started/installation.md)
-- [Início rápido](getting-started/quickstart.md)
+- [Introduction](introduction.md)
+- [Installation](getting-started/installation.md)
+- [Quickstart](getting-started/quickstart.md)
 
-### Manual de uso (fluxos)
+### Usage guides
 
-- [Construir um SELECT](guides/construir-select.md)
-- [INSERT, UPDATE e DELETE](guides/dml-insert-update-delete.md)
-- [Parâmetros e UNION / INTERSECT](guides/parametros-e-uniao.md)
-- [Extensão explícita por motor (ESP-016)](guides/extensao-por-dialeto.md)
+- [Build a SELECT](guides/construir-select.md)
+- [INSERT, UPDATE, DELETE](guides/dml-insert-update-delete.md)
+- [Parameters and UNION / INTERSECT](guides/parametros-e-uniao.md)
+- [Explicit per-engine extension (ESP-016)](guides/extensao-por-dialeto.md)
 - [DDL — CREATE TABLE (ESP-017)](guides/ddl-create-table.md)
 - [DDL — DROP TABLE (ESP-018)](guides/ddl-drop-table.md)
-- [Configuração e constantes](reference/configuration.md)
+- [DDL — ALTER TABLE ADD COLUMN (ESP-019)](guides/ddl-alter-table-add-column.md)
+- [Configuration and constants](reference/configuration.md)
 
-### Para quem desenvolve ou integra o framework
+### For contributors / integrators
 
-- [Arquitetura](architecture/overview.md)
-- [Referência de API](reference/api.md)
-- [Testes](tests/overview.md)
+- [Architecture](architecture/overview.md)
+- [API reference](reference/api.md)
+- [Tests](tests/overview.md)
 
-## Escopo
+## Scope
 
-- **Cobre:** construção fluente de SQL, dialetos suportados via `Source/Drivers/`, parâmetros tipados (`IFluentSQLParams`), operações de conjunto (`Union`, `UnionAll`, `Intersect`) com **mescla ordenada de parâmetros** a partir da v0.2.0; na **v1.0.3**, listas em **`InValues` / `NotIn`** com arrays passam a placeholders + `Params` (**ESP-009**); na **v1.0.4**, sobrecargas com **`array of const`** em `Where`, `Having`, `Values`, `CASE`/`When`, etc., expandem **valores escalares** via placeholders + `Params` (**ESP-010**); na **v1.0.5**, **`TFluentSQLCriteriaExpression`** ligada a `IFluentSQLParams` e **`Expression(string | array of const)`** no fluente usam o mesmo contrato (**ESP-011** / **ADR-011**); na **v1.0.6**, **`Column(array of const)`** na projeção usa o mesmo helper de parametrização (**ESP-012** / **ADR-009**); na **v1.0.7**, **`CaseExpr(array of const)`** usa o mesmo helper na expressão discriminante do `CASE` (**ESP-013** / **ADR-012**); na **v1.0.8**, driver **MongoDB** com serialização **MQL/JSON** coerente e DML mínimo (**ESP-014** / **ADR-013**); na **v1.0.9**, **INSERT em lote** com **`AddRow`**, SQL multi-`VALUES` e Mongo **`insertMany`** quando N > 1 (**ESP-015** / **ADR-014**); ponto de entrada público **`CreateFluentSQL`** na **v1.0.0**; **`ROADMAP.md`** (governança **v1.0.1**; Fase 0 fechada **v1.0.2**; ver `CHANGELOG.md`).
-- **Não cobre:** binding em runtime com FireDAC/UniDAC (apenas contratos de SQL + `Params`), nem substituição de camada de acesso a dados.
+- **In scope:** fluent SQL construction; drivers under `Source/Drivers/`; typed parameters (`IFluentSQLParams`); set operations with **ordered merged parameters** (since v0.2.0); parametrization increments **ESP-009**–**ESP-013** (v1.0.3–v1.0.7); MongoDB JSON/MQL + minimal DML (**ESP-014**, v1.0.8); batch INSERT (**ESP-015**, v1.0.9); per-engine extension (**ESP-016**); DDL text for **CREATE** / **DROP** / **ALTER ADD COLUMN** (**ESP-017**–**ESP-019**, **v1.1.0**); public factory **`CreateFluentSQL`** (v1.0.0); operational **`ROADMAP.md`** — see `CHANGELOG.md` for issue links.
+- **Out of scope:** runtime binding with FireDAC/UniDAC (SQL + `Params` contracts only); not a data-access replacement.

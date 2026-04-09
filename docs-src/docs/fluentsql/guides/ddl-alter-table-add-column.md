@@ -3,6 +3,8 @@ displayed_sidebar: fluentsqlSidebar
 title: DDL — ALTER TABLE ADD COLUMN (ESP-019)
 ---
 
+> **Release:** shipped in **`CHANGELOG.md` [1.1.0]** (2026-04-09), issue [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31). Technical-debt follow-up: [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
+
 A partir da entrega **ESP-019** / **ADR-019**, o FluentSQL gera **texto SQL** para **`ALTER TABLE … ADD …`** com **uma coluna lógica por comando** `AsString`, reutilizando os mesmos **`TDDLLogicalType`** e o mapeamento físico por dialeto que **`CREATE TABLE`** (**ESP-017**). O pacote **não executa** DDL.
 
 ## Ponto de entrada
