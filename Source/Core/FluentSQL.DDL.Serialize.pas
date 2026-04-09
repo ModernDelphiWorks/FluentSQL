@@ -26,6 +26,7 @@ uses
 function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
 function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
 function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef): string;
+function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
 
 implementation
 
@@ -162,6 +163,27 @@ begin
   else
     raise ENotSupportedException.CreateFmt(
       'DDL ALTER TABLE ADD COLUMN (ESP-019) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
+  end;
+end;
+
+function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if Trim(ADef.TableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if Trim(ADef.ColumnName) = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE DROP COLUMN: a column target is required');
+
+  case ADef.Dialect of
+    dbnFirebird:
+      Result := 'ALTER TABLE ' + ADef.TableName + ' DROP ' + ADef.ColumnName;
+    dbnPostgreSQL:
+      Result := 'ALTER TABLE ' + ADef.TableName + ' DROP COLUMN ' + ADef.ColumnName;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL ALTER TABLE DROP COLUMN (ESP-020) is not implemented for dialect %d in this build',
       [Ord(ADef.Dialect)]);
   end;
 end;

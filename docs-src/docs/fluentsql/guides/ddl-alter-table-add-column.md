@@ -31,7 +31,7 @@ O **tipo físico** é o mesmo produzido por **`DDLCreateTableSQL`** para o mesmo
 ## Limitações declaradas
 
 - **Uma coluna** por `AsString`; várias colunas implicam **várias** cadeias na aplicação.
-- Sem **`DROP COLUMN`**, **`ALTER COLUMN`**, **`MODIFY`**, defaults, constraints ou **`IF NOT EXISTS`** ao nível de coluna nesta entrega.
+- Para **`DROP COLUMN`**, ver [ddl-alter-table-drop-column](./ddl-alter-table-drop-column.md) (**ESP-020** / **ADR-020**). Sem **`ALTER COLUMN`**, **`MODIFY`**, defaults, constraints ou **`IF NOT EXISTS`** ao nível de coluna na entrega ADD.
 - Para **`CREATE TABLE`** e **`DROP TABLE`**, ver [ddl-create-table](./ddl-create-table.md) e [ddl-drop-table](./ddl-drop-table.md).
 
 ## Leitura no código

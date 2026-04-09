@@ -45,6 +45,21 @@ type
     procedure TestAlterTableAddColumn_UnsupportedDialect_RaisesNotSupported;
   end;
 
+  [TestFixture]
+  TTestDDLAlterTableDropColumn = class
+  public
+    [Test]
+    procedure TestAlterTableDropColumn_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableDropColumn_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableDropColumn_SecondDropColumn_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableDropColumn_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestAlterTableDropColumn_UnsupportedDialect_MessageReferencesESP020;
+  end;
+
 implementation
 
 uses
@@ -187,6 +202,71 @@ begin
         .AsString;
     end,
     ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableDropColumn(dbnFirebird, 'CLIENTES')
+    .DropColumn('LEGADO')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES DROP LEGADO', LSql);
+end;
+
+procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableDropColumn(dbnPostgreSQL, 'CLIENTES')
+    .DropColumn('LEGADO')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES DROP COLUMN LEGADO', LSql);
+end;
+
+procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_SecondDropColumn_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableDropColumn(dbnPostgreSQL, 'T')
+        .DropColumn('A')
+        .DropColumn('B')
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableDropColumn(dbnMySQL, 'T')
+        .DropColumn('C')
+        .AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_UnsupportedDialect_MessageReferencesESP020;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLAlterTableDropColumn(dbnMySQL, 'T').DropColumn('C').AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-020', LMsg) > 0);
 end;
 
 end.

@@ -40,6 +40,7 @@ const sidebars: SidebarsConfig = {
             'fluentsql/guides/ddl-create-table',
             'fluentsql/guides/ddl-drop-table',
             'fluentsql/guides/ddl-alter-table-add-column',
+            'fluentsql/guides/ddl-alter-table-drop-column',
           ],
         },
         {
