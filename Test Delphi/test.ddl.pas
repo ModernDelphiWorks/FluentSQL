@@ -30,6 +30,21 @@ type
     procedure TestDropTableIfExists_Firebird_RaisesNotSupported;
   end;
 
+  [TestFixture]
+  TTestDDLAlterTableAddColumn = class
+  public
+    [Test]
+    procedure TestAlterTableAddColumn_Firebird_Integer_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddColumn_PostgreSQL_VarChar_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddColumn_Firebird_Boolean_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddColumn_SecondColumn_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableAddColumn_UnsupportedDialect_RaisesNotSupported;
+  end;
+
 implementation
 
 uses
@@ -115,6 +130,61 @@ begin
     procedure
     begin
       CreateFluentDDLDropTable(dbnFirebird, 'CLIENTES').IfExists.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_Firebird_Integer_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableAddColumn(dbnFirebird, 'CLIENTES')
+    .ColumnInteger('NOVO_ID')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ADD NOVO_ID INTEGER', LSql);
+end;
+
+procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_PostgreSQL_VarChar_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableAddColumn(dbnPostgreSQL, 'CLIENTES')
+    .ColumnVarChar('NOME', 80)
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ADD NOME VARCHAR(80)', LSql);
+end;
+
+procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_Firebird_Boolean_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableAddColumn(dbnFirebird, 'CLIENTES')
+    .ColumnBoolean('ATIVO')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ADD ATIVO BOOLEAN', LSql);
+end;
+
+procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_SecondColumn_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableAddColumn(dbnPostgreSQL, 'T')
+        .ColumnInteger('A')
+        .ColumnInteger('B')
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableAddColumn(dbnMySQL, 'T')
+        .ColumnInteger('C')
+        .AsString;
     end,
     ENotSupportedException);
 end;
