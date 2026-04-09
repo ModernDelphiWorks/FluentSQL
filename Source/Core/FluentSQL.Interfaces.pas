@@ -776,6 +776,29 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-022 / ADR-022: read-only view of CREATE INDEX for serializers.</summary>
+  IFluentDDLCreateIndexDef = interface
+    ['{A1C24E5F-B37D-4D8E-9A0B-1C2D3E4F5A6B}']
+    function GetDialect: TFluentSQLDriver;
+    function GetIndexName: string;
+    function GetTableName: string;
+    function GetIsUnique: Boolean;
+    function GetColumnCount: Integer;
+    function GetColumnName(AIndex: Integer): string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property IndexName: string read GetIndexName;
+    property TableName: string read GetTableName;
+    property IsUnique: Boolean read GetIsUnique;
+  end;
+
+  /// <summary>ESP-022: fluent builder for CREATE INDEX SQL text (one command per AsString).</summary>
+  IFluentDDLCreateIndexBuilder = interface(IFluentDDLCreateIndexDef)
+    ['{B2D35F6A-C48E-5E9F-A1B2-3D4E5F6A7081}']
+    function Column(const AName: string): IFluentDDLCreateIndexBuilder;
+    function Unique: IFluentDDLCreateIndexBuilder;
+    function AsString: string;
+  end;
+
 implementation
 
 end.

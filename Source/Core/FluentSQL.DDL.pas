@@ -129,10 +129,34 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLCreateIndexBuilder = class(TInterfacedObject, IFluentDDLCreateIndexBuilder, IFluentDDLCreateIndexDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FIndexName: string;
+    FTableName: string;
+    FUnique: Boolean;
+    FColumns: TList<string>;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string);
+    destructor Destroy; override;
+    { IFluentDDLCreateIndexDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetIndexName: string;
+    function GetTableName: string;
+    function GetIsUnique: Boolean;
+    function GetColumnCount: Integer;
+    function GetColumnName(AIndex: Integer): string;
+    { IFluentDDLCreateIndexBuilder }
+    function Column(const AName: string): IFluentDDLCreateIndexBuilder;
+    function Unique: IFluentDDLCreateIndexBuilder;
+    function AsString: string;
+  end;
+
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
+function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
 
 implementation
 
@@ -482,6 +506,88 @@ end;
 function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 begin
   Result := TFluentDDLAlterTableDropBuilder.Create(ADialect, ATableName);
+end;
+
+{ TFluentDDLCreateIndexBuilder }
+
+constructor TFluentDDLCreateIndexBuilder.Create(const ADialect: TFluentSQLDriver;
+  const AIndexName, ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FIndexName := AIndexName;
+  FTableName := ATableName;
+  FUnique := False;
+  FColumns := TList<string>.Create;
+end;
+
+destructor TFluentDDLCreateIndexBuilder.Destroy;
+begin
+  FColumns.Free;
+  inherited;
+end;
+
+function TFluentDDLCreateIndexBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLCreateIndexBuilder.GetIndexName: string;
+begin
+  Result := FIndexName;
+end;
+
+function TFluentDDLCreateIndexBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLCreateIndexBuilder.GetIsUnique: Boolean;
+begin
+  Result := FUnique;
+end;
+
+function TFluentDDLCreateIndexBuilder.GetColumnCount: Integer;
+begin
+  Result := FColumns.Count;
+end;
+
+function TFluentDDLCreateIndexBuilder.GetColumnName(AIndex: Integer): string;
+begin
+  Result := FColumns[AIndex];
+end;
+
+function TFluentDDLCreateIndexBuilder.Column(const AName: string): IFluentDDLCreateIndexBuilder;
+begin
+  if Trim(AName) = '' then
+    raise EArgumentException.Create('DDL: column name is required');
+  FColumns.Add(AName);
+  Result := Self;
+end;
+
+function TFluentDDLCreateIndexBuilder.Unique: IFluentDDLCreateIndexBuilder;
+begin
+  if FUnique then
+    raise EArgumentException.Create(
+      'DDL CREATE INDEX: UNIQUE can only be specified once per AsString in this build (ESP-022).');
+  FUnique := True;
+  Result := Self;
+end;
+
+function TFluentDDLCreateIndexBuilder.AsString: string;
+begin
+  if Trim(FIndexName) = '' then
+    raise EArgumentException.Create('DDL: index name is required');
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if FColumns.Count = 0 then
+    raise EArgumentException.Create('DDL CREATE INDEX: at least one column is required');
+  Result := DDLCreateIndexSQL(Self as IFluentDDLCreateIndexDef);
+end;
+
+function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+begin
+  Result := TFluentDDLCreateIndexBuilder.Create(ADialect, AIndexName, ATableName);
 end;
 
 end.
