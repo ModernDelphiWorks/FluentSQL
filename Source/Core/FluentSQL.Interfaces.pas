@@ -731,6 +731,32 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-019 / ADR-019: read-only view of ALTER TABLE ADD (one column) for serializers.</summary>
+  IFluentDDLAlterTableAddColumnDef = interface
+    ['{C8E41D2A-9F3B-4E1C-A7D5-6B8E9F0A1B2C}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    /// <summary>The single column to add; <c>nil</c> if the builder has not received a Column* call yet.</summary>
+    function GetColumn: IFluentDDLColumn;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property Column: IFluentDDLColumn read GetColumn;
+  end;
+
+  /// <summary>ESP-019: fluent builder for ALTER TABLE ADD COLUMN SQL text (one logical column per AsString).</summary>
+  IFluentDDLAlterTableAddBuilder = interface(IFluentDDLAlterTableAddColumnDef)
+    ['{D9F52E3B-A04C-4F2D-B8E6-7C9F0A1B2C3D}']
+    function ColumnInteger(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnBigInt(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnVarChar(const AName: string; ALength: Integer): IFluentDDLAlterTableAddBuilder;
+    function ColumnBoolean(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnDate(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function AsString: string;
+  end;
+
 implementation
 
 end.

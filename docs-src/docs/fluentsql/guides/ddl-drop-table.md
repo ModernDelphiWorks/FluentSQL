@@ -27,7 +27,7 @@ Outros motores levantam **`ENotSupportedException`** até extensão do mapeament
 
 ## Limitações
 
-- Apenas **`DROP TABLE`** nesta fatia; sem `ALTER`, `TRUNCATE`, índices, etc.
+- Apenas **`DROP TABLE`** nesta fatia; para **`ALTER TABLE ADD COLUMN`** ver [ddl-alter-table-add-column](./ddl-alter-table-add-column.md) (**ESP-019**). Sem `TRUNCATE`, índices, etc.
 - Identificadores como em **ESP-017** (nomes simples na primeira vertical).
 
 ## Leitura no código

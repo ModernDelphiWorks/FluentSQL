@@ -228,6 +228,8 @@ function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableNam
 
 function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 
+function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
+
 implementation
 
 uses
@@ -251,6 +253,11 @@ end;
 function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 begin
   Result := NewFluentDDLDropTable(ADatabase, ATableName);
+end;
+
+function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := NewFluentDDLAlterTableAddColumn(ADatabase, ATableName);
 end;
 
 { TFluentSQL }

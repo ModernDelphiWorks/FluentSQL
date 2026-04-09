@@ -38,6 +38,7 @@ const sidebars: SidebarsConfig = {
             'fluentsql/guides/extensao-por-dialeto',
             'fluentsql/guides/ddl-create-table',
             'fluentsql/guides/ddl-drop-table',
+            'fluentsql/guides/ddl-alter-table-add-column',
           ],
         },
         {

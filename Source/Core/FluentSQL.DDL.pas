@@ -86,8 +86,35 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLAlterTableAddBuilder = class(TInterfacedObject, IFluentDDLAlterTableAddBuilder, IFluentDDLAlterTableAddColumnDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FColumn: TFluentDDLColumn;
+    FHasColumn: Boolean;
+    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    destructor Destroy; override;
+    { IFluentDDLAlterTableAddColumnDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetColumn: IFluentDDLColumn;
+    { IFluentDDLAlterTableAddBuilder }
+    function ColumnInteger(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnBigInt(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnVarChar(const AName: string; ALength: Integer): IFluentDDLAlterTableAddBuilder;
+    function ColumnBoolean(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnDate(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function AsString: string;
+  end;
+
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
+function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 
 implementation
 
@@ -279,6 +306,109 @@ end;
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 begin
   Result := TFluentDDLDropBuilder.Create(ADialect, ATableName);
+end;
+
+{ TFluentDDLAlterTableAddBuilder }
+
+constructor TFluentDDLAlterTableAddBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FColumn := nil;
+  FHasColumn := False;
+end;
+
+destructor TFluentDDLAlterTableAddBuilder.Destroy;
+begin
+  FColumn.Free;
+  inherited;
+end;
+
+function TFluentDDLAlterTableAddBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLAlterTableAddBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLAlterTableAddBuilder.GetColumn: IFluentDDLColumn;
+begin
+  if FHasColumn then
+    Result := FColumn
+  else
+    Result := nil;
+end;
+
+function TFluentDDLAlterTableAddBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    raise EArgumentException.Create(
+      'DDL ALTER TABLE ADD COLUMN: only one logical column per AsString in this build (ESP-019).');
+  if Trim(AName) = '' then
+    raise EArgumentException.Create('DDL: column name is required');
+  FColumn := TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg);
+  FHasColumn := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnInteger(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltInteger, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnBigInt(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltBigInt, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnVarChar(const AName: string; ALength: Integer): IFluentDDLAlterTableAddBuilder;
+begin
+  if ALength <= 0 then
+    raise EArgumentException.Create('ColumnVarChar: ALength must be > 0');
+  Result := _AddColumn(AName, dltVarChar, ALength);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnBoolean(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltBoolean, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnDate(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltDate, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltDateTime, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltLongText, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltBlob, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.AsString: string;
+begin
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if not FHasColumn then
+    raise EArgumentException.Create('DDL ALTER TABLE: a column definition is required');
+  Result := DDLAlterTableAddColumnSQL(Self as IFluentDDLAlterTableAddColumnDef);
+end;
+
+function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := TFluentDDLAlterTableAddBuilder.Create(ADialect, ATableName);
 end;
 
 end.
