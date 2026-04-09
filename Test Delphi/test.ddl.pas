@@ -76,6 +76,12 @@ type
     [Test]
     procedure TestCreateIndex_NoColumns_RaisesArgumentException;
     [Test]
+    procedure TestCreateIndex_EmptyIndexName_RaisesArgumentException;
+    [Test]
+    procedure TestCreateIndex_EmptyTableName_RaisesArgumentException;
+    [Test]
+    procedure TestCreateIndex_EmptyColumnName_RaisesArgumentException;
+    [Test]
     procedure TestCreateIndex_SecondUnique_RaisesArgumentException;
     [Test]
     procedure TestCreateIndex_UnsupportedDialect_RaisesNotSupported;
@@ -351,6 +357,42 @@ begin
     procedure
     begin
       CreateFluentDDLCreateIndex(dbnFirebird, 'IX_X', 'T').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_EmptyIndexName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLCreateIndex(dbnFirebird, '', 'T')
+        .Column('A')
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_EmptyTableName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLCreateIndex(dbnFirebird, 'IX_X', '')
+        .Column('A')
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_EmptyColumnName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLCreateIndex(dbnFirebird, 'IX_X', 'T')
+        .Column('')
+        .AsString;
     end,
     EArgumentException);
 end;
