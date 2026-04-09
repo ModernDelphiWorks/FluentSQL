@@ -17,6 +17,7 @@ title: FluentSQL
 - [INSERT, UPDATE e DELETE](guides/dml-insert-update-delete.md)
 - [Parâmetros e UNION / INTERSECT](guides/parametros-e-uniao.md)
 - [Extensão explícita por motor (ESP-016)](guides/extensao-por-dialeto.md)
+- [DDL — CREATE TABLE (ESP-017)](guides/ddl-create-table.md)
 - [Configuração e constantes](reference/configuration.md)
 
 ### Para quem desenvolve ou integra o framework

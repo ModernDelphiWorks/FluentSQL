@@ -666,6 +666,52 @@ type
     function Abs(const AValue: String): String;
   end;
 
+  /// <summary>ESP-017: logical column kinds for DDL; SQL text is produced per dialect.</summary>
+  TDDLLogicalType = (
+    dltInteger,
+    dltBigInt,
+    dltVarChar,
+    dltBoolean,
+    dltDate,
+    dltDateTime,
+    dltLongText,
+    dltBlob
+  );
+
+  IFluentDDLColumn = interface
+    ['{6E8A1F2C-9B4D-4E7A-8F31-2D5C6E7F8091}']
+    function GetName: string;
+    function GetLogicalType: TDDLLogicalType;
+    /// <summary>For <c>dltVarChar</c>: max length; otherwise 0.</summary>
+    function GetTypeArg: Integer;
+    property Name: string read GetName;
+    property LogicalType: TDDLLogicalType read GetLogicalType;
+    property TypeArg: Integer read GetTypeArg;
+  end;
+
+  IFluentDDLTableDef = interface
+    ['{7F9B2E3D-AC5E-4F8B-9442-3E6D7F8A9102}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetColumnCount: Integer;
+    function GetColumn(AIndex: Integer): IFluentDDLColumn;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+  end;
+
+  IFluentDDLBuilder = interface(IFluentDDLTableDef)
+    ['{80AC3F4E-BD6F-409C-A853-4F7E8F9A0213}']
+    function ColumnInteger(const AName: string): IFluentDDLBuilder;
+    function ColumnBigInt(const AName: string): IFluentDDLBuilder;
+    function ColumnVarChar(const AName: string; ALength: Integer): IFluentDDLBuilder;
+    function ColumnBoolean(const AName: string): IFluentDDLBuilder;
+    function ColumnDate(const AName: string): IFluentDDLBuilder;
+    function ColumnDateTime(const AName: string): IFluentDDLBuilder;
+    function ColumnLongText(const AName: string): IFluentDDLBuilder;
+    function ColumnBlob(const AName: string): IFluentDDLBuilder;
+    function AsString: string;
+  end;
+
 implementation
 
 end.

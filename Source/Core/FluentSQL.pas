@@ -224,7 +224,12 @@ function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
 
 function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
 
+function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
+
 implementation
+
+uses
+  FluentSQL.DDL;
 
 function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
@@ -234,6 +239,11 @@ end;
 function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
   Result := TCQ(ADatabase);
+end;
+
+function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
+begin
+  Result := NewFluentDDLTable(ADatabase, ATableName);
 end;
 
 { TFluentSQL }
