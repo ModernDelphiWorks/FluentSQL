@@ -20,7 +20,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 ## Estado atual (foco)
 
 - **Fase 0 (identidade / rebranding, âmbito consumidor):** encerrada no roadmap após auditoria **ESP-008** (evidências e matriz em `.claude/pipeline/implement-report.md`). Issue: [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17).
-- **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), `.claude/pipeline/implement-report.md`); próximo passo operacional imediato do fecho: **`/develop`** / commit. **Próxima demanda planeada na esteira:** **ESP-017** — DDL fluente (`CREATE TABLE`, **ADR-017**); ver `.claude/pipeline/esp.md`. **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
+- **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), `.claude/pipeline/implement-report.md`); próximo passo operacional imediato do fecho: **`/develop`** / commit. **Fase 3 — ESP-017** (DDL `CREATE TABLE`, **ADR-017**, issue [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)): implementação e QA aprovados (`.claude/pipeline/test-report.md`); passo operacional imediato: **`/develop`**. **Próxima demanda planeada na esteira:** **ESP-018** — DDL alargado **`DROP TABLE`** (**ADR-018**); ver `.claude/pipeline/esp.md`. **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
 
@@ -78,7 +78,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 **Nota:** Inspeção de metadados e execução via componentes de acesso a dados são **fora do núcleo só-string**; se constarem no roadmap, referem-se a **ecossistema / exemplos / camadas da aplicação**, não a responsabilidade do pacote FluentSQL em si.
 
 - [ ] **ESP-017** — DDL fluente (vertical inicial): fundação + **`CREATE TABLE`** com **ADR-017**, API/serialização mínima e testes em ≥2 dialetos; detalhe em `.claude/pipeline/esp.md` / `plan.md`.
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE`, `DROP TABLE` (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app).
+- [ ] **ESP-018** — DDL alargado (1ª vertical): **`DROP TABLE`** com **ADR-018**, API/serialização alinhada à família **ADR-017**, testes em ≥2 dialetos (mesma linha Firebird + PostgreSQL salvo ajuste documentado); detalhe em `.claude/pipeline/esp.md` / `plan.md`.
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE`, `DROP COLUMN`, índices (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` entra por **ESP-018**; esta linha cobre o restante alargamento.*
 - [ ] Metadata Inspection *(opcional / ecossistema):* validação por metadados **não** é núcleo do FluentSQL — documentar como padrão externo.
 - [ ] REST API Serializer: Gerar representações para consumo em APIs (alinhado ao desenho só-texto / JSON onde aplicável).
 - [ ] Execução Direta *(opcional / ecossistema):* ligação a FireDAC, UniDAC, Zeos **fora** do núcleo de montagem de string.
@@ -136,6 +137,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-09 | **Pipeline:** artefatos **ESP-016** renovados para **fecho formal** (auditoria de serializadores, testes, docs); plano em 6 fatias em `plan.md` — implementação núcleo já presente no repo. | `.claude/pipeline/esp.md`, `plan.md`, `task-input.md`, `checklist.md` |
 | 2026-04-09 | **Fase 2 — ESP-016:** checklist e roadmap ticados; documentação alinhada (issue **#27** vs rastreio **ESP-013** em `CHANGELOG` **[1.0.7]**); relatórios `implement-report.md` / `test-report.md` prontos para **`/develop`**. | `.claude/pipeline/implement-report.md`, `test-report.md`, `task.md` |
 | 2026-04-09 | Planejada **ESP-017** — DDL fluente (fundação + `CREATE TABLE`, **ADR-017**); artefatos `esp.md`, `adr.md`, `plan.md`, `task-input.md` na pasta pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-09 | Planejada **ESP-018** — DDL alargado (`DROP TABLE`, **ADR-018**); **ESP-017** com QA aprovado, aguardando **`/develop`**; artefatos renovados na pasta pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 
 ---
 

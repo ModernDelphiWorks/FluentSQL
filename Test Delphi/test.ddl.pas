@@ -17,10 +17,23 @@ type
     procedure TestLongTextAndBlob_DivergeBetweenFirebirdAndPostgreSQL;
   end;
 
+  [TestFixture]
+  TTestDDLDropTable = class
+  public
+    [Test]
+    procedure TestDropTable_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestDropTable_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropTableIfExists_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropTableIfExists_Firebird_RaisesNotSupported;
+  end;
+
 implementation
 
 uses
-  SysUtils,
+  System.SysUtils,
   FluentSQL,
   FluentSQL.Interfaces;
 
@@ -70,6 +83,40 @@ begin
   Assert.IsTrue(Pos('BLOB SUB_TYPE 0', LFirebirdSql) > 0);
   Assert.IsTrue(Pos('TEXT', LPostgreSql) > 0);
   Assert.IsTrue(Pos('BYTEA', LPostgreSql) > 0);
+end;
+
+procedure TTestDDLDropTable.TestDropTable_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropTable(dbnFirebird, 'CLIENTES').AsString;
+  Assert.AreEqual('DROP TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLDropTable.TestDropTable_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropTable(dbnPostgreSQL, 'CLIENTES').AsString;
+  Assert.AreEqual('DROP TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLDropTable.TestDropTableIfExists_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropTable(dbnPostgreSQL, 'CLIENTES').IfExists.AsString;
+  Assert.AreEqual('DROP TABLE IF EXISTS CLIENTES', LSql);
+end;
+
+procedure TTestDDLDropTable.TestDropTableIfExists_Firebird_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropTable(dbnFirebird, 'CLIENTES').IfExists.AsString;
+    end,
+    ENotSupportedException);
 end;
 
 end.

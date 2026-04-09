@@ -70,7 +70,24 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLDropBuilder = class(TInterfacedObject, IFluentDDLDropBuilder, IFluentDDLDropTableDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    { IFluentDDLDropTableDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropBuilder }
+    function IfExists: IFluentDDLDropBuilder;
+    function AsString: string;
+  end;
+
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
+function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 
 implementation
 
@@ -219,6 +236,49 @@ end;
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
 begin
   Result := TFluentDDLBuilder.Create(ADialect, ATableName);
+end;
+
+{ TFluentDDLDropBuilder }
+
+constructor TFluentDDLDropBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLDropBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropBuilder.IfExists: IFluentDDLDropBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropBuilder.AsString: string;
+begin
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  Result := DDLDropTableSQL(Self as IFluentDDLDropTableDef);
+end;
+
+function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
+begin
+  Result := TFluentDDLDropBuilder.Create(ADialect, ATableName);
 end;
 
 end.
