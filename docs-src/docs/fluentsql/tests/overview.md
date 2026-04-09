@@ -24,5 +24,5 @@ Após compilar, execute o `.exe` gerado com `CI=1` no ambiente se quiser saída 
 
 ## Cobertura esperada
 
-- Novos recursos devem incluir testes em **múltiplos dialetos** quando possível (diretriz do projeto: sugerido Firebird, MSSQL, MySQL em `.claude/references/conventions.md`).
+- Novos recursos devem incluir testes em **múltiplos dialetos** quando possível (diretriz alinhada aos projetos em `Test Delphi/` e ao `ROADMAP.md`; quando existir documentação de convenções em `.claude/references/`, cruze com essa fonte).
 - Para mudanças em **parâmetros + conjunto**, mantenha casos com placeholders na query principal **e** na subquery unida.

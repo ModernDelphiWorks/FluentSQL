@@ -5,7 +5,7 @@ title: Extensão explícita por motor (ESP-016)
 
 # Extensão explícita por motor (ESP-016)
 
-O **núcleo** do FluentSQL continua focado em SQL **amplamente portável** e uma API fluente coerença entre motores. Recursos que **não** são universais (por exemplo `RETURNING`, dicas de otimizador específicas, extensões de um SGBD) entram apenas pela **extensão opt-in** documentada em **ADR-016**. Fecho formal e rastreio: issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27) (**ESP-016**).
+O **núcleo** do FluentSQL continua focado em SQL **amplamente portável** e uma API fluente coerente entre motores. Recursos que **não** são universais (por exemplo `RETURNING`, dicas de otimizador específicas, extensões de um SGBD) entram apenas pela **extensão opt-in** documentada em **ADR-016**. Fecho formal e rastreio: issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27) (**ESP-016**).
 
 ## Contrato
 
