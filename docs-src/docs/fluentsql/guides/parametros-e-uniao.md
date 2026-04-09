@@ -24,7 +24,7 @@ Mais detalhes: [Referência de API](../reference/api.md) e `CHANGELOG.md` **[1.0
 
 Sobrecargas que aceitam **`const Args: array of const`** (por exemplo em `Where`, `Having`, `Values`, ramos de `CASE`/`When`) tratam **valores escalares** como **parâmetros** (`:pN` ou `?` por dialeto) e preenchem **`Params`** na ordem correspondente. **Strings**, **identificadores** e **operadores** passados como literais dentro do `array of const` continuam embutidos na expressão SQL (não viram binding), alinhado à regra **RN-P3** descrita no pipeline.
 
-**`CaseExpr(array of const)`** e **`Column(array of const)`** usam **`SqlArrayOfConstToParameterizedSql`** com a coleção da query: **`Column`** desde a **v1.0.6** (**ESP-012**, issue [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25)); **`CaseExpr`** desde a **v1.0.7** (**ESP-013**, issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)), com **strings** no `array of const` ainda como literais (**ADR-011**). Consulte `CHANGELOG.md` **[1.0.4]**, **[1.0.6]** e **[1.0.7]** e a [Referência de API](../reference/api.md).
+**`CaseExpr(array of const)`** e **`Column(array of const)`** usam **`SqlArrayOfConstToParameterizedSql`** com a coleção da query: **`Column`** desde a **v1.0.6** (**ESP-012**, issue [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25)); **`CaseExpr`** desde a **v1.0.7** (**ESP-013**, rastreio em `CHANGELOG` **[1.0.7]** — não confundir com a issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), hoje **ESP-016**), com **strings** no `array of const` ainda como literais (**ADR-011**). Consulte `CHANGELOG.md` **[1.0.4]**, **[1.0.6]** e **[1.0.7]** e a [Referência de API](../reference/api.md).
 
 ## Critérios e `Expression` no fluente (v1.0.5)
 
