@@ -2,9 +2,10 @@ name: Deploy Docs
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'docs-src/**'
+      - '.github/workflows/deploy-docs.yml'
 
 permissions:
   contents: write

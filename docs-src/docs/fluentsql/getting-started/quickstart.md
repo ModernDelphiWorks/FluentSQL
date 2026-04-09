@@ -36,5 +36,6 @@ end;
 
 ## Próximos passos
 
+- [Site de documentação (CI)](./documentation-ci.md)
 - [Visão da arquitetura](../architecture/overview.md)
 - [Referência de API](../reference/api.md)

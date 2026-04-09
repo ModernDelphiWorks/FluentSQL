@@ -39,7 +39,7 @@ The shorthand `TCQ(dbnFirebird)` in unit `FluentSQL` is equivalent to `CreateFlu
 ## Documentation
 
 - User-oriented docs live under [docs-src/docs/fluentsql/](docs-src/docs/fluentsql/) (Docusaurus).
-- The Docusaurus site is **built on GitHub Actions** (workflow `docs-build.yml`) when `docs-src/` changes; a local Node install is not required to edit Markdown.
+- The static site under `docs/` is **built and committed on GitHub Actions** (workflow [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml)) when `docs-src/` changes on `main` or `develop`. Pull requests that touch `docs-src/` are validated by [`.github/workflows/docs-build.yml`](.github/workflows/docs-build.yml). A local Node install is **not** required to edit Markdown only; see [documentation-ci.md](docs-src/docs/fluentsql/getting-started/documentation-ci.md).
 - Operational notes for agents: [.claude/SKILL.md](.claude/SKILL.md) and [.claude/references/](.claude/references/).
 
 ## Tests

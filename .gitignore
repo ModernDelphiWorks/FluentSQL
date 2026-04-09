@@ -12,5 +12,10 @@
 # DUnitX — saída de runner local/CI (evita poluir git status / diffs)
 dunitx-results.xml
 
+# Docusaurus (docs-src/) — artefatos locais; build oficial no GitHub Actions
+docs-src/node_modules/
+docs-src/build/
+docs-src/.docusaurus/
+
 __history/
 __recovery/
