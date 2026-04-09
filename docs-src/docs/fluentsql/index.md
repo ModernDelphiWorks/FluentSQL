@@ -16,6 +16,7 @@ title: FluentSQL
 - [Construir um SELECT](guides/construir-select.md)
 - [INSERT, UPDATE e DELETE](guides/dml-insert-update-delete.md)
 - [Parâmetros e UNION / INTERSECT](guides/parametros-e-uniao.md)
+- [Extensão explícita por motor (ESP-016)](guides/extensao-por-dialeto.md)
 - [Configuração e constantes](reference/configuration.md)
 
 ### Para quem desenvolve ou integra o framework

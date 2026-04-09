@@ -7,7 +7,7 @@ title: Fluxo em tempo de execução
 
 1. **Entrada:** o consumidor obtém uma instância fluente (por exemplo via `TCQ(dbnX)`) e encadeia cláusulas (`Select`, `From`, `Where`, …).
 2. **Construção:** o estado é mantido na implementação concreta e na AST; operadores podem acumular valores em `IFluentSQLParams`.
-3. **Serialização:** ao chamar `AsString`, o serializer do driver percorre a AST e produz o SQL do dialeto. Se houver operação de conjunto com subquery, o texto da subquery pode ser ajustado (`UnionRemapBranchSQL`) para que os índices dos placeholders não colidam com os da query principal.
+3. **Serialização:** ao chamar `AsString`, o serializer do driver percorre a AST e produz o SQL do dialeto. Se houver operação de conjunto com subquery, o texto da subquery pode ser ajustado (`UnionRemapBranchSQL`) para que os índices dos placeholders não colidam com os da query principal. Fragmentos registados com **`ForDialectOnly`** são concatenados ao núcleo apenas quando o dialeto ativo coincide (**ESP-016**; `DialectOnlySqlSuffix` em `FluentSQL.Serialize.pas`).
 4. **Saída:** retorno da **string SQL**; a coleção **`Params`** reflete a ordem esperada pelo texto final (incluindo mescla primário + secundário via `TFluentSQLMergedParams` quando aplicável).
 
 ## Pontos de atenção

@@ -6,6 +6,9 @@ const config: Config = {
   tagline: 'Fluent API para SQL em Delphi e Lazarus',
   favicon: 'img/favicon.svg',
 
+  // Static output at repository root for `deploy-docs.yml` (git add docs/)
+  outDir: '../docs',
+
   url: 'https://moderndelphiworks.github.io',
   baseUrl: '/FluentSQL/',
   organizationName: 'ModernDelphiWorks',
