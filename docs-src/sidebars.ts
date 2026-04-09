@@ -26,6 +26,7 @@ const sidebars: SidebarsConfig = {
           items: [
             'fluentsql/getting-started/installation',
             'fluentsql/getting-started/quickstart',
+            'fluentsql/getting-started/documentation-ci',
           ],
         },
         {
