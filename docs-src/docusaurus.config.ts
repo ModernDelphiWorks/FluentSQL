@@ -6,8 +6,8 @@ const config: Config = {
   tagline: 'Fluent API para SQL em Delphi e Lazarus',
   favicon: 'img/favicon.svg',
 
-  // Static output at repository root for `deploy-docs.yml` (git add docs/)
-  outDir: '../docs',
+  // Build output directory is set via CLI (`npm run build` → `docusaurus build --out-dir ../docs`)
+  // so it stays compatible with Docusaurus 3 schema validation (top-level `outDir` is not allowed).
 
   url: 'https://moderndelphiworks.github.io',
   baseUrl: '/FluentSQL/',
