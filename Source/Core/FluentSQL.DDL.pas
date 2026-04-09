@@ -112,9 +112,27 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLAlterTableDropBuilder = class(TInterfacedObject, IFluentDDLAlterTableDropBuilder, IFluentDDLAlterTableDropColumnDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FColumnName: string;
+    FHasDrop: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    { IFluentDDLAlterTableDropColumnDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetColumnName: string;
+    { IFluentDDLAlterTableDropBuilder }
+    function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function AsString: string;
+  end;
+
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
+function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 
 implementation
 
@@ -409,6 +427,61 @@ end;
 function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 begin
   Result := TFluentDDLAlterTableAddBuilder.Create(ADialect, ATableName);
+end;
+
+{ TFluentDDLAlterTableDropBuilder }
+
+constructor TFluentDDLAlterTableDropBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FColumnName := '';
+  FHasDrop := False;
+end;
+
+function TFluentDDLAlterTableDropBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLAlterTableDropBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLAlterTableDropBuilder.GetColumnName: string;
+begin
+  if FHasDrop then
+    Result := FColumnName
+  else
+    Result := '';
+end;
+
+function TFluentDDLAlterTableDropBuilder.DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  if FHasDrop then
+    raise EArgumentException.Create(
+      'DDL ALTER TABLE DROP COLUMN: only one column target per AsString in this build (ESP-020).');
+  if Trim(AName) = '' then
+    raise EArgumentException.Create('DDL: column name is required');
+  FColumnName := AName;
+  FHasDrop := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableDropBuilder.AsString: string;
+begin
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if not FHasDrop then
+    raise EArgumentException.Create('DDL ALTER TABLE DROP COLUMN: a column target is required');
+  Result := DDLAlterTableDropColumnSQL(Self as IFluentDDLAlterTableDropColumnDef);
+end;
+
+function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := TFluentDDLAlterTableDropBuilder.Create(ADialect, ATableName);
 end;
 
 end.

@@ -757,6 +757,25 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-020 / ADR-020: read-only view of ALTER TABLE DROP COLUMN (one column) for serializers.</summary>
+  IFluentDDLAlterTableDropColumnDef = interface
+    ['{E1A24C5D-B36F-4A7B-8E8F-9A0B1C2D3E4F}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    /// <summary>The single column to drop; empty until the builder receives a DropColumn call.</summary>
+    function GetColumnName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property ColumnName: string read GetColumnName;
+  end;
+
+  /// <summary>ESP-020: fluent builder for ALTER TABLE DROP COLUMN SQL text (one column target per AsString).</summary>
+  IFluentDDLAlterTableDropBuilder = interface(IFluentDDLAlterTableDropColumnDef)
+    ['{F2B35D6E-C470-5B8C-9F9A-0B1C2D3E4F5A}']
+    function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function AsString: string;
+  end;
+
 implementation
 
 end.
