@@ -138,6 +138,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-09 | **Fase 2 — ESP-016:** checklist e roadmap ticados; documentação alinhada (issue **#27** vs rastreio **ESP-013** em `CHANGELOG` **[1.0.7]**); relatórios `implement-report.md` / `test-report.md` prontos para **`/develop`**. | `.claude/pipeline/implement-report.md`, `test-report.md`, `task.md` |
 | 2026-04-09 | Planejada **ESP-017** — DDL fluente (fundação + `CREATE TABLE`, **ADR-017**); artefatos `esp.md`, `adr.md`, `plan.md`, `task-input.md` na pasta pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-09 | Planejada **ESP-018** — DDL alargado (`DROP TABLE`, **ADR-018**); **ESP-017** com QA aprovado, aguardando **`/develop`**; artefatos renovados na pasta pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-09 | **`/architect`** — handoff **ESP-018** confirmado; código-fonte já inclui API **`DROP TABLE`**; critérios de aceite e issue GitHub a fechar na esteira (`/task`, testes, **`/release`**). Índice **ADR-018** corrigido (sem associação errada a **#29**). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md` |
 
 ---
 
