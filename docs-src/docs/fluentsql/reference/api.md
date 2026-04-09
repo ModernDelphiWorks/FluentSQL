@@ -11,6 +11,7 @@ Documentação alinhada à entrega **v1.0.9** (sexto incremento relevante à DML
 |------|-----------|
 | Factory / ponto de entrada | **`CreateFluentSQL(dbnFirebird)`** (unit `FluentSQL`); o atalho `TCQ(dbn…)` permanece equivalente. |
 | DDL (`CREATE TABLE`, ESP-017) | **`CreateFluentDDLTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLBuilder`**; **`AsString`** gera só texto SQL. Ver [DDL — CREATE TABLE](../guides/ddl-create-table.md). |
+| DDL (`DROP TABLE`, ESP-018) | **`CreateFluentDDLDropTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLDropBuilder`**; encadear **`.IfExists`** antes de **`AsString`** quando aplicável. Ver [DDL — DROP TABLE](../guides/ddl-drop-table.md). |
 | Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** (v1.0.9) fecha a linha corrente e inicia a próxima para **INSERT em lote** (ver regras abaixo). |
 | Subquery em conjunto | `Union`, `UnionAll` e `Intersect` recebem `IFluentSQL` da ramificação secundária; a AST armazena `UnionType` e `UnionQuery`. |
 

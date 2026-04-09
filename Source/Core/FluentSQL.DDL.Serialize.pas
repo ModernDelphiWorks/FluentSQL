@@ -24,6 +24,7 @@ uses
   FluentSQL.Interfaces;
 
 function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
+function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
 
 implementation
 
@@ -110,6 +111,33 @@ begin
   end;
 
   Result := 'CREATE TABLE ' + ADef.TableName + ' (' + LParts + ')';
+end;
+
+function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if Trim(ADef.TableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+
+  case ADef.Dialect of
+    dbnPostgreSQL:
+      if ADef.GetIfExists then
+        Result := 'DROP TABLE IF EXISTS ' + ADef.TableName
+      else
+        Result := 'DROP TABLE ' + ADef.TableName;
+    dbnFirebird:
+      if ADef.GetIfExists then
+        raise ENotSupportedException.Create(
+          'DDL DROP TABLE: IF EXISTS is not emitted for Firebird in this build; use CreateFluentDDLDropTable(...).AsString ' +
+          'without IfExists, or compose dialect-specific SQL in the application (e.g. Firebird 4+).')
+      else
+        Result := 'DROP TABLE ' + ADef.TableName;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL DROP TABLE (ESP-018) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
+  end;
 end;
 
 end.

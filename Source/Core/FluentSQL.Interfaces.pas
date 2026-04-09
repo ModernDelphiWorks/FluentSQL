@@ -712,6 +712,25 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-018 / ADR-018: read-only view of a DROP TABLE request for serializers.</summary>
+  IFluentDDLDropTableDef = interface
+    ['{91A3B4C5-D6E7-4F89-A012-345678901234}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    /// <summary>True when the caller requested an idempotent drop (IF EXISTS) where supported.</summary>
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+  end;
+
+  /// <summary>ESP-018: fluent builder for DROP TABLE SQL text (no execution).</summary>
+  IFluentDDLDropBuilder = interface(IFluentDDLDropTableDef)
+    ['{A2B4C6D8-E0F1-42A3-B456-789012345678}']
+    /// <summary>Ask for DROP TABLE IF EXISTS (behaviour is dialect-specific; see ADR-018).</summary>
+    function IfExists: IFluentDDLDropBuilder;
+    function AsString: string;
+  end;
+
 implementation
 
 end.

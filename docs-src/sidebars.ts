@@ -37,6 +37,7 @@ const sidebars: SidebarsConfig = {
             'fluentsql/guides/parametros-e-uniao',
             'fluentsql/guides/extensao-por-dialeto',
             'fluentsql/guides/ddl-create-table',
+            'fluentsql/guides/ddl-drop-table',
           ],
         },
         {
