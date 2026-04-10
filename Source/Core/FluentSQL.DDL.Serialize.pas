@@ -27,6 +27,7 @@ function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
 function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
 function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef): string;
 function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
+function DDLAlterTableRenameColumnSQL(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
 function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
 function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
 function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
@@ -187,6 +188,40 @@ begin
   else
     raise ENotSupportedException.CreateFmt(
       'DDL ALTER TABLE DROP COLUMN (ESP-020) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
+  end;
+end;
+
+function DDLAlterTableRenameColumnSQL(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
+var
+  LTable: string;
+  LOld: string;
+  LNew: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  LTable := Trim(ADef.GetTableName);
+  LOld := Trim(ADef.GetOldColumnName);
+  LNew := Trim(ADef.GetNewColumnName);
+  if LTable = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): table name is required');
+  if LOld = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): old column name is required');
+  if LNew = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): new column name is required');
+  if LOld = LNew then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): old and new column names must differ');
+
+  case ADef.Dialect of
+    dbnPostgreSQL:
+      Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
+    dbnMySQL:
+      Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
+    dbnFirebird:
+      Result := 'ALTER TABLE ' + LTable + ' ALTER ' + LOld + ' TO ' + LNew;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL ALTER TABLE RENAME COLUMN (ESP-030) is not implemented for dialect %d in this build',
       [Ord(ADef.Dialect)]);
   end;
 end;

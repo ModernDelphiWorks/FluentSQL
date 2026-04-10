@@ -61,6 +61,33 @@ type
   end;
 
   [TestFixture]
+  TTestDDLAlterTableRenameColumn = class
+  public
+    [Test]
+    procedure TestAlterTableRenameColumn_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_TrimsIdentifiersInOutput;
+    [Test]
+    procedure TestAlterTableRenameColumn_EmptyTableName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_EmptyOldName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_EmptyNewName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_SameOldAndNew_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_TrimmedEqualNames_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestAlterTableRenameColumn_UnsupportedDialect_MessageReferencesESP030;
+  end;
+
+  [TestFixture]
   TTestDDLCreateIndex = class
   public
     [Test]
@@ -376,6 +403,122 @@ begin
   end;
   Assert.IsTrue(LRaised);
   Assert.IsTrue(Pos('ESP-020', LMsg) > 0);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'CLIENTES', 'LEGADO', 'NOVO_NOME')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES RENAME COLUMN LEGADO TO NOVO_NOME', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnMySQL, 'pedidos', 'status_id', 'status_ref')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE pedidos RENAME COLUMN status_id TO status_ref', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnFirebird, 'CLIENTES', 'LEGADO', 'NOVO_NOME')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ALTER LEGADO TO NOVO_NOME', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_TrimsIdentifiersInOutput;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, '  T  ', '  a  ', '  b  ')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE T RENAME COLUMN a TO b', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyTableName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, '', 'A', 'B').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyOldName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', '  ', 'B').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyNewName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', 'A', '').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_SameOldAndNew_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', 'X', 'X').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_TrimmedEqualNames_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', 'X', '  X  ').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnMSSQL, 'T', 'A', 'B').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_UnsupportedDialect_MessageReferencesESP030;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLAlterTableRenameColumn(dbnMSSQL, 'T', 'A', 'B').AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-030', LMsg) > 0);
 end;
 
 procedure TTestDDLCreateIndex.TestCreateIndex_Firebird_GeneratesExpected;

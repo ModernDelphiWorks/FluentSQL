@@ -232,6 +232,9 @@ function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; c
 
 function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 
+function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
+  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+
 function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
 
 function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
@@ -271,6 +274,12 @@ end;
 function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 begin
   Result := NewFluentDDLAlterTableDropColumn(ADatabase, ATableName);
+end;
+
+function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
+  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+begin
+  Result := NewFluentDDLAlterTableRenameColumn(ADatabase, ATableName, AOldColumnName, ANewColumnName);
 end;
 
 function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;

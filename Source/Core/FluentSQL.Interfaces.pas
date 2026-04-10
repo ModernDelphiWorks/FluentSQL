@@ -776,6 +776,25 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-030 / ADR-030: read-only view of ALTER TABLE RENAME COLUMN for serializers.</summary>
+  IFluentDDLAlterTableRenameColumnDef = interface
+    ['{A3C46E7F-B481-6C9D-0F1A-2B3C4D5E6F70}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetOldColumnName: string;
+    function GetNewColumnName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property OldColumnName: string read GetOldColumnName;
+    property NewColumnName: string read GetNewColumnName;
+  end;
+
+  /// <summary>ESP-030: fluent builder for ALTER TABLE RENAME COLUMN SQL text (factory fixes table, old and new names).</summary>
+  IFluentDDLAlterTableRenameColumnBuilder = interface(IFluentDDLAlterTableRenameColumnDef)
+    ['{B4D57F80-C592-7D0E-1A2B-3C4D5E6F7081}']
+    function AsString: string;
+  end;
+
   /// <summary>ESP-022 / ADR-022: read-only view of CREATE INDEX for serializers.</summary>
   IFluentDDLCreateIndexDef = interface
     ['{A1C24E5F-B37D-4D8E-9A0B-1C2D3E4F5A6B}']
