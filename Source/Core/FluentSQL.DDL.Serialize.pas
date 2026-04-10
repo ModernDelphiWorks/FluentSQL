@@ -236,10 +236,13 @@ begin
 
   case ADef.Dialect of
     dbnFirebird, dbnPostgreSQL:
-      Result := 'DROP INDEX ' + ADef.IndexName;
+      if ADef.GetIfExists then
+        Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
+      else
+        Result := 'DROP INDEX ' + ADef.IndexName;
   else
     raise ENotSupportedException.CreateFmt(
-      'DDL DROP INDEX (ESP-025) is not implemented for dialect %d in this build',
+      'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
       [Ord(ADef.Dialect)]);
   end;
 end;
