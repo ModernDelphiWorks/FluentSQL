@@ -799,18 +799,22 @@ type
     function AsString: string;
   end;
 
-  /// <summary>ESP-025 / ADR-025: read-only view of DROP INDEX for serializers.</summary>
+  /// <summary>ESP-025 / ADR-025; ESP-026 / ADR-026: read-only view of DROP INDEX for serializers.</summary>
   IFluentDDLDropIndexDef = interface
-    ['{C314E570-BD6F-40A1-C293-456789ABCDEF}']
+    ['{B314E570-BD6F-40A1-C293-456789ABC000}']
     function GetDialect: TFluentSQLDriver;
     function GetIndexName: string;
+    /// <summary>True when the caller requested IF EXISTS (see ADR-026).</summary>
+    function GetIfExists: Boolean;
     property Dialect: TFluentSQLDriver read GetDialect;
     property IndexName: string read GetIndexName;
   end;
 
-  /// <summary>ESP-025: fluent builder for DROP INDEX SQL text (one command per AsString).</summary>
+  /// <summary>ESP-025 / ESP-026: fluent builder for DROP INDEX SQL text (one command per AsString).</summary>
   IFluentDDLDropIndexBuilder = interface(IFluentDDLDropIndexDef)
-    ['{D425F681-CE70-51B2-D304-56789ABCDEF0}']
+    ['{E536F792-DF81-62C3-E415-67890ABCD001}']
+    /// <summary>Ask for DROP INDEX IF EXISTS where mapped (see ADR-026).</summary>
+    function IfExists: IFluentDDLDropIndexBuilder;
     function AsString: string;
   end;
 

@@ -26,7 +26,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
 - **Visibilidade de execução (ESP-024):** especificação e ADR em `.claude/pipeline/esp.md` (**ESP-024**) e **ADR-024** em `adr.md`. Quadro executivo e pendências rastreáveis: [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) na raiz (versionado).
-- **DDL — próxima vertical planeada:** **ESP-025** — **`DROP INDEX`** (**ADR-025**); artefactos em `.claude/pipeline/`; issue GitHub a criar no **`/task`** (complementa **ESP-022** / **CREATE INDEX**).
+- **DDL — próxima vertical planeada:** **ESP-026** — **`DROP INDEX IF EXISTS`** (**ADR-026**); artefactos em `.claude/pipeline/`; issue GitHub a criar no **`/task`** (extensão opt-in após **ESP-025** / [#40](https://github.com/ModernDelphiWorks/FluentSQL/issues/40)). **ESP-025** — código e QA aprovados (#40, `test-report.md`); fecho versionado via **`/develop`** / **`/release`** conforme política.
 - **Décalage roadmap ↔ changelog:** o quadro abaixo agrupa entregas DDL em **v1.1.0** (**ESP-017** … **ESP-019**); a última secção **versionada** em `CHANGELOG.md` neste ramo continua **[1.0.9]** até existir **`/release`** que publique a versão correspondente — nota transparente em [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) (secção 1).
 
 ---
@@ -88,7 +88,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-020** — DDL alargado (3ª vertical): **`ALTER TABLE … DROP COLUMN`** com **ADR-020**, testes Firebird + PostgreSQL e guia em `docs-src`; detalhe em `.claude/pipeline/esp.md` / `plan.md`.
 - [ ] **ESP-022** — DDL alargado (4ª vertical): **`CREATE INDEX`** (API fluente + serialização **Firebird** e **PostgreSQL**, **ADR-022**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
 - [ ] **ESP-025** — DDL alargado (5ª vertical): **`DROP INDEX`** (API fluente + serialização **Firebird** e **PostgreSQL**, **ADR-025**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; esta linha cobre o restante alargamento.*
+- [ ] **ESP-026** — DDL alargado (6ª vertical): **`DROP INDEX IF EXISTS`** (opt-in na fluent API + serialização **Firebird** e **PostgreSQL**, **ADR-026**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; esta linha cobre o restante alargamento.*
 
 ### Meta — Governança do roadmap (contínuo)
 
@@ -157,6 +158,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-10 | **`/architect` — ESP-024:** **ADR-024** e texto em `esp.md` / `plan.md` / `task-input.md` (visibilidade de execução); roadmap alinhado; rascunho inicial de conteúdo para `VISIBILIDADE-EXECUCAO.md`. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 | 2026-04-10 | **ESP-024 — issue [#38](https://github.com/ModernDelphiWorks/FluentSQL/issues/38):** `VISIBILIDADE-EXECUCAO.md` **versionado** na raiz; removida exclusão em `.gitignore`; roadmap com ponte explícita ao documento e décalage. | `VISIBILIDADE-EXECUCAO.md`, `ROADMAP.md`, `.gitignore` |
 | 2026-04-10 | **`/architect` (próxima demanda de produto):** planeada **ESP-025** — **`DROP INDEX`** (**ADR-025**); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; item na Fase 3; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-10 | **`/architect` (próxima demanda):** planeada **ESP-026** — **`DROP INDEX IF EXISTS`** (**ADR-026**); substitui **ESP-025** como “próxima vertical” no estado actual; artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; novo item na Fase 3; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 
 ---
 

@@ -99,11 +99,17 @@ type
     [Test]
     procedure TestDropIndex_PostgreSQL_GeneratesExpected;
     [Test]
+    procedure TestDropIndex_Firebird_IfExists_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_IfExists_GeneratesExpected;
+    [Test]
     procedure TestDropIndex_EmptyIndexName_RaisesArgumentException;
     [Test]
     procedure TestDropIndex_UnsupportedDialect_RaisesNotSupported;
     [Test]
-    procedure TestDropIndex_UnsupportedDialect_MessageReferencesESP025;
+    procedure TestDropIndex_UnsupportedDialect_IfExists_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_MessageReferencesESP026;
   end;
 
 implementation
@@ -487,6 +493,22 @@ begin
   Assert.AreEqual('DROP INDEX ix_orders_status', LSql);
 end;
 
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_IfExists_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').IfExists.AsString;
+  Assert.AreEqual('DROP INDEX IF EXISTS IX_CLI_NOME', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_IfExists_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').IfExists.AsString;
+  Assert.AreEqual('DROP INDEX IF EXISTS ix_orders_status', LSql);
+end;
+
 procedure TTestDDLDropIndex.TestDropIndex_EmptyIndexName_RaisesArgumentException;
 begin
   Assert.WillRaise(
@@ -507,7 +529,17 @@ begin
     ENotSupportedException);
 end;
 
-procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_MessageReferencesESP025;
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_IfExists_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').IfExists.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_MessageReferencesESP026;
 var
   LRaised: Boolean;
   LMsg: string;
@@ -524,6 +556,7 @@ begin
     end;
   end;
   Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-026', LMsg) > 0);
   Assert.IsTrue(Pos('ESP-025', LMsg) > 0);
 end;
 
