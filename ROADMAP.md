@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-09
+**Última atualização:** 2026-04-10
 
 ## Como este roadmap evolui
 
@@ -25,6 +25,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)). **Fase 3 — DDL (ESP-017 … ESP-019):** entregues em **v1.1.0** (**2026-04-09**, `CHANGELOG.md`): `CREATE TABLE` (**ESP-017**, [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)), `DROP TABLE` (**ESP-018**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)), `ALTER TABLE ADD COLUMN` (**ESP-019**, [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); guias em `docs-src`. **ESP-020** (`ALTER TABLE DROP COLUMN`, **ADR-020**, issue [#34](https://github.com/ModernDelphiWorks/FluentSQL/issues/34)):** implementação e documentação no repositório; `task.md` reconciliado com `review-report.md` / `test-report.md`; **próximo passo:** **`/develop`** e **`/release`** (entrada em `CHANGELOG`/versão — contrato do pipeline). **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
+- **Visibilidade de execução (ESP-024):** especificação e ADR em `.claude/pipeline/esp.md` (**ESP-024**) e **ADR-024** em `adr.md`. *Opcional:* podes manter na raiz um ficheiro `VISIBILIDADE-EXECUCAO.md` só local (está em `.gitignore`; não faz parte do repositório versionado).
+- **Décalage roadmap ↔ changelog:** o quadro abaixo agrupa entregas DDL em **v1.1.0** (**ESP-017** … **ESP-019**); a última secção **versionada** em `CHANGELOG.md` neste ramo continua **[1.0.9]** até existir **`/release`** que publique a versão correspondente — nota transparente também no espelho local opcional `VISIBILIDADE-EXECUCAO.md` (secção 1).
 
 ---
 
@@ -95,6 +97,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] A cada `/sprint` ou release relevante, atualizar [Registro de sprints](#registro-de-sprints) e checklists conforme o que foi de fato entregue.
 - [ ] A cada mudança material de direção (escopo de fase, prioridade), registrar no [Histórico de evolução do roadmap](#histórico-de-evolução-do-roadmap).
 - [ ] Revisar trimestralmente (ou por release maior) se as **previsões** por fase ainda fazem sentido.
+- [x] **ESP-024** — governança de visibilidade em `.claude/pipeline/esp.md` e **ADR-024**; quadro de pendências/ideias/triagem documentado nos artefactos do pipeline — **2026-04-10**. *Ficheiro raiz homónimo não é versionado (opcional local).*
 
 ---
 
@@ -149,6 +152,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-09 | **`/architect`:** ficheiros `esp.md`, `adr.md`, `plan.md`, `task-input.md` **materializados** no repositório (ESP-020 / ADR-020 + ADR-021); checklist rodada 7; próximo passo oficial **`/task`** para `task.md` e **#34**. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md` |
 | 2026-04-09 | **`/architect` (próxima demanda):** **ESP-020** — artefactos e `task.md` reconciliados (`review-report.md` marcado cumprido); remanescente **`/develop`** + **`/release`** (issue **#34**); checklist rodada 9. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `task.md`, `checklist.md` |
 | 2026-04-09 | **`/architect` (próxima demanda de produto):** planeada **ESP-022** — **`CREATE INDEX`** (Firebird + PostgreSQL, **ADR-022**); *nota:* **ESP-021** já usada no pipeline para trabalho documental (non-goals / **ADR-021**). Pendente **`/release`** para fecho versionado de **ESP-020** (**#34**) antes ou em paralelo à esteira de implementação, conforme política. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-10 | **`/architect` — ESP-024:** **ADR-024** e texto em `esp.md` / `plan.md` / `task-input.md` (visibilidade de execução); roadmap alinhado; **decisão:** `VISIBILIDADE-EXECUCAO.md` na raiz **não** versionado (`.gitignore`), cópia opcional só local. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md`, `.gitignore` |
 
 ---
 
