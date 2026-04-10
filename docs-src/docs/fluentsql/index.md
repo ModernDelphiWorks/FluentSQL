@@ -10,6 +10,8 @@ title: FluentSQL
 - [Introduction](introduction.md)
 - [Installation](getting-started/installation.md)
 - [Quickstart](getting-started/quickstart.md)
+- [Configuration](reference/configuration.md)
+- [Troubleshooting](troubleshooting/common-errors.md)
 
 ### Usage guides
 
