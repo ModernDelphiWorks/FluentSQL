@@ -228,27 +228,39 @@ begin
 end;
 
 function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
+var
+  LTable: string;
 begin
   if not Assigned(ADef) then
     Exit('');
   if Trim(ADef.IndexName) = '' then
     raise EArgumentException.Create('DDL: index name is required');
 
+  LTable := Trim(ADef.GetTableName);
+
   case ADef.Dialect of
     dbnPostgreSQL:
-      if ADef.GetConcurrently then
       begin
-        if ADef.GetIfExists then
-          Result := 'DROP INDEX CONCURRENTLY IF EXISTS ' + ADef.IndexName
+        if LTable <> '' then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX: ON TABLE is not used for PostgreSQL in this vertical (ESP-028 / ADR-028).');
+        if ADef.GetConcurrently then
+        begin
+          if ADef.GetIfExists then
+            Result := 'DROP INDEX CONCURRENTLY IF EXISTS ' + ADef.IndexName
+          else
+            Result := 'DROP INDEX CONCURRENTLY ' + ADef.IndexName;
+        end
+        else if ADef.GetIfExists then
+          Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
         else
-          Result := 'DROP INDEX CONCURRENTLY ' + ADef.IndexName;
-      end
-      else if ADef.GetIfExists then
-        Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
-      else
-        Result := 'DROP INDEX ' + ADef.IndexName;
+          Result := 'DROP INDEX ' + ADef.IndexName;
+      end;
     dbnFirebird:
       begin
+        if LTable <> '' then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX: ON TABLE is not used for Firebird in this vertical (ESP-028 / ADR-028).');
         if ADef.GetConcurrently then
           raise ENotSupportedException.Create(
             'DDL DROP INDEX CONCURRENTLY (ESP-027) is not supported for Firebird; only PostgreSQL maps CONCURRENTLY (ADR-027). Use IF EXISTS without CONCURRENTLY per ADR-026.');
@@ -257,15 +269,34 @@ begin
         else
           Result := 'DROP INDEX ' + ADef.IndexName;
       end;
+    dbnMySQL:
+      begin
+        if ADef.GetConcurrently then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX CONCURRENTLY (ESP-027 / ESP-028) is not supported for MySQL; only PostgreSQL maps CONCURRENTLY (ADR-027).');
+        if LTable = '' then
+          raise EArgumentException.Create(
+            'DDL DROP INDEX: table name is required for MySQL (DROP INDEX ... ON ...); see ESP-028 / ADR-028.');
+        if ADef.GetIfExists then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX IF EXISTS is not emitted for MySQL / MariaDB in this build for the standalone DROP INDEX ... ON ... form (ESP-028 / ADR-028); use dialect-specific SQL or omit IfExists.')
+        else
+          Result := 'DROP INDEX ' + ADef.IndexName + ' ON ' + LTable;
+      end;
   else
-    if ADef.GetConcurrently then
-      raise ENotSupportedException.CreateFmt(
-        'DDL DROP INDEX CONCURRENTLY (ESP-027) is not implemented for dialect %d; only PostgreSQL supports CONCURRENTLY in this build.',
-        [Ord(ADef.Dialect)])
-    else
-      raise ENotSupportedException.CreateFmt(
-        'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
-        [Ord(ADef.Dialect)]);
+    begin
+      if LTable <> '' then
+        raise ENotSupportedException.Create(
+          'DDL DROP INDEX: ON TABLE is only mapped for dbnMySQL in this vertical (ESP-028 / ADR-028).');
+      if ADef.GetConcurrently then
+        raise ENotSupportedException.CreateFmt(
+          'DDL DROP INDEX CONCURRENTLY (ESP-027) is not implemented for dialect %d; only PostgreSQL supports CONCURRENTLY in this build.',
+          [Ord(ADef.Dialect)])
+      else
+        raise ENotSupportedException.CreateFmt(
+          'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
+          [Ord(ADef.Dialect)]);
+    end;
   end;
 end;
 
