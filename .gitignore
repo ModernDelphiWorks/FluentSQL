@@ -19,6 +19,3 @@ docs-src/.docusaurus/
 
 __history/
 __recovery/
-
-# ESP-024 — cópia local opcional na raiz (não versionada)
-VISIBILIDADE-EXECUCAO.md
