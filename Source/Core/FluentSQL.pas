@@ -3,10 +3,10 @@
   FluentSQL
   Fluent API for building and composing SQL queries in Delphi.
 
-  SPDX-License-Identifier: Apache-2.0
-  Copyright (c) 2025-2026 Isaque Pinheiro
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
 
-  Licensed under the Apache License, Version 2.0.
+  Licensed under the MIT License.
   See the LICENSE file in the project root for full license information.
   ------------------------------------------------------------------------------
 }
@@ -230,6 +230,10 @@ function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATabl
 
 function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 
+function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
+
+function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+
 implementation
 
 uses
@@ -258,6 +262,16 @@ end;
 function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 begin
   Result := NewFluentDDLAlterTableAddColumn(ADatabase, ATableName);
+end;
+
+function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := NewFluentDDLAlterTableDropColumn(ADatabase, ATableName);
+end;
+
+function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+begin
+  Result := NewFluentDDLCreateIndex(ADatabase, AIndexName, ATableName);
 end;
 
 { TFluentSQL }

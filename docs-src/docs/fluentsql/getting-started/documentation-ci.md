@@ -5,7 +5,7 @@ title: Site de documentação (CI)
 
 ## Visão geral
 
-O portal Docusaurus vive em `docs-src/`. A pasta de saída estática configurada no build é `docs/` na raiz do repositório (`outDir` em `docs-src/docusaurus.config.ts`), para publicação em GitHub Pages.
+O portal Docusaurus vive em `docs-src/`. A pasta de saída estática do build é `docs/` na raiz do repositório, definida pelo script **`npm run build`** em `docs-src/package.json` (`docusaurus build --out-dir ../docs`), para publicação em GitHub Pages. O Docusaurus 3 não aceita o campo `outDir` no ficheiro de configuração; a saída deve ser indicada na linha de comandos.
 
 ## Node local não é obrigatório
 
