@@ -156,6 +156,7 @@ type
   strict private
     FDialect: TFluentSQLDriver;
     FIndexName: string;
+    FTableName: string;
     FIfExists: Boolean;
     FConcurrently: Boolean;
   public
@@ -163,9 +164,11 @@ type
     { IFluentDDLDropIndexDef }
     function GetDialect: TFluentSQLDriver;
     function GetIndexName: string;
+    function GetTableName: string;
     function GetIfExists: Boolean;
     function GetConcurrently: Boolean;
     { IFluentDDLDropIndexBuilder }
+    function OnTable(const ATable: string): IFluentDDLDropIndexBuilder;
     function IfExists: IFluentDDLDropIndexBuilder;
     function Concurrently: IFluentDDLDropIndexBuilder;
     function AsString: string;
@@ -617,6 +620,7 @@ begin
   inherited Create;
   FDialect := ADialect;
   FIndexName := AIndexName;
+  FTableName := '';
   FIfExists := False;
   FConcurrently := False;
 end;
@@ -629,6 +633,17 @@ end;
 function TFluentDDLDropIndexBuilder.GetIndexName: string;
 begin
   Result := FIndexName;
+end;
+
+function TFluentDDLDropIndexBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLDropIndexBuilder.OnTable(const ATable: string): IFluentDDLDropIndexBuilder;
+begin
+  FTableName := Trim(ATable);
+  Result := Self;
 end;
 
 function TFluentDDLDropIndexBuilder.GetIfExists: Boolean;

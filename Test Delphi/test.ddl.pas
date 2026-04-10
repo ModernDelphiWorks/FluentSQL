@@ -119,11 +119,21 @@ type
     [Test]
     procedure TestDropIndex_EmptyIndexName_RaisesArgumentException;
     [Test]
+    procedure TestDropIndex_MySQL_WithoutOnTable_RaisesArgumentException;
+    [Test]
+    procedure TestDropIndex_MySQL_WithoutOnTable_MessageReferencesESP028;
+    [Test]
+    procedure TestDropIndex_MySQL_OnTable_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_MySQL_OnTable_IfExists_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_MySQL_OnTable_IfExists_MessageReferencesESP028;
+    [Test]
+    procedure TestDropIndex_Firebird_OnTable_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_OnTable_RaisesNotSupported;
+    [Test]
     procedure TestDropIndex_UnsupportedDialect_RaisesNotSupported;
-    [Test]
-    procedure TestDropIndex_UnsupportedDialect_IfExists_RaisesNotSupported;
-    [Test]
-    procedure TestDropIndex_UnsupportedDialect_MessageReferencesESP026;
   end;
 
 implementation
@@ -617,27 +627,17 @@ begin
     EArgumentException);
 end;
 
-procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_RaisesNotSupported;
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_WithoutOnTable_RaisesArgumentException;
 begin
   Assert.WillRaise(
     procedure
     begin
       CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').AsString;
     end,
-    ENotSupportedException);
+    EArgumentException);
 end;
 
-procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_IfExists_RaisesNotSupported;
-begin
-  Assert.WillRaise(
-    procedure
-    begin
-      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').IfExists.AsString;
-    end,
-    ENotSupportedException);
-end;
-
-procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_MessageReferencesESP026;
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_WithoutOnTable_MessageReferencesESP028;
 var
   LRaised: Boolean;
   LMsg: string;
@@ -647,6 +647,44 @@ begin
   try
     CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').AsString;
   except
+    on E: EArgumentException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-028', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_OnTable_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnMySQL, 'ix_orders_status').OnTable('orders').AsString;
+  Assert.AreEqual('DROP INDEX ix_orders_status ON orders', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_OnTable_IfExists_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').OnTable('T').IfExists.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_OnTable_IfExists_MessageReferencesESP028;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').OnTable('T').IfExists.AsString;
+  except
     on E: ENotSupportedException do
     begin
       LRaised := True;
@@ -654,8 +692,37 @@ begin
     end;
   end;
   Assert.IsTrue(LRaised);
-  Assert.IsTrue(Pos('ESP-026', LMsg) > 0);
-  Assert.IsTrue(Pos('ESP-025', LMsg) > 0);
+  Assert.IsTrue(Pos('ESP-028', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_OnTable_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').OnTable('CLIENTES').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_OnTable_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').OnTable('orders').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnOracle, 'IX_X').AsString;
+    end,
+    ENotSupportedException);
 end;
 
 end.
