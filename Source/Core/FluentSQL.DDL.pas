@@ -174,12 +174,32 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLTruncateTableBuilder = class(TInterfacedObject, IFluentDDLTruncateTableBuilder, IFluentDDLTruncateTableDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FRestartIdentity: Boolean;
+    FCascade: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    { IFluentDDLTruncateTableDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetRestartIdentity: Boolean;
+    function GetCascade: Boolean;
+    { IFluentDDLTruncateTableBuilder }
+    function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function Cascade: IFluentDDLTruncateTableBuilder;
+    function AsString: string;
+  end;
+
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
 function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
+function NewFluentDDLTruncateTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
 
 implementation
 
@@ -678,6 +698,59 @@ end;
 function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
 begin
   Result := TFluentDDLDropIndexBuilder.Create(ADialect, AIndexName);
+end;
+
+{ TFluentDDLTruncateTableBuilder }
+
+constructor TFluentDDLTruncateTableBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FRestartIdentity := False;
+  FCascade := False;
+end;
+
+function TFluentDDLTruncateTableBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLTruncateTableBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLTruncateTableBuilder.GetRestartIdentity: Boolean;
+begin
+  Result := FRestartIdentity;
+end;
+
+function TFluentDDLTruncateTableBuilder.GetCascade: Boolean;
+begin
+  Result := FCascade;
+end;
+
+function TFluentDDLTruncateTableBuilder.RestartIdentity: IFluentDDLTruncateTableBuilder;
+begin
+  FRestartIdentity := True;
+  Result := Self;
+end;
+
+function TFluentDDLTruncateTableBuilder.Cascade: IFluentDDLTruncateTableBuilder;
+begin
+  FCascade := True;
+  Result := Self;
+end;
+
+function TFluentDDLTruncateTableBuilder.AsString: string;
+begin
+  Result := DDLTruncateTableSQL(Self as IFluentDDLTruncateTableDef);
+end;
+
+function NewFluentDDLTruncateTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
+begin
+  Result := TFluentDDLTruncateTableBuilder.Create(ADialect, ATableName);
 end;
 
 end.

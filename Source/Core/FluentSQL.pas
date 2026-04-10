@@ -236,6 +236,8 @@ function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIn
 
 function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
 
+function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
+
 implementation
 
 uses
@@ -279,6 +281,11 @@ end;
 function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
 begin
   Result := NewFluentDDLDropIndex(ADatabase, AIndexName);
+end;
+
+function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
+begin
+  Result := NewFluentDDLTruncateTable(ADatabase, ATableName);
 end;
 
 { TFluentSQL }

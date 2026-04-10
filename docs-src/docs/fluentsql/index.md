@@ -25,6 +25,7 @@ title: FluentSQL
 - [DDL — ALTER TABLE DROP COLUMN (ESP-020)](guides/ddl-alter-table-drop-column.md)
 - [DDL — CREATE INDEX (ESP-022)](guides/ddl-create-index.md)
 - [DDL — DROP INDEX (ESP-025 / ESP-026)](guides/ddl-drop-index.md)
+- [DDL — TRUNCATE TABLE (ESP-029)](guides/ddl-truncate-table.md)
 - [Configuração e constantes](reference/configuration.md)
 
 ### For contributors / integrators

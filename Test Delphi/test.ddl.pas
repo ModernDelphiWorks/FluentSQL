@@ -136,6 +136,39 @@ type
     procedure TestDropIndex_UnsupportedDialect_RaisesNotSupported;
   end;
 
+  [TestFixture]
+  TTestDDLTruncateTable = class
+  public
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_RestartIdentity_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_Cascade_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_RestartIdentityAndCascade_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_CascadeThenRestartIdentity_SameOutput;
+    [Test]
+    procedure TestTruncateTable_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_Firebird_RestartIdentity_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_Firebird_Cascade_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_MySQL_RestartIdentity_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_MySQL_Cascade_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_Firebird_Modifier_MessageReferencesESP029;
+    [Test]
+    procedure TestTruncateTable_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_EmptyTableName_RaisesArgumentException;
+  end;
+
 implementation
 
 uses
@@ -723,6 +756,142 @@ begin
       CreateFluentDDLDropIndex(dbnOracle, 'IX_X').AsString;
     end,
     ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_RestartIdentity_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'logs').RestartIdentity.AsString;
+  Assert.AreEqual('TRUNCATE TABLE logs RESTART IDENTITY', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_Cascade_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'orders').Cascade.AsString;
+  Assert.AreEqual('TRUNCATE TABLE orders CASCADE', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_RestartIdentityAndCascade_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'orders').RestartIdentity.Cascade.AsString;
+  Assert.AreEqual('TRUNCATE TABLE orders RESTART IDENTITY CASCADE', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_CascadeThenRestartIdentity_SameOutput;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'orders').Cascade.RestartIdentity.AsString;
+  Assert.AreEqual('TRUNCATE TABLE orders RESTART IDENTITY CASCADE', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnFirebird, 'CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnMySQL, 'CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_RestartIdentity_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnFirebird, 'T').RestartIdentity.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_Cascade_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnFirebird, 'T').Cascade.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_RestartIdentity_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnMySQL, 'T').RestartIdentity.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_Cascade_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnMySQL, 'T').Cascade.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_Modifier_MessageReferencesESP029;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLTruncateTable(dbnFirebird, 'T').RestartIdentity.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-029', LMsg) > 0);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnOracle, 'T').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_EmptyTableName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnPostgreSQL, '   ').AsString;
+    end,
+    EArgumentException);
 end;
 
 end.
