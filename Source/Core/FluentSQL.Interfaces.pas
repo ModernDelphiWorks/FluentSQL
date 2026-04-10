@@ -799,22 +799,26 @@ type
     function AsString: string;
   end;
 
-  /// <summary>ESP-025 / ADR-025; ESP-026 / ADR-026: read-only view of DROP INDEX for serializers.</summary>
+  /// <summary>ESP-025 / ADR-025; ESP-026 / ADR-026; ESP-027 / ADR-027: read-only view of DROP INDEX for serializers.</summary>
   IFluentDDLDropIndexDef = interface
-    ['{B314E570-BD6F-40A1-C293-456789ABC000}']
+    ['{B414E571-BD70-41B2-B394-56789ABCDEF0}']
     function GetDialect: TFluentSQLDriver;
     function GetIndexName: string;
     /// <summary>True when the caller requested IF EXISTS (see ADR-026).</summary>
     function GetIfExists: Boolean;
+    /// <summary>True when the caller requested CONCURRENTLY (PostgreSQL only; see ADR-027).</summary>
+    function GetConcurrently: Boolean;
     property Dialect: TFluentSQLDriver read GetDialect;
     property IndexName: string read GetIndexName;
   end;
 
-  /// <summary>ESP-025 / ESP-026: fluent builder for DROP INDEX SQL text (one command per AsString).</summary>
+  /// <summary>ESP-025 / ESP-026 / ESP-027: fluent builder for DROP INDEX SQL text (one command per AsString).</summary>
   IFluentDDLDropIndexBuilder = interface(IFluentDDLDropIndexDef)
-    ['{E536F792-DF81-62C3-E415-67890ABCD001}']
+    ['{E636F893-DF82-62D3-E526-67890ABCDEF1}']
     /// <summary>Ask for DROP INDEX IF EXISTS where mapped (see ADR-026).</summary>
     function IfExists: IFluentDDLDropIndexBuilder;
+    /// <summary>Ask for DROP INDEX CONCURRENTLY (PostgreSQL only; see ADR-027).</summary>
+    function Concurrently: IFluentDDLDropIndexBuilder;
     function AsString: string;
   end;
 

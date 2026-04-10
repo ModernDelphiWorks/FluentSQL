@@ -103,6 +103,20 @@ type
     [Test]
     procedure TestDropIndex_PostgreSQL_IfExists_GeneratesExpected;
     [Test]
+    procedure TestDropIndex_PostgreSQL_Concurrently_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_Concurrently_IfExists_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_IfExists_Concurrently_SameOutput;
+    [Test]
+    procedure TestDropIndex_Firebird_Concurrently_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_Firebird_Concurrently_MessageReferencesESP027;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_Concurrently_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_Concurrently_MessageReferencesESP027;
+    [Test]
     procedure TestDropIndex_EmptyIndexName_RaisesArgumentException;
     [Test]
     procedure TestDropIndex_UnsupportedDialect_RaisesNotSupported;
@@ -507,6 +521,90 @@ var
 begin
   LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').IfExists.AsString;
   Assert.AreEqual('DROP INDEX IF EXISTS ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_Concurrently_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').Concurrently.AsString;
+  Assert.AreEqual('DROP INDEX CONCURRENTLY ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_Concurrently_IfExists_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').Concurrently.IfExists.AsString;
+  Assert.AreEqual('DROP INDEX CONCURRENTLY IF EXISTS ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_IfExists_Concurrently_SameOutput;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').IfExists.Concurrently.AsString;
+  Assert.AreEqual('DROP INDEX CONCURRENTLY IF EXISTS ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_Concurrently_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').Concurrently.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_Concurrently_MessageReferencesESP027;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').Concurrently.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-027', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_Concurrently_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').Concurrently.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_Concurrently_MessageReferencesESP027;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').Concurrently.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-027', LMsg) > 0);
 end;
 
 procedure TTestDDLDropIndex.TestDropIndex_EmptyIndexName_RaisesArgumentException;
