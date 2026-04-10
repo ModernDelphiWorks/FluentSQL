@@ -235,15 +235,37 @@ begin
     raise EArgumentException.Create('DDL: index name is required');
 
   case ADef.Dialect of
-    dbnFirebird, dbnPostgreSQL:
-      if ADef.GetIfExists then
+    dbnPostgreSQL:
+      if ADef.GetConcurrently then
+      begin
+        if ADef.GetIfExists then
+          Result := 'DROP INDEX CONCURRENTLY IF EXISTS ' + ADef.IndexName
+        else
+          Result := 'DROP INDEX CONCURRENTLY ' + ADef.IndexName;
+      end
+      else if ADef.GetIfExists then
         Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
       else
         Result := 'DROP INDEX ' + ADef.IndexName;
+    dbnFirebird:
+      begin
+        if ADef.GetConcurrently then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX CONCURRENTLY (ESP-027) is not supported for Firebird; only PostgreSQL maps CONCURRENTLY (ADR-027). Use IF EXISTS without CONCURRENTLY per ADR-026.');
+        if ADef.GetIfExists then
+          Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
+        else
+          Result := 'DROP INDEX ' + ADef.IndexName;
+      end;
   else
-    raise ENotSupportedException.CreateFmt(
-      'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
-      [Ord(ADef.Dialect)]);
+    if ADef.GetConcurrently then
+      raise ENotSupportedException.CreateFmt(
+        'DDL DROP INDEX CONCURRENTLY (ESP-027) is not implemented for dialect %d; only PostgreSQL supports CONCURRENTLY in this build.',
+        [Ord(ADef.Dialect)])
+    else
+      raise ENotSupportedException.CreateFmt(
+        'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
+        [Ord(ADef.Dialect)]);
   end;
 end;
 

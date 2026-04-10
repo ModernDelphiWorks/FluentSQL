@@ -157,14 +157,17 @@ type
     FDialect: TFluentSQLDriver;
     FIndexName: string;
     FIfExists: Boolean;
+    FConcurrently: Boolean;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const AIndexName: string);
     { IFluentDDLDropIndexDef }
     function GetDialect: TFluentSQLDriver;
     function GetIndexName: string;
     function GetIfExists: Boolean;
+    function GetConcurrently: Boolean;
     { IFluentDDLDropIndexBuilder }
     function IfExists: IFluentDDLDropIndexBuilder;
+    function Concurrently: IFluentDDLDropIndexBuilder;
     function AsString: string;
   end;
 
@@ -615,6 +618,7 @@ begin
   FDialect := ADialect;
   FIndexName := AIndexName;
   FIfExists := False;
+  FConcurrently := False;
 end;
 
 function TFluentDDLDropIndexBuilder.GetDialect: TFluentSQLDriver;
@@ -635,6 +639,17 @@ end;
 function TFluentDDLDropIndexBuilder.IfExists: IFluentDDLDropIndexBuilder;
 begin
   FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropIndexBuilder.GetConcurrently: Boolean;
+begin
+  Result := FConcurrently;
+end;
+
+function TFluentDDLDropIndexBuilder.Concurrently: IFluentDDLDropIndexBuilder;
+begin
+  FConcurrently := True;
   Result := Self;
 end;
 
