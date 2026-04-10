@@ -129,6 +129,24 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLAlterTableRenameColumnBuilder = class(TInterfacedObject, IFluentDDLAlterTableRenameColumnBuilder,
+    IFluentDDLAlterTableRenameColumnDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FOldColumnName: string;
+    FNewColumnName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName, AOldColumnName, ANewColumnName: string);
+    { IFluentDDLAlterTableRenameColumnDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetOldColumnName: string;
+    function GetNewColumnName: string;
+    { IFluentDDLAlterTableRenameColumnBuilder }
+    function AsString: string;
+  end;
+
   TFluentDDLCreateIndexBuilder = class(TInterfacedObject, IFluentDDLCreateIndexBuilder, IFluentDDLCreateIndexDef)
   strict private
     FDialect: TFluentSQLDriver;
@@ -197,6 +215,8 @@ function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: s
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
+function NewFluentDDLAlterTableRenameColumn(const ADialect: TFluentSQLDriver; const ATableName, AOldColumnName,
+  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
 function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
 function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
 function NewFluentDDLTruncateTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
@@ -549,6 +569,49 @@ end;
 function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 begin
   Result := TFluentDDLAlterTableDropBuilder.Create(ADialect, ATableName);
+end;
+
+{ TFluentDDLAlterTableRenameColumnBuilder }
+
+constructor TFluentDDLAlterTableRenameColumnBuilder.Create(const ADialect: TFluentSQLDriver;
+  const ATableName, AOldColumnName, ANewColumnName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FOldColumnName := AOldColumnName;
+  FNewColumnName := ANewColumnName;
+end;
+
+function TFluentDDLAlterTableRenameColumnBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLAlterTableRenameColumnBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLAlterTableRenameColumnBuilder.GetOldColumnName: string;
+begin
+  Result := FOldColumnName;
+end;
+
+function TFluentDDLAlterTableRenameColumnBuilder.GetNewColumnName: string;
+begin
+  Result := FNewColumnName;
+end;
+
+function TFluentDDLAlterTableRenameColumnBuilder.AsString: string;
+begin
+  Result := DDLAlterTableRenameColumnSQL(Self as IFluentDDLAlterTableRenameColumnDef);
+end;
+
+function NewFluentDDLAlterTableRenameColumn(const ADialect: TFluentSQLDriver; const ATableName, AOldColumnName,
+  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+begin
+  Result := TFluentDDLAlterTableRenameColumnBuilder.Create(ADialect, ATableName, AOldColumnName, ANewColumnName);
 end;
 
 { TFluentDDLCreateIndexBuilder }
