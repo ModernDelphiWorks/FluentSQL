@@ -7,6 +7,18 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-04-10
+
+### Added
+- **DDL — ALTER TABLE DROP COLUMN (ESP-020, ADR-020, issue [#34](https://github.com/ModernDelphiWorks/FluentSQL/issues/34)):** `CreateFluentDDLAlterTableDropColumn`, `DDLAlterTableDropColumnSQL` e serialização Firebird/PostgreSQL; guia `ddl-alter-table-drop-column.md`.
+- **DDL — CREATE [UNIQUE] INDEX (ESP-022, ADR-022, issue [#35](https://github.com/ModernDelphiWorks/FluentSQL/issues/35)):** `CreateFluentDDLCreateIndex`, `DDLCreateIndexSQL` (Firebird, PostgreSQL); guia `ddl-create-index.md`; testes DUnitX adicionais (incl. multi-coluna Firebird e nomes vazios).
+
+### Changed
+- **Documentação:** alinhamento do índice do portal e da referência de API com ESP-020/ESP-022; quadro de visibilidade de execução em `VISIBILIDADE-EXECUCAO.md` (ESP-024).
+
+### Tests
+- DUnitX: `TTestDDLAlterTableDropColumn`, `TTestDDLCreateIndex` em `Test Delphi/test.ddl.pas` (suíte Firebird).
+
 ## [1.1.0] — 2026-04-09
 
 ### Added
