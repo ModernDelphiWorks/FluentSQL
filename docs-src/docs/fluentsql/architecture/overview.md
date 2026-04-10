@@ -1,6 +1,6 @@
 ---
 displayed_sidebar: fluentsqlSidebar
-title: Visão da arquitetura
+title: Architecture overview
 ---
 
 ## Contexto
@@ -11,9 +11,11 @@ O FluentSQL separa **definição da consulta** (API fluente + AST) da **serializ
 
 | Área | Papel |
 |------|--------|
-| `Source/Core/FluentSQL.Interfaces.pas` | Contratos (`IFluentSQL`, seções, `IFluentSQLParams`, AST exposta onde aplicável). |
+| `Source/Core/FluentSQL.Interfaces.pas` | Contratos (`IFluentSQL`, seções, `IFluentSQLParams`, AST exposta onde aplicável; contratos DDL `IFluentDDL*` desde **v1.1.0**). |
 | `Source/Core/FluentSQL.Insert.pas` | Secção **Insert**: linhas múltiplas (**v1.0.9**, **`AddRow`**), serialização `VALUES (...), (...)` e validações de lote (`EFluentSQLInsertBatch`). |
-| `Source/Core/FluentSQL.pas` | Implementação principal (`TFluentSQL`), estado da query, operações de conjunto e exposição de `Params` mesclados quando há `UnionQuery`. |
+| `Source/Core/FluentSQL.DDL.pas` | Builders DDL (**v1.1.0**): `CREATE TABLE`, `DROP TABLE`, `ALTER TABLE ADD COLUMN` — apenas texto via `AsString`. |
+| `Source/Core/FluentSQL.DDL.Serialize.pas` | Serialização DDL (`DDLCreateTableSQL`, `DDLDropTableSQL`, `DDLAlterTableAddColumnSQL`). |
+| `Source/Core/FluentSQL.pas` | Implementação principal (`TFluentSQL`), estado da query, operações de conjunto e exposição de `Params` mesclados quando há `UnionQuery`; fábricas `CreateFluentDDL*`. |
 | `Source/Core/FluentSQL.Ast.pas` | AST interna; campos como `UnionType` e `UnionQuery` para operações de conjunto. |
 | `Source/Core/FluentSQL.Serialize.pas` | Lógica comum de serialização, incluindo remapeamento de placeholders no ramo de conjunto. |
 | `Source/Core/FluentSQL.Params.pas` | `TFluentSQLParams` e `TFluentSQLMergedParams` (visão ordenada de duas coleções). |
@@ -30,4 +32,4 @@ O repositório inclui drivers e testes sob `Source/Drivers/` e `Test Delphi/` pa
 
 ## Roadmap e pipeline (repositório)
 
-Para **direção do produto** e checklist de fases, use o `ROADMAP.md` na raiz e o `CHANGELOG.md` (artefato vivo desde a v1.0.1; na v1.0.2 a Fase 0 foi encerrada no âmbito consumidor; na **v1.0.3** entrou **ESP-009** (`IN`/`NOT IN` com listas); na **v1.0.4** entrou **ESP-010** (`array of const` em predicados e DML); na **v1.0.5** entrou **ESP-011** (critérios em `FluentSQL.Expression.pas` alinhados a `IFluentSQLParams`); na **v1.0.6** entrou **ESP-012** (`Column(array of const)` parametrizado na projeção); na **v1.0.7** entrou **ESP-013** (`CaseExpr(array of const)` alinhado ao helper de parametrização); na **v1.0.8** entrou **ESP-014** (Mongo MQL/DML); na **v1.0.9** entrou **ESP-015** (INSERT em lote, **ADR-014**); **ESP-016** (**ForDialectOnly**, **ADR-016**) está descrita na documentação e no código em `FluentSQL.Serialize.pas` / `FluentSQL.pas`). Evidências operacionais finas, quando existirem no clone: `.claude/pipeline/implement-report.md` e relatórios da esteira.
+Para **direção do produto** e checklist de fases, use o `ROADMAP.md` na raiz e o `CHANGELOG.md` (artefato vivo desde a v1.0.1; na v1.0.2 a Fase 0 foi encerrada no âmbito consumidor; na **v1.0.3** entrou **ESP-009** (`IN`/`NOT IN` com listas); na **v1.0.4** entrou **ESP-010** (`array of const` em predicados e DML); na **v1.0.5** entrou **ESP-011** (critérios em `FluentSQL.Expression.pas` alinhados a `IFluentSQLParams`); na **v1.0.6** entrou **ESP-012** (`Column(array of const)` parametrizado na projeção); na **v1.0.7** entrou **ESP-013** (`CaseExpr(array of const)` alinhado ao helper de parametrização); na **v1.0.8** entrou **ESP-014** (Mongo MQL/DML); na **v1.0.9** entrou **ESP-015** (INSERT em lote, **ADR-014**); na **v1.1.0** entraram **ESP-016** (fecho formal `ForDialectOnly`), **ESP-017**–**ESP-019** (DDL texto para `CREATE` / `DROP` / `ALTER ADD COLUMN`) e o portal em `docs-src/` com CI). **ESP-016** está no código em `FluentSQL.Serialize.pas` / `FluentSQL.pas`. Evidências operacionais finas, quando existirem no clone: `.claude/pipeline/implement-report.md` e relatórios da esteira.

@@ -1,13 +1,13 @@
 ---
 displayed_sidebar: docsSidebar
-title: Portal de documentação
+title: Documentation portal
 slug: /
 sidebar_position: 0
 ---
 
-Bem-vindo ao portal técnico do ecossistema **FluentSQL**. Aqui você encontra a documentação derivada do código-fonte, dos testes e dos artefatos do pipeline.
+Welcome to the **FluentSQL** technical documentation portal. Content is derived from source code, tests, and pipeline artifacts.
 
-## Projetos
+## Projects
 
 <div className="row">
   <div className="col col--6 margin-bottom--lg">
@@ -16,15 +16,27 @@ Bem-vindo ao portal técnico do ecossistema **FluentSQL**. Aqui você encontra a
         <h3>FluentSQL</h3>
       </div>
       <div className="card__body">
-        <p>Fluent API para construir SQL em Delphi/Lazarus, com AST, drivers por dialeto e parâmetros alinhados à SQL gerada (incluindo <code>UNION</code> / <code>INTERSECT</code> desde a v0.2.0). A API pública estável usa <code>CreateFluentSQL</code> desde a v1.0.0; na v1.0.1 o <code>ROADMAP.md</code> passou a ser artefato operacional; na <strong>v1.0.2</strong> a <strong>Fase 0</strong> foi fechada no roadmap (<strong>ESP-008</strong>); nas <strong>v1.0.3</strong>–<strong>v1.0.7</strong> entraram os incrementos de parametrização (<strong>ESP-009</strong> … <strong>ESP-013</strong>); na <strong>v1.0.8</strong> o driver <strong>MongoDB</strong> passou a serialização <strong>JSON/MQL</strong> canónica (<strong>ESP-014</strong>); na <strong>v1.0.9</strong> há <strong>INSERT em lote</strong> com <code>AddRow</code> e Mongo <code>insertMany</code> quando N &gt; 1 (<strong>ESP-015</strong>); <strong>ESP-016</strong> documenta <strong>extensão explícita por motor</strong> via <code>ForDialectOnly</code> (<strong>ADR-016</strong>). Inclui <strong>manual de uso</strong> além da documentação técnica.</p>
+        <p>Fluent API for building SQL in Delphi/Lazarus with an AST, per-dialect drivers, and parameters aligned to the generated SQL (including <code>UNION</code> / <code>INTERSECT</code> since v0.2.0). The stable public factory is <code>CreateFluentSQL</code> (since v1.0.0). Later releases added parametrization (<strong>ESP-009</strong>–<strong>ESP-013</strong>, v1.0.3–v1.0.7), canonical MongoDB JSON/MQL (<strong>ESP-014</strong>, v1.0.8), batch INSERT with <code>AddRow</code> / multi-<code>VALUES</code> / Mongo <code>insertMany</code> (<strong>ESP-015</strong>, v1.0.9), explicit per-engine extension via <code>ForDialectOnly</code> (<strong>ESP-016</strong> / <strong>ADR-016</strong>), and in <strong>v1.1.0</strong> shipped DDL helpers for <strong>CREATE TABLE</strong>, <strong>DROP TABLE</strong>, and <strong>ALTER TABLE ADD COLUMN</strong> (Firebird + PostgreSQL for DDL verticals), plus the Docusaurus portal and docs CI workflows.</p>
       </div>
       <div className="card__footer">
-        <a className="button button--primary" href="./fluentsql/">Abrir documentação →</a>
+        <a className="button button--primary" href="./fluentsql/">Open documentation →</a>
       </div>
     </div>
   </div>
 </div>
 
-## Versão documentada
+## Documented release
 
-A documentação do produto reflete o estado publicado em **v1.0.9** (2026-04-08), conforme `CHANGELOG.md`, `boss.json` e as tags no repositório. A mudança de API pública (`CreateFluentSQL`, pacote FluentSQL) permanece na entrada **[1.0.0]**; listas em `IN` / `NOT IN` estão em **[1.0.3]** (issue [#19](https://github.com/ModernDelphiWorks/FluentSQL/issues/19)); parametrização com **`array of const`** em predicados e DML está em **[1.0.4]** (issue [#21](https://github.com/ModernDelphiWorks/FluentSQL/issues/21)); alinhamento de **`Expression`** / critérios em **`FluentSQL.Expression.pas`** ao helper de parametrização está em **[1.0.5]** (issue [#23](https://github.com/ModernDelphiWorks/FluentSQL/issues/23)); **`Column(array of const)`** na lista `SELECT` está em **[1.0.6]** (issue [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25)); **`CaseExpr(array of const)`** na expressão discriminante do `CASE` está em **[1.0.7]** (**ESP-013**; rastreio no `CHANGELOG`, não confundir com a issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27) — **ESP-016**). **MongoDB** (JSON/MQL, DML mínimo) está em **[1.0.8]** ([#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)); **INSERT em lote** (`AddRow`, multi-`VALUES`, Mongo `insertMany`) está em **[1.0.9]** ([#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)). **Extensão por motor** (`ForDialectOnly`, **ADR-016**) está descrita no guia [Extensão explícita por motor](./fluentsql/guides/extensao-por-dialeto.md) e na [referência de API](./fluentsql/reference/api.md).
+This portal matches the published **v1.1.0** tag (2026-04-09), per `CHANGELOG.md`, `boss.json`, and repository tags.
+
+- **[1.0.0]** — public API rename: `CreateFluentSQL`, Boss package **FluentSQL** — issue [#13](https://github.com/ModernDelphiWorks/FluentSQL/issues/13).
+- **[1.0.3]** — `IN` / `NOT IN` list parametrization — [#19](https://github.com/ModernDelphiWorks/FluentSQL/issues/19).
+- **[1.0.4]** — `array of const` in predicates/DML — [#21](https://github.com/ModernDelphiWorks/FluentSQL/issues/21).
+- **[1.0.5]** — criteria `Expression` + `IFluentSQLParams` — [#23](https://github.com/ModernDelphiWorks/FluentSQL/issues/23).
+- **[1.0.6]** — `Column(array of const)` — [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25).
+- **[1.0.7]** — `CaseExpr(array of const)` (**ESP-013**; do not confuse with issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), which tracks **ESP-016** on GitHub).
+- **[1.0.8]** — MongoDB JSON/MQL + DML — [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29).
+- **[1.0.9]** — batch INSERT (**ESP-015**) — issue [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24) (traceability for this slice; see `CHANGELOG.md` **[1.0.9]**).
+- **[1.1.0]** — **ESP-016** ([#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)), **ESP-017** ([#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)), **ESP-018** ([#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29), [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)), **ESP-019** ([#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); technical debt follow-ups: [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
+
+Per-engine extension (`ForDialectOnly`, **ADR-016**): [Explicit per-engine extension](./fluentsql/guides/extensao-por-dialeto) and [API reference](./fluentsql/reference/api).
