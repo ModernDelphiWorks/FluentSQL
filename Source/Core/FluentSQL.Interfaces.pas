@@ -799,6 +799,21 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-025 / ADR-025: read-only view of DROP INDEX for serializers.</summary>
+  IFluentDDLDropIndexDef = interface
+    ['{C314E570-BD6F-40A1-C293-456789ABCDEF}']
+    function GetDialect: TFluentSQLDriver;
+    function GetIndexName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property IndexName: string read GetIndexName;
+  end;
+
+  /// <summary>ESP-025: fluent builder for DROP INDEX SQL text (one command per AsString).</summary>
+  IFluentDDLDropIndexBuilder = interface(IFluentDDLDropIndexDef)
+    ['{D425F681-CE70-51B2-D304-56789ABCDEF0}']
+    function AsString: string;
+  end;
+
 implementation
 
 end.

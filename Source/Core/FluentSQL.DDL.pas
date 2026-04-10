@@ -152,11 +152,25 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLDropIndexBuilder = class(TInterfacedObject, IFluentDDLDropIndexBuilder, IFluentDDLDropIndexDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FIndexName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AIndexName: string);
+    { IFluentDDLDropIndexDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetIndexName: string;
+    { IFluentDDLDropIndexBuilder }
+    function AsString: string;
+  end;
+
 function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
 function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
 function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
 function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
 
 implementation
 
@@ -588,6 +602,37 @@ end;
 function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
 begin
   Result := TFluentDDLCreateIndexBuilder.Create(ADialect, AIndexName, ATableName);
+end;
+
+{ TFluentDDLDropIndexBuilder }
+
+constructor TFluentDDLDropIndexBuilder.Create(const ADialect: TFluentSQLDriver; const AIndexName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FIndexName := AIndexName;
+end;
+
+function TFluentDDLDropIndexBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropIndexBuilder.GetIndexName: string;
+begin
+  Result := FIndexName;
+end;
+
+function TFluentDDLDropIndexBuilder.AsString: string;
+begin
+  if Trim(FIndexName) = '' then
+    raise EArgumentException.Create('DDL: index name is required');
+  Result := DDLDropIndexSQL(Self as IFluentDDLDropIndexDef);
+end;
+
+function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
+begin
+  Result := TFluentDDLDropIndexBuilder.Create(ADialect, AIndexName);
 end;
 
 end.
