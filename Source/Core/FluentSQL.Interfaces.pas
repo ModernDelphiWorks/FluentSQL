@@ -3,10 +3,10 @@
   FluentSQL
   Fluent API for building and composing SQL queries in Delphi.
 
-  SPDX-License-Identifier: Apache-2.0
-  Copyright (c) 2025-2026 Isaque Pinheiro
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
 
-  Licensed under the Apache License, Version 2.0.
+  Licensed under the MIT License.
   See the LICENSE file in the project root for full license information.
   ------------------------------------------------------------------------------
 }
@@ -754,6 +754,48 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-020 / ADR-020: read-only view of ALTER TABLE DROP COLUMN (one column) for serializers.</summary>
+  IFluentDDLAlterTableDropColumnDef = interface
+    ['{E1A24C5D-B36F-4A7B-8E8F-9A0B1C2D3E4F}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    /// <summary>The single column to drop; empty until the builder receives a DropColumn call.</summary>
+    function GetColumnName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property ColumnName: string read GetColumnName;
+  end;
+
+  /// <summary>ESP-020: fluent builder for ALTER TABLE DROP COLUMN SQL text (one column target per AsString).</summary>
+  IFluentDDLAlterTableDropBuilder = interface(IFluentDDLAlterTableDropColumnDef)
+    ['{F2B35D6E-C470-5B8C-9F9A-0B1C2D3E4F5A}']
+    function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-022 / ADR-022: read-only view of CREATE INDEX for serializers.</summary>
+  IFluentDDLCreateIndexDef = interface
+    ['{A1C24E5F-B37D-4D8E-9A0B-1C2D3E4F5A6B}']
+    function GetDialect: TFluentSQLDriver;
+    function GetIndexName: string;
+    function GetTableName: string;
+    function GetIsUnique: Boolean;
+    function GetColumnCount: Integer;
+    function GetColumnName(AIndex: Integer): string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property IndexName: string read GetIndexName;
+    property TableName: string read GetTableName;
+    property IsUnique: Boolean read GetIsUnique;
+  end;
+
+  /// <summary>ESP-022: fluent builder for CREATE INDEX SQL text (one command per AsString).</summary>
+  IFluentDDLCreateIndexBuilder = interface(IFluentDDLCreateIndexDef)
+    ['{B2D35F6A-C48E-5E9F-A1B2-3D4E5F6A7081}']
+    function Column(const AName: string): IFluentDDLCreateIndexBuilder;
+    function Unique: IFluentDDLCreateIndexBuilder;
     function AsString: string;
   end;
 

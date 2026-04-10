@@ -3,10 +3,10 @@
   FluentSQL
   Fluent API for building and composing SQL queries in Delphi.
 
-  SPDX-License-Identifier: Apache-2.0
-  Copyright (c) 2025-2026 Isaque Pinheiro
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
 
-  Licensed under the Apache License, Version 2.0.
+  Licensed under the MIT License.
   See the LICENSE file in the project root for full license information.
   ------------------------------------------------------------------------------
 }
@@ -221,7 +221,7 @@ begin
     dbnInterbase: Result := Format('CHAR_TO_UUID(''%s'')', [AValue.ToString]);
 
     else
-      raise Exception.Create('Conversùo de Guid no formato String nùo implementada.');
+      raise Exception.Create('Convers¬ùo de Guid no formato String n¬ùo implementada.');
   end;
 end;
 
