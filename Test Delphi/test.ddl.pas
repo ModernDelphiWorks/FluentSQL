@@ -68,6 +68,8 @@ type
     [Test]
     procedure TestCreateIndex_Firebird_Unique_GeneratesExpected;
     [Test]
+    procedure TestCreateIndex_Firebird_MultiColumn_GeneratesExpected;
+    [Test]
     procedure TestCreateIndex_PostgreSQL_GeneratesExpected;
     [Test]
     procedure TestCreateIndex_PostgreSQL_Unique_GeneratesExpected;
@@ -317,6 +319,17 @@ begin
     .Column('EMAIL')
     .AsString;
   Assert.AreEqual('CREATE UNIQUE INDEX UQ_CLI_EMAIL ON CLIENTES (EMAIL)', LSql);
+end;
+
+procedure TTestDDLCreateIndex.TestCreateIndex_Firebird_MultiColumn_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLCreateIndex(dbnFirebird, 'IX_EVT', 'EVENTS')
+    .Column('TENANT_ID')
+    .Column('CREATED_AT')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX IX_EVT ON EVENTS (TENANT_ID, CREATED_AT)', LSql);
 end;
 
 procedure TTestDDLCreateIndex.TestCreateIndex_PostgreSQL_GeneratesExpected;
