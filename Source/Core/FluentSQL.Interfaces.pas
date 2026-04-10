@@ -827,6 +827,27 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-029 / ADR-029: read-only view of TRUNCATE TABLE for serializers.</summary>
+  IFluentDDLTruncateTableDef = interface
+    ['{C6E8F1A2-3B4D-5E6F-A7B8-9C0D1E2F3A40}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetRestartIdentity: Boolean;
+    function GetCascade: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property RestartIdentity: Boolean read GetRestartIdentity;
+    property Cascade: Boolean read GetCascade;
+  end;
+
+  /// <summary>ESP-029: fluent builder for TRUNCATE TABLE SQL text (one command per AsString).</summary>
+  IFluentDDLTruncateTableBuilder = interface(IFluentDDLTruncateTableDef)
+    ['{D7F9A2B3-4C5E-6F70-B8C9-0D1E2F3A4B51}']
+    function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function Cascade: IFluentDDLTruncateTableBuilder;
+    function AsString: string;
+  end;
+
 implementation
 
 end.

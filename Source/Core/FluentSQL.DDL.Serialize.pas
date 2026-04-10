@@ -29,6 +29,7 @@ function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef)
 function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
 function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
 function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
+function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
 
 implementation
 
@@ -96,7 +97,7 @@ end;
 
 function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
 var
-  I: Integer;
+  LI: Integer;
   LParts: string;
   LCol: IFluentDDLColumn;
 begin
@@ -106,9 +107,9 @@ begin
     raise EArgumentException.Create('DDL: empty column list');
 
   LParts := '';
-  for I := 0 to ADef.GetColumnCount - 1 do
+  for LI := 0 to ADef.GetColumnCount - 1 do
   begin
-    LCol := ADef.GetColumn(I);
+    LCol := ADef.GetColumn(LI);
     if LParts <> '' then
       LParts := LParts + ', ';
     LParts := LParts + LCol.Name + ' ' + MapLogicalType(ADef.Dialect, LCol);
@@ -297,6 +298,46 @@ begin
           'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
           [Ord(ADef.Dialect)]);
     end;
+  end;
+end;
+
+function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LName: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  LName := Trim(ADef.GetTableName);
+  if LName = '' then
+    raise EArgumentException.Create('DDL TRUNCATE TABLE: table name is required (ESP-029 / ADR-029).');
+
+  case ADef.Dialect of
+    dbnPostgreSQL:
+      begin
+        Result := 'TRUNCATE TABLE ' + LName;
+        if ADef.GetRestartIdentity then
+          Result := Result + ' RESTART IDENTITY';
+        if ADef.GetCascade then
+          Result := Result + ' CASCADE';
+      end;
+    dbnFirebird:
+      begin
+        if ADef.GetRestartIdentity or ADef.GetCascade then
+          raise ENotSupportedException.Create(
+            'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
+        Result := 'TRUNCATE TABLE ' + LName;
+      end;
+    dbnMySQL:
+      begin
+        if ADef.GetRestartIdentity or ADef.GetCascade then
+          raise ENotSupportedException.Create(
+            'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
+        Result := 'TRUNCATE TABLE ' + LName;
+      end;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL TRUNCATE TABLE (ESP-029) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
   end;
 end;
 
