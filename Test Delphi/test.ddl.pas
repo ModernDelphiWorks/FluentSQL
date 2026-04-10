@@ -91,6 +91,21 @@ type
     procedure TestCreateIndex_UnsupportedDialect_MessageReferencesESP022;
   end;
 
+  [TestFixture]
+  TTestDDLDropIndex = class
+  public
+    [Test]
+    procedure TestDropIndex_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_EmptyIndexName_RaisesArgumentException;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_MessageReferencesESP025;
+  end;
+
 implementation
 
 uses
@@ -454,6 +469,62 @@ begin
   end;
   Assert.IsTrue(LRaised);
   Assert.IsTrue(Pos('ESP-022', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').AsString;
+  Assert.AreEqual('DROP INDEX IX_CLI_NOME', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').AsString;
+  Assert.AreEqual('DROP INDEX ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_EmptyIndexName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnFirebird, '   ').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_MessageReferencesESP025;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-025', LMsg) > 0);
 end;
 
 end.
