@@ -1,7 +1,9 @@
 ---
 displayed_sidebar: fluentsqlSidebar
-title: Introdução
+title: Introduction
 ---
+
+> **Documentation language:** this page is being aligned with the **English-first** editorial rule for technical docs; older paragraphs may still be in Portuguese until fully migrated.
 
 ## Problema que resolve
 
@@ -43,4 +45,5 @@ O arquivo [ROADMAP.md](https://github.com/ModernDelphiWorks/FluentSQL/blob/main/
 - **v1.0.6:** quarto incremento (**ESP-012**) — `Column(array of const)` usa `SqlArrayOfConstToParameterizedSql` com `FAST.Params` na projeção; testes `TestColumnArrayOfConstFirebird` / `TestColumnArrayOfConstMySQL` em `test.core.params.pas` — changelog **[1.0.6]**, issue [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25). Dívida técnica pós-caveats: [#26](https://github.com/ModernDelphiWorks/FluentSQL/issues/26).
 - **v1.0.7:** quinto incremento (**ESP-013**) — `CaseExpr(array of const)` usa `SqlArrayOfConstToParameterizedSql` com `FAST.Params` na expressão discriminante do `CASE`; testes `TestCaseExprArrayOfConstFirebird` / `TestCaseExprArrayOfConstMySQL` em `test.core.params.pas` — changelog **[1.0.7]** (rastreio da entrega; não confundir com a issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), hoje **ESP-016**). Dívida técnica pós-caveats: [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28).
 - **v1.0.8:** driver MongoDB (**ESP-014**, **ADR-013**) — SELECT em JSON canónico; DML `insertOne` / `updateMany` / `deleteMany`; breaking change documentado para quem dependia do pseudo-SQL antigo do select — changelog **[1.0.8]**, issue [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29). Dívida técnica pós-caveats: [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30).
-- **v1.0.9:** INSERT em lote (**ESP-015**, **ADR-014**) — `AddRow` no fluente; SQL multi-`VALUES` com placeholders na ordem das linhas; Mongo `insertMany` quando há mais de uma linha; testes `TestInsertBatchTwoRowsFirebird` / `TestInsertBatchTwoRowsMySQL` em `test.core.params.pas` e `TestMongoDB_Insert_SerializesInsertMany` em `UTestFluentSQLFirebird.pas` — changelog **[1.0.9]**, issue [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31). Dívida técnica pós-caveats: [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
+- **v1.0.9:** INSERT em lote (**ESP-015**, **ADR-014**) — `AddRow` no fluente; SQL multi-`VALUES` com placeholders na ordem das linhas; Mongo `insertMany` quando há mais de uma linha; testes `TestInsertBatchTwoRowsFirebird` / `TestInsertBatchTwoRowsMySQL` em `test.core.params.pas` e `TestMongoDB_Insert_SerializesInsertMany` em `UTestFluentSQLFirebird.pas` — changelog **[1.0.9]**; rastreio da entrega: issue [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24) (não confundir com a **#31**, hoje **ESP-019** no GitHub). Dívida técnica pós-caveats: [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
+- **v1.1.0:** **ESP-016** — `ForDialectOnly` / **ADR-016**; **ESP-017** — `CREATE TABLE` (issue [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)); **ESP-018** — `DROP TABLE` ([#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29), [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)); **ESP-019** — `ALTER TABLE ADD COLUMN` ([#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); portal Docusaurus + workflows de CI em `docs-src/` e `.github/workflows/`. Ver `CHANGELOG.md` **[1.1.0]**.

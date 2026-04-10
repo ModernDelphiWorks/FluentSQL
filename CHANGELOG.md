@@ -7,6 +7,20 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-04-09
+
+### Added
+- **Extensão explícita por motor (ESP-016, ADR-016, issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)):** API de opt-in por dialeto (`ForDialectOnly` / serialização por motor), alinhada a `FluentSQL.Serialize.pas` e documentação em `docs-src`.
+- **DDL — CREATE TABLE (ESP-017, ADR-017, issue [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)):** API fluente e `DDLCreateTableSQL` para Firebird e PostgreSQL com `TDDLLogicalType`.
+- **DDL — DROP TABLE (ESP-018, ADR-018, issues [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)):** API fluente e serialização de texto SQL para `DROP TABLE`.
+- **DDL — ALTER TABLE ADD COLUMN (ESP-019, ADR-019, issue [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)):** uma coluna lógica por `AsString`, reutilização do mapeamento de tipos do CREATE e paridade Firebird/PostgreSQL.
+- **Documentação e CI:** portal Docusaurus em `docs-src/`, `ROADMAP.md` operacional, fluxos `.github/workflows/docs-build.yml` e `deploy-docs.yml`, e guias DDL (`ddl-create-table`, `ddl-drop-table`, `ddl-alter-table-add-column`).
+
+### Tests
+- DUnitX em `Test Delphi/test.ddl.pas` para CREATE/DROP/ALTER (matriz referida nos relatórios de review/test; execução MSBuild sujeita a caveats).
+
+Dívida técnica pós-caveats: [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
+
 ## [1.0.9] — 2026-04-08
 
 ### Added
