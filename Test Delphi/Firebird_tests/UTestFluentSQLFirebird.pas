@@ -90,7 +90,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select.All
     .From('CLIENTES')
     .Where('ATIVO').Equal(1);
@@ -107,7 +107,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMySQL)
+  LQuery := FluentSQL.Query(dbnMySQL)
     .Select.All
     .From('CLIENTES')
     .Where('ATIVO').Equal(1);
@@ -124,7 +124,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnPostgreSQL)
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
     .Select.All
     .From('CLIENTES')
     .Where('ATIVO').Equal(1);
@@ -141,7 +141,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Select.All
     .From('CLIENTES');
 
@@ -154,7 +154,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Select.All
     .From('CLIENTES')
     .Where('ATIVO').Equal(1);
@@ -171,7 +171,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnPostgreSQL)
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'ISAQUE')
@@ -189,7 +189,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Update('USUARIOS')
     .SetValue('NOME', 'ISAQUE')
     .Where('ID').Equal(10);
@@ -206,7 +206,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Delete
     .From('USUARIOS')
     .Where('ID').Equal(10);
@@ -222,7 +222,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Select
     .Column('ID')
     .Column('NOME')
@@ -239,7 +239,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'ISAQUE')
@@ -255,7 +255,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'ANA')
@@ -276,7 +276,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Update('USUARIOS')
     .SetValue('NOME', 'ISAQUE')
     .Where('ID').Equal(10);
@@ -291,7 +291,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Delete
     .From('USUARIOS')
     .Where('ID').Equal(10);
@@ -307,7 +307,7 @@ var
   LFull: String;
   LFragment: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Select
     .Column('ID')
     .Column('NOME')
@@ -327,7 +327,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnMongoDB)
+  LQuery := FluentSQL.Query(dbnMongoDB)
     .Select
     .All
     .From('CLIENTES')
@@ -342,7 +342,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('PEDIDOS')
@@ -360,7 +360,7 @@ var
   LQuery: IFluentSQL;
   LSQL: String;
 begin
-  LQuery := TCQ(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('ID').Count.Over('', 'ID').Alias('TOTAL')
@@ -376,12 +376,12 @@ var
   LUnionQuery: IFluentSQL;
   LSQL: String;
 begin
-  LBaseQuery := TCQ(dbnFirebird)
+  LBaseQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('CLIENTES_ATIVOS');
 
-  LUnionQuery := TCQ(dbnFirebird)
+  LUnionQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('CLIENTES_INATIVOS');
@@ -396,12 +396,12 @@ var
   LIntersectQuery: IFluentSQL;
   LSQL: String;
 begin
-  LBaseQuery := TCQ(dbnFirebird)
+  LBaseQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('CLIENTES_ATIVOS');
 
-  LIntersectQuery := TCQ(dbnFirebird)
+  LIntersectQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('CLIENTES_PREFERENCIAIS');
@@ -415,12 +415,12 @@ var
   LBase, LRight, LCompound: IFluentSQL;
   LSQL: String;
 begin
-  LBase := TCQ(dbnFirebird)
+  LBase := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('T1')
     .Where('X').Equal(1);
-  LRight := TCQ(dbnFirebird)
+  LRight := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('T2')
@@ -442,12 +442,12 @@ var
   LBase, LRight, LCompound: IFluentSQL;
   LSQL: String;
 begin
-  LBase := TCQ(dbnFirebird)
+  LBase := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('T1')
     .Where('A').Equal(10);
-  LRight := TCQ(dbnFirebird)
+  LRight := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('T2')
@@ -467,12 +467,12 @@ var
   LBase, LRight, LCompound: IFluentSQL;
   LSQL: String;
 begin
-  LBase := TCQ(dbnFirebird)
+  LBase := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('T1')
     .Where('U').Equal(3);
-  LRight := TCQ(dbnFirebird)
+  LRight := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .From('T2')
@@ -492,12 +492,12 @@ var
   LBase, LRight, LCompound: IFluentSQL;
   LSQL: String;
 begin
-  LBase := TCQ(dbnMySQL)
+  LBase := FluentSQL.Query(dbnMySQL)
     .Select
     .Column('ID')
     .From('T1')
     .Where('X').Equal(1);
-  LRight := TCQ(dbnMySQL)
+  LRight := FluentSQL.Query(dbnMySQL)
     .Select
     .Column('ID')
     .From('T2')

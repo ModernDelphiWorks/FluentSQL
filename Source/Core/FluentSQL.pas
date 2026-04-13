@@ -228,9 +228,11 @@ type
 function Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
 function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
 
-function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL; deprecated 'Use ''FluentSQL.Query'' instead';
 
-function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL; deprecated 'Use ''FluentSQL.Query'' instead';
+
+function Func(const ADatabase: TFluentSQLDriver): IFluentSQLFunctions;
 
 
 implementation
@@ -240,9 +242,40 @@ uses
 
 { FluentSQL }
 
+type
+  TStaticFuncWrapper = class(TInterfacedObject, IFluentSQLFunctions)
+  private
+    FRegister: TFluentSQLRegister;
+    FFuncs: IFluentSQLFunctions;
+  public
+    constructor Create(const ADatabase: TFluentSQLDriver);
+    destructor Destroy; override;
+    property Funcs: IFluentSQLFunctions read FFuncs implements IFluentSQLFunctions;
+  end;
+
+constructor TStaticFuncWrapper.Create(const ADatabase: TFluentSQLDriver);
+begin
+  inherited Create;
+  FRegister := TFluentSQLRegister.Create;
+  FFuncs := TFluentSQLFunctions.Create(ADatabase, FRegister);
+end;
+
+destructor TStaticFuncWrapper.Destroy;
+begin
+  FFuncs := nil;
+  FRegister.Free;
+  inherited;
+end;
+
+function Func(const ADatabase: TFluentSQLDriver): IFluentSQLFunctions;
+begin
+  Result := TStaticFuncWrapper.Create(ADatabase);
+end;
+
 function Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
-  Result := TCQ(ADatabase);
+  // A chamada interna para o construtor evita o warning the deprecation 
+  Result := TFluentSQL.Create(ADatabase);
 end;
 
 function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
@@ -257,7 +290,7 @@ end;
 
 function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
-  Result := TCQ(ADatabase);
+  Result := TFluentSQL.Create(ADatabase);
 end;
 
 

@@ -68,7 +68,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT UPPER(NOME_CLIENTE) AS NOME FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('NOME_CLIENTE').Upper
                                       .Alias('NOME')
@@ -81,7 +81,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT YEAR(NASCTO) FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column.Year('NASCTO')
                                       .From('CLIENTES')
@@ -93,7 +93,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (YEAR(NASCTO) = 9)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -106,7 +106,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT MIN(ID_CLIENTE) AS IDCOUNT FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('ID_CLIENTE').Min
                                       .Alias('IDCOUNT')
@@ -119,7 +119,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (MONTH(NASCTO) = 9)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -132,7 +132,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT MONTH(NASCTO) FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column.Month('NASCTO')
                                       .From('CLIENTES')
@@ -144,7 +144,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT SUBString(NOME_CLIENTE, 1, 2) AS NOME FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('NOME_CLIENTE').SubString(1, 2)
                                       .Alias('NOME')
@@ -157,7 +157,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT LOWER(NOME_CLIENTE) AS NOME FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('NOME_CLIENTE').Lower
                                       .Alias('NOME')
@@ -170,7 +170,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT MAX(ID_CLIENTE) AS IDCOUNT FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('ID_CLIENTE').Max
                                       .Alias('IDCOUNT')
@@ -183,7 +183,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT CONCAT(''-'', NOME) FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                  .Select
                                  .Column.Concat(['''-''', 'NOME'])
                                  .From('CLIENTES')
@@ -195,7 +195,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT CONCAT(''-'', NOME) FROM CLIENTES WHERE (CONCAT(''-'', NOME) = ''-NOME'')';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                  .Select
                                  .Column.Concat(['''-''', 'NOME'])
                                  .From('CLIENTES')
@@ -208,7 +208,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT COUNT(ID_CLIENTE) AS IDCOUNT FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('ID_CLIENTE').Count
                                       .Alias('IDCOUNT')
@@ -221,7 +221,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE NASCTO = ''02/11/2020''';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -234,7 +234,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT DAY(NASCTO) FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column.Day('NASCTO')
                                       .From('CLIENTES')
@@ -246,7 +246,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (DAY(NASCTO) = 9)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')

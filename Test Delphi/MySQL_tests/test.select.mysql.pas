@@ -53,7 +53,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES AS CLI';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .From('CLIENTES').Alias('CLI')
@@ -65,7 +65,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -78,7 +78,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE ID_CLIENTE = 1';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -91,7 +91,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND (ID >= ?) AND (ID <= ?)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -106,7 +106,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND ((ID >= ?) OR (ID <= ?))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -121,7 +121,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT ID_CLIENTE, NOME_CLIENTE FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .Column('ID_CLIENTE')
                                       .Column('NOME_CLIENTE')
@@ -134,7 +134,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT ID_CLIENTE, NOME_CLIENTE, (CASE TIPO_CLIENTE WHEN 0 THEN ''FISICA'' WHEN 1 THEN ''JURIDICA'' ELSE ''PRODUTOR'' END) AS TIPO_PESSOA FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .Column('ID_CLIENTE')
                                       .Column('NOME_CLIENTE')
@@ -154,7 +154,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC LIMIT 3 OFFSET 0';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .First(3)
