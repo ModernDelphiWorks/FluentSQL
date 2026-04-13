@@ -33,6 +33,11 @@ type
     FName: string;
     FLogicalType: TDDLLogicalType;
     FTypeArg: Integer;
+    FNotNull: Boolean;
+    FPrimaryKey: Boolean;
+    FDefaultValue: string;
+    FReferenceTable: string;
+    FReferenceColumn: string;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -42,6 +47,15 @@ type
     function GetName: string;
     function GetLogicalType: TDDLLogicalType;
     function GetTypeArg: Integer;
+    function GetNotNull: Boolean;
+    function GetIsPrimaryKey: Boolean;
+    function GetDefaultValue: string;
+    function GetReferenceTable: string;
+    function GetReferenceColumn: string;
+    procedure SetNotNull(AValue: Boolean);
+    procedure SetPrimaryKey(AValue: Boolean);
+    procedure SetDefaultValue(const AValue: string);
+    procedure SetReferences(const ATableName, AColumnName: string);
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
@@ -67,6 +81,10 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLBuilder;
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
+    function NotNull: IFluentDDLBuilder;
+    function PrimaryKey: IFluentDDLBuilder;
+    function DefaultValue(const AValue: string): IFluentDDLBuilder;
+    function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
   end;
 
@@ -109,6 +127,10 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function NotNull: IFluentDDLAlterTableAddBuilder;
+    function PrimaryKey: IFluentDDLAlterTableAddBuilder;
+    function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
+    function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
 
@@ -272,6 +294,52 @@ begin
   Result := FTypeArg;
 end;
 
+function TFluentDDLColumn.GetNotNull: Boolean;
+begin
+  Result := FNotNull;
+end;
+
+function TFluentDDLColumn.GetIsPrimaryKey: Boolean;
+begin
+  Result := FPrimaryKey;
+end;
+
+function TFluentDDLColumn.GetDefaultValue: string;
+begin
+  Result := FDefaultValue;
+end;
+
+function TFluentDDLColumn.GetReferenceTable: string;
+begin
+  Result := FReferenceTable;
+end;
+
+function TFluentDDLColumn.GetReferenceColumn: string;
+begin
+  Result := FReferenceColumn;
+end;
+
+procedure TFluentDDLColumn.SetNotNull(AValue: Boolean);
+begin
+  FNotNull := AValue;
+end;
+
+procedure TFluentDDLColumn.SetPrimaryKey(AValue: Boolean);
+begin
+  FPrimaryKey := AValue;
+end;
+
+procedure TFluentDDLColumn.SetDefaultValue(const AValue: string);
+begin
+  FDefaultValue := AValue;
+end;
+
+procedure TFluentDDLColumn.SetReferences(const ATableName, AColumnName: string);
+begin
+  FReferenceTable := ATableName;
+  FReferenceColumn := AColumnName;
+end;
+
 { TFluentDDLBuilder }
 
 constructor TFluentDDLBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -354,6 +422,34 @@ end;
 function TFluentDDLBuilder.ColumnBlob(const AName: string): IFluentDDLBuilder;
 begin
   Result := _AddColumn(AName, dltBlob, 0);
+end;
+
+function TFluentDDLBuilder.NotNull: IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetNotNull(True);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.PrimaryKey: IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetPrimaryKey(True);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.DefaultValue(const AValue: string): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetDefaultValue(AValue);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetReferences(ATableName, AColumnName);
+  Result := Self;
 end;
 
 function TFluentDDLBuilder.AsString: string;
@@ -500,6 +596,34 @@ end;
 function TFluentDDLAlterTableAddBuilder.ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
 begin
   Result := _AddColumn(AName, dltBlob, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.NotNull: IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetNotNull(True);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.PrimaryKey: IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetPrimaryKey(True);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetDefaultValue(AValue);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetReferences(ATableName, AColumnName);
+  Result := Self;
 end;
 
 function TFluentDDLAlterTableAddBuilder.AsString: string;
