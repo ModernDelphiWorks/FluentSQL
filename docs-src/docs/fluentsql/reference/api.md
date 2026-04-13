@@ -3,23 +3,24 @@ displayed_sidebar: fluentsqlSidebar
 title: API reference
 ---
 
-Documentation aligned with release **v1.1.1** (2026-04-10): **ESP-016** (per-dialect extension), **ESP-017**–**ESP-019** (DDL string generation, **v1.1.0**), **ESP-020** / **ESP-022** (additional DDL, **v1.1.1**), plus the parametrization and DML history from **ESP-009** through **ESP-015** documented in `CHANGELOG.md`. The public factory and Boss package **FluentSQL** were stabilized in **v1.0.0**; roadmap reconciliation landed in **v1.0.2** (**ESP-008**). Set-operation parameter behavior was strengthened in **v0.2.0**. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
+Documentation aligned with release **v1.2.0** (2026-04-13): **ESP-034** (Advanced Constraints: NotNull, Default, PK), **ESP-035** (Foreign Keys), **ESP-032** (Redis Cache), plus DDL improvements from **v1.1.0** and **v1.1.1**. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
 
 ## Main entry points
 
 | Item | Descrição |
 |------|-----------|
 | Factory / ponto de entrada | **`CreateFluentSQL(dbnFirebird)`** (unit `FluentSQL`); o atalho `TCQ(dbn…)` permanece equivalente. |
-| DDL (`CREATE TABLE`, ESP-017) | **`CreateFluentDDLTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLBuilder`**; **`AsString`** gera só texto SQL. Ver [DDL — CREATE TABLE](../guides/ddl-create-table.md). |
+| DDL (`CREATE TABLE`, ESP-017) | **`CreateFluentDDLTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLBuilder`**; suporte a constraints (**ESP-034**) e chaves estrangeiras (**ESP-035**). Ver [DDL — CREATE TABLE](../guides/ddl-create-table.md). |
 | DDL (`DROP TABLE`, ESP-018) | **`CreateFluentDDLDropTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLDropBuilder`**; encadear **`.IfExists`** antes de **`AsString`** quando aplicável. Ver [DDL — DROP TABLE](../guides/ddl-drop-table.md). |
-| DDL (`ALTER TABLE ADD COLUMN`, ESP-019) | **`CreateFluentDDLAlterTableAddColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableAddBuilder`**; exatamente uma chamada `Column*` antes de **`AsString`**. Ver [DDL — ALTER TABLE ADD COLUMN](../guides/ddl-alter-table-add-column.md). |
+| DDL (`ALTER TABLE ADD COLUMN`, ESP-019) | **`CreateFluentDDLAlterTableAddColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableAddBuilder`**; suporte a constraints e chaves estrangeiras. Ver [DDL — ALTER TABLE ADD COLUMN](../guides/ddl-alter-table-add-column.md). |
 | DDL (`ALTER TABLE DROP COLUMN`, ESP-020) | **`CreateFluentDDLAlterTableDropColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableDropBuilder`**; exatamente uma **`DropColumn`** antes de **`AsString`**. Ver [DDL — ALTER TABLE DROP COLUMN](../guides/ddl-alter-table-drop-column.md). |
-| DDL (`ALTER TABLE RENAME COLUMN`, ESP-030) | **`CreateFluentDDLAlterTableRenameColumn(ADialect, 'TABELA', 'COLUNA_ANTIGA', 'COLUNA_NOVA')`** devolve **`IFluentDDLAlterTableRenameColumnBuilder`**; **`AsString`** gera o texto conforme **ADR-030** (PostgreSQL, Firebird, MySQL). Ver [DDL — ALTER TABLE RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
-| Performance (Cache, ESP-032) | **`.WithCache(provider)`** e **`.WithTTL(seconds)`**: injecta cache provider (ex: Redis) e define tempo de vida; o SQL é gerado apenas uma vez. Ver [Cache Distribuído](../guides/cache-distribuido.md). |
-| DDL (`CREATE INDEX`, ESP-022) | **`CreateFluentDDLCreateIndex(ADialect, 'INDICE', 'TABELA')`** devolve **`IFluentDDLCreateIndexBuilder`**; uma ou mais **`Column`**; opcional **`Unique`**. Ver [DDL — CREATE INDEX](../guides/ddl-create-index.md). |
-| DDL (`DROP INDEX`, ESP-025 / ESP-026 / ESP-027 / ESP-028) | **`CreateFluentDDLDropIndex(ADialect, 'INDICE')`** devolve **`IFluentDDLDropIndexBuilder`**; **`AsString`** gera **`DROP INDEX`**; opcional **`.OnTable`** para **`dbnMySQL`** (**`DROP INDEX … ON …`**, **ADR-028**); opcional **`.IfExists`** para **`DROP INDEX IF EXISTS`** (**ADR-026**, não mapeado para MySQL nesta build); opcional **`.Concurrently`** só em **PostgreSQL** para **`DROP INDEX CONCURRENTLY`** (**ADR-027**). Ver [DDL — DROP INDEX](../guides/ddl-drop-index.md). |
-| DDL (`TRUNCATE TABLE`, ESP-029) | **`CreateFluentDDLTruncateTable(ADialect, 'TABELA')`** devolve **`IFluentDDLTruncateTableBuilder`**; **`AsString`** gera **`TRUNCATE TABLE`**; opcional **`.RestartIdentity`** e **`.Cascade`** só em **PostgreSQL** (**ADR-029**). Ver [DDL — TRUNCATE TABLE](../guides/ddl-truncate-table.md). |
-| DDL (`References`, ESP-035) | Suporte a **`.References('TABELA', 'COLUNA')`** nos builders de **`CREATE TABLE`** e **`ALTER TABLE ADD COLUMN`**; gera a cláusula de chave estrangeira em linha. Ver [DDL — Foreign Keys](../guides/ddl-foreign-keys.md). |
+| DDL (`ALTER TABLE RENAME COLUMN`, ESP-030) | **`CreateFluentDDLAlterTableRenameColumn(ADialect, 'TABELA', 'COLUNA_ANTIGA', 'COLUNA_NOVA')`** devolve **`IFluentDDLAlterTableRenameColumnBuilder`**. Ver [DDL — ALTER TABLE RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
+| Performance (Cache, ESP-032) | **`.WithCache(provider)`** e **`.WithTTL(seconds)`**: injecta cache provider (ex: Redis). Ver [Cache Distribuído](../guides/cache-distribuido.md). |
+| DDL (`CREATE INDEX`, ESP-022) | **`CreateFluentDDLCreateIndex(ADialect, 'INDICE', 'TABELA')`** devolve **`IFluentDDLCreateIndexBuilder`**. |
+| DDL (`DROP INDEX`, ESP-025 … ESP-028) | **`CreateFluentDDLDropIndex(ADialect, 'INDICE')`** devolve **`IFluentDDLDropIndexBuilder`**. |
+| DDL (`TRUNCATE TABLE`, ESP-029) | **`CreateFluentDDLTruncateTable(ADialect, 'TABELA')`** devolve **`IFluentDDLTruncateTableBuilder`**. |
+| **Constraints (ESP-034)** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`** disponíveis após a definição de coluna no builder de DDL. |
+| **Foreign Keys (ESP-035)** | **`.References('TABELA', 'COLUNA')`** disponível no builder de DDL; gera a cláusula REFERENCES. |
 | Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** (v1.0.9) fecha a linha corrente e inicia a próxima para **INSERT em lote** (ver regras abaixo). |
 | Subquery em conjunto | `Union`, `UnionAll` e `Intersect` recebem `IFluentSQL` da ramificação secundária; a AST armazena `UnionType` e `UnionQuery`. |
 

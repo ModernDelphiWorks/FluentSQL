@@ -11,7 +11,21 @@ A partir da entrega **ESP-019** / **ADR-019**, o FluentSQL gera **texto SQL** pa
 
 - **`CreateFluentDDLAlterTableAddColumn(ADialect, 'NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLAlterTableAddBuilder`** (`FluentSQL.Interfaces`).
 
-Chame **um único** método `ColumnInteger`, `ColumnVarChar`, `ColumnBoolean`, etc., e finalize com **`AsString`**. Uma segunda chamada a `Column*` na mesma cadeia levanta **`EArgumentException`** com mensagem estável (regra **ESP-019**).
+Chame **um único** método `ColumnInteger`, `ColumnVarChar`, etc., encadeie as **Constraints Avançadas** (**ESP-034**) ou **Foreign Keys** (**ESP-035**) se necessário, e finalize com **`AsString`**. 
+
+## Exemplo com Constraints (ESP-034 / ESP-035)
+
+```delphi
+  // Adicionar coluna com NOT NULL e DEFAULT
+  LSql := CreateFluentDDLAlterTableAddColumn(dbnPostgreSQL, 'CLIENTES')
+    .ColumnBoolean('VIP').NotNull.DefaultValue(False)
+    .AsString;
+
+  // Adicionar coluna que é uma Chave Estrangeira
+  LSql := CreateFluentDDLAlterTableAddColumn(dbnPostgreSQL, 'PEDIDOS')
+    .ColumnInteger('VENDEDOR_ID').References('VENDEDORES', 'ID')
+    .AsString;
+```
 
 ## Dialetos suportados nesta vertical
 
@@ -33,7 +47,7 @@ O **tipo físico** é o mesmo produzido por **`DDLCreateTableSQL`** para o mesmo
 ## Limitações declaradas
 
 - **Uma coluna** por `AsString`; várias colunas implicam **várias** cadeias na aplicação.
-- Para **`DROP COLUMN`**, ver [ddl-alter-table-drop-column](./ddl-alter-table-drop-column.md) (**ESP-020** / **ADR-020**). Sem **`ALTER COLUMN`**, **`MODIFY`**, defaults, constraints ou **`IF NOT EXISTS`** ao nível de coluna na entrega ADD.
+- Para **`DROP COLUMN`**, ver [ddl-alter-table-drop-column](./ddl-alter-table-drop-column.md) (**ESP-020** / **ADR-020**).
 - Para **`CREATE TABLE`** e **`DROP TABLE`**, ver [ddl-create-table](./ddl-create-table.md) e [ddl-drop-table](./ddl-drop-table.md).
 
 ## Leitura no código

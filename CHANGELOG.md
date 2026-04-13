@@ -7,6 +7,19 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-04-13
+
+### Added
+- **DDL — Foreign Keys (ESP-035, issue [#49]):** added `.References(const ATableName, AColumnName: string)` support for `CREATE TABLE` and `ALTER TABLE ADD COLUMN` (Firebird, PostgreSQL).
+- **DDL — Advanced Constraints (ESP-034, issue [#48]):** support for `NOT NULL`, `DEFAULT`, and `PRIMARY KEY` in `CREATE TABLE` and `ALTER TABLE ADD COLUMN`.
+- **Cache — Redis Provider (ESP-032, issue [#47]):** distributed SQL string caching with support for Redis as a back-end, including deterministic AST-based hashing (`TFluentSQL.AsString`) to prevent cache collisions.
+- **DDL — RENAME COLUMN/TABLE (ESP-030, ESP-031, issues [#45], [#46]):** added `.RenameTo` and `RenameColumn` for PostgreSQL, Firebird, and MySQL.
+- **DDL — TRUNCATE TABLE (ESP-029, issue [#44]):** fluent API for `TRUNCATE TABLE` and serialization across multiple dialects.
+- **DDL — DROP INDEX improvements (ESP-025, ESP-026, ESP-027, ESP-028, issues [#40], [#41], [#42], [#43]):** added `DROP INDEX`, support for `IF EXISTS`, `CONCURRENTLY` (PostgreSQL), and `ON table` (MySQL/MariaDB).
+
+### Changed
+- **Documentation:** updated DDL guides (foreign keys, renaming, create table) and API reference. Root directory cleanup (`VISIBILIDADE-EXECUCAO.md` removed).
+
 ## [1.1.1] — 2026-04-10
 
 ### Added
