@@ -64,6 +64,25 @@ Se em runtime aparecer erro de **select** do dialeto não registrado, veja [Erro
 
 Tabela de migração: `CHANGELOG.md`, entrada **[1.0.0]**.
 
+## Cache Distribuído (Redis)
+
+O FluentSQL suporta cache de strings SQL para evitar serializações repetitivas. A configuração é feita através da injeção de um provedor que implemente `IFluentSQLCacheProvider` (`FluentSQL.Cache.Interfaces.pas`).
+
+O provedor padrão Redis (`TFluentSQLRedisCacheProvider` em `FluentSQL.Cache.Redis.pas`) requer uma função de execução de comandos compatível com o seu driver Redis.
+
+| Método | Finalidade | Padrão |
+|--------|------------|--------|
+| `.WithCache(AProvider)` | Ativa o cache para a instância da query. | `nil` (desativado) |
+| `.WithTTL(ASeconds)` | Define o tempo de vida da entrada no cache. | `3600` (1 hora) |
+
+## Constraints e Chaves Estrangeiras (DDL)
+
+A partir da **v1.2.0**, o builder DDL suporta metadados estendidos:
+- **Primary Key**: `.PrimaryKey` (define chave primária).
+- **Not Null**: `.NotNull` (obrigatoriedade).
+- **Default Value**: `.DefaultValue(AValue)` (valor padrão).
+- **Chaves Estrangeiras**: `.References(ATable, AColumn)` (vínculo com outra tabela).
+
 ## Variáveis de ambiente
 
 Não há variáveis de ambiente obrigatórias documentadas para o uso da biblioteca em tempo de compilação ou runtime.
