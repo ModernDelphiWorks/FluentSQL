@@ -40,6 +40,7 @@ type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
+  IFluentSQLCacheProvider = interface;
 
   IFluentSQLParam = interface
     ['{3320078D-5B6A-4A8E-8C79-D8763B8F8942}']
@@ -290,6 +291,10 @@ type
     function ForDialectOnly(const ADialect: TFluentSQLDriver; const ASqlFragment: string): IFluentSQL; overload;
     /// <summary>ESP-016: same as string overload; scalars bind via IFluentSQLParams (placeholders :pN in AST dialect).</summary>
     function ForDialectOnly(const ADialect: TFluentSQLDriver; const AExpression: array of const): IFluentSQL; overload;
+    /// <summary>ESP-032: inject an optional cache provider.</summary>
+    function WithCache(const AProvider: IFluentSQLCacheProvider): IFluentSQL;
+    /// <summary>ESP-032: set TTL for the cached SQL string.</summary>
+    function WithTTL(const ASeconds: Integer): IFluentSQL;
     //
     function AsFun: IFluentSQLFunctions;
     function AsString: String;
@@ -776,7 +781,28 @@ type
     function AsString: string;
   end;
 
+  /// <summary>ESP-030 / ADR-030: read-only view of ALTER TABLE RENAME COLUMN for serializers.</summary>
+  IFluentDDLAlterTableRenameColumnDef = interface
+    ['{A3C46E7F-B481-6C9D-0F1A-2B3C4D5E6F70}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetOldColumnName: string;
+    function GetNewColumnName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property OldColumnName: string read GetOldColumnName;
+    property NewColumnName: string read GetNewColumnName;
+  end;
+
+  /// <summary>ESP-030: fluent builder for ALTER TABLE RENAME COLUMN SQL text (factory fixes table, old and new names).</summary>
+  IFluentDDLAlterTableRenameColumnBuilder = interface(IFluentDDLAlterTableRenameColumnDef)
+    ['{B4D57F80-C592-7D0E-1A2B-3C4D5E6F7081}']
+    function AsString: string;
+  end;
+
+
   /// <summary>ESP-022 / ADR-022: read-only view of CREATE INDEX for serializers.</summary>
+
   IFluentDDLCreateIndexDef = interface
     ['{A1C24E5F-B37D-4D8E-9A0B-1C2D3E4F5A6B}']
     function GetDialect: TFluentSQLDriver;
@@ -796,6 +822,55 @@ type
     ['{B2D35F6A-C48E-5E9F-A1B2-3D4E5F6A7081}']
     function Column(const AName: string): IFluentDDLCreateIndexBuilder;
     function Unique: IFluentDDLCreateIndexBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-025 / ADR-025; ESP-026 / ADR-026; ESP-027 / ADR-027; ESP-028 / ADR-028: read-only view of DROP INDEX for serializers.</summary>
+  IFluentDDLDropIndexDef = interface
+    ['{3F8E2B41-9C0D-4E5F-A8B1-2D3E4F5A6B7C}']
+    function GetDialect: TFluentSQLDriver;
+    function GetIndexName: string;
+    /// <summary>Table qualifier for MySQL / MariaDB DROP INDEX ... ON ... (empty = not set; see ADR-028).</summary>
+    function GetTableName: string;
+    /// <summary>True when the caller requested IF EXISTS (see ADR-026).</summary>
+    function GetIfExists: Boolean;
+    /// <summary>True when the caller requested CONCURRENTLY (PostgreSQL only; see ADR-027).</summary>
+    function GetConcurrently: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property IndexName: string read GetIndexName;
+    property TableName: string read GetTableName;
+  end;
+
+  /// <summary>ESP-025 / ESP-026 / ESP-027 / ESP-028: fluent builder for DROP INDEX SQL text (one command per AsString).</summary>
+  IFluentDDLDropIndexBuilder = interface(IFluentDDLDropIndexDef)
+    ['{4A9F3C52-AD1E-5F60-B9C2-3E4F5A6B7C8D}']
+    /// <summary>Qualify with ON table for dbnMySQL (required for that dialect; see ADR-028).</summary>
+    function OnTable(const ATable: string): IFluentDDLDropIndexBuilder;
+    /// <summary>Ask for DROP INDEX IF EXISTS where mapped (see ADR-026).</summary>
+    function IfExists: IFluentDDLDropIndexBuilder;
+    /// <summary>Ask for DROP INDEX CONCURRENTLY (PostgreSQL only; see ADR-027).</summary>
+    function Concurrently: IFluentDDLDropIndexBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-029 / ADR-029: read-only view of TRUNCATE TABLE for serializers.</summary>
+  IFluentDDLTruncateTableDef = interface
+    ['{C6E8F1A2-3B4D-5E6F-A7B8-9C0D1E2F3A40}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetRestartIdentity: Boolean;
+    function GetCascade: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property RestartIdentity: Boolean read GetRestartIdentity;
+    property Cascade: Boolean read GetCascade;
+  end;
+
+  /// <summary>ESP-029: fluent builder for TRUNCATE TABLE SQL text (one command per AsString).</summary>
+  IFluentDDLTruncateTableBuilder = interface(IFluentDDLTruncateTableDef)
+    ['{D7F9A2B3-4C5E-6F70-B8C9-0D1E2F3A4B51}']
+    function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function Cascade: IFluentDDLTruncateTableBuilder;
     function AsString: string;
   end;
 

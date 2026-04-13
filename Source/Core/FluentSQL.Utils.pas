@@ -21,6 +21,9 @@ interface
 
 uses
   SysUtils,
+  {$ifndef fpc}
+  System.Hash,
+  {$endif}
   FluentSQL.Interfaces;
 
 type
@@ -43,6 +46,7 @@ type
     class function DateToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDate): String;
     class function DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDateTime): String;
     class function GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TGUID): String;
+    class function GetHash(const AString: String): String;
   end;
 
 implementation
@@ -291,6 +295,16 @@ begin
   else
     raise Exception.Create('VarRecToString: Unsupported parameter type');
   end;
+end;
+
+class function TUtils.GetHash(const AString: String): String;
+begin
+  {$ifndef fpc}
+  Result := THashBobJenkins.GetHashString(AString);
+  {$else}
+  // Simplified hash for FPC if System.Hash is not available
+  Result := IntToHex(Cardinal(AString.GetHashCode), 8);
+  {$endif}
 end;
 
 end.

@@ -27,7 +27,10 @@ function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
 function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
 function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef): string;
 function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
+function DDLAlterTableRenameColumnSQL(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
 function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
+function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
+function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
 
 implementation
 
@@ -95,7 +98,7 @@ end;
 
 function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
 var
-  I: Integer;
+  LI: Integer;
   LParts: string;
   LCol: IFluentDDLColumn;
 begin
@@ -105,9 +108,9 @@ begin
     raise EArgumentException.Create('DDL: empty column list');
 
   LParts := '';
-  for I := 0 to ADef.GetColumnCount - 1 do
+  for LI := 0 to ADef.GetColumnCount - 1 do
   begin
-    LCol := ADef.GetColumn(I);
+    LCol := ADef.GetColumn(LI);
     if LParts <> '' then
       LParts := LParts + ', ';
     LParts := LParts + LCol.Name + ' ' + MapLogicalType(ADef.Dialect, LCol);
@@ -189,6 +192,40 @@ begin
   end;
 end;
 
+function DDLAlterTableRenameColumnSQL(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
+var
+  LTable: string;
+  LOld: string;
+  LNew: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  LTable := Trim(ADef.GetTableName);
+  LOld := Trim(ADef.GetOldColumnName);
+  LNew := Trim(ADef.GetNewColumnName);
+  if LTable = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): table name is required');
+  if LOld = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): old column name is required');
+  if LNew = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): new column name is required');
+  if LOld = LNew then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): old and new column names must differ');
+
+  case ADef.Dialect of
+    dbnPostgreSQL:
+      Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
+    dbnMySQL:
+      Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
+    dbnFirebird:
+      Result := 'ALTER TABLE ' + LTable + ' ALTER ' + LOld + ' TO ' + LNew;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL ALTER TABLE RENAME COLUMN (ESP-030) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
+  end;
+end;
+
 function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
 var
   I: Integer;
@@ -222,6 +259,119 @@ begin
   else
     raise ENotSupportedException.CreateFmt(
       'DDL CREATE INDEX (ESP-022) is not implemented for dialect %d in this build',
+      [Ord(ADef.Dialect)]);
+  end;
+end;
+
+function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
+var
+  LTable: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if Trim(ADef.IndexName) = '' then
+    raise EArgumentException.Create('DDL: index name is required');
+
+  LTable := Trim(ADef.GetTableName);
+
+  case ADef.Dialect of
+    dbnPostgreSQL:
+      begin
+        if LTable <> '' then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX: ON TABLE is not used for PostgreSQL in this vertical (ESP-028 / ADR-028).');
+        if ADef.GetConcurrently then
+        begin
+          if ADef.GetIfExists then
+            Result := 'DROP INDEX CONCURRENTLY IF EXISTS ' + ADef.IndexName
+          else
+            Result := 'DROP INDEX CONCURRENTLY ' + ADef.IndexName;
+        end
+        else if ADef.GetIfExists then
+          Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
+        else
+          Result := 'DROP INDEX ' + ADef.IndexName;
+      end;
+    dbnFirebird:
+      begin
+        if LTable <> '' then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX: ON TABLE is not used for Firebird in this vertical (ESP-028 / ADR-028).');
+        if ADef.GetConcurrently then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX CONCURRENTLY (ESP-027) is not supported for Firebird; only PostgreSQL maps CONCURRENTLY (ADR-027). Use IF EXISTS without CONCURRENTLY per ADR-026.');
+        if ADef.GetIfExists then
+          Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
+        else
+          Result := 'DROP INDEX ' + ADef.IndexName;
+      end;
+    dbnMySQL:
+      begin
+        if ADef.GetConcurrently then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX CONCURRENTLY (ESP-027 / ESP-028) is not supported for MySQL; only PostgreSQL maps CONCURRENTLY (ADR-027).');
+        if LTable = '' then
+          raise EArgumentException.Create(
+            'DDL DROP INDEX: table name is required for MySQL (DROP INDEX ... ON ...); see ESP-028 / ADR-028.');
+        if ADef.GetIfExists then
+          raise ENotSupportedException.Create(
+            'DDL DROP INDEX IF EXISTS is not emitted for MySQL / MariaDB in this build for the standalone DROP INDEX ... ON ... form (ESP-028 / ADR-028); use dialect-specific SQL or omit IfExists.')
+        else
+          Result := 'DROP INDEX ' + ADef.IndexName + ' ON ' + LTable;
+      end;
+  else
+    begin
+      if LTable <> '' then
+        raise ENotSupportedException.Create(
+          'DDL DROP INDEX: ON TABLE is only mapped for dbnMySQL in this vertical (ESP-028 / ADR-028).');
+      if ADef.GetConcurrently then
+        raise ENotSupportedException.CreateFmt(
+          'DDL DROP INDEX CONCURRENTLY (ESP-027) is not implemented for dialect %d; only PostgreSQL supports CONCURRENTLY in this build.',
+          [Ord(ADef.Dialect)])
+      else
+        raise ENotSupportedException.CreateFmt(
+          'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
+          [Ord(ADef.Dialect)]);
+    end;
+  end;
+end;
+
+function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LName: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  LName := Trim(ADef.GetTableName);
+  if LName = '' then
+    raise EArgumentException.Create('DDL TRUNCATE TABLE: table name is required (ESP-029 / ADR-029).');
+
+  case ADef.Dialect of
+    dbnPostgreSQL:
+      begin
+        Result := 'TRUNCATE TABLE ' + LName;
+        if ADef.GetRestartIdentity then
+          Result := Result + ' RESTART IDENTITY';
+        if ADef.GetCascade then
+          Result := Result + ' CASCADE';
+      end;
+    dbnFirebird:
+      begin
+        if ADef.GetRestartIdentity or ADef.GetCascade then
+          raise ENotSupportedException.Create(
+            'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
+        Result := 'TRUNCATE TABLE ' + LName;
+      end;
+    dbnMySQL:
+      begin
+        if ADef.GetRestartIdentity or ADef.GetCascade then
+          raise ENotSupportedException.Create(
+            'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
+        Result := 'TRUNCATE TABLE ' + LName;
+      end;
+  else
+    raise ENotSupportedException.CreateFmt(
+      'DDL TRUNCATE TABLE (ESP-029) is not implemented for dialect %d in this build',
       [Ord(ADef.Dialect)]);
   end;
 end;

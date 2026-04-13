@@ -51,7 +51,7 @@ Para **Firebird** e **PostgreSQL** nesta fatia, a forma é a mesma (identificado
 
 ## Limitações declaradas
 
-- Sem **`DROP INDEX`**, índices parciais, expressões em colunas, **`CONCURRENTLY`**, **`INCLUDE`**, ou opções avançadas de método de acesso (**ADR-022**).
+- Sem índices parciais, expressões em colunas, **`CONCURRENTLY`**, **`INCLUDE`**, ou opções avançadas de método de acesso (**ADR-022**). Para **`DROP INDEX`** (incl. **`IF EXISTS`**, **ESP-026**), ver [DDL — DROP INDEX (ESP-025 / ESP-026)](ddl-drop-index.md).
 - Para **`ALTER TABLE`**, **`CREATE TABLE`** e **`DROP TABLE`**, ver os guias DDL existentes.
 
 ## Leitura no código
