@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-10
+**Última atualização:** 2026-04-13
 
 ## Como este roadmap evolui
 
@@ -94,7 +94,9 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entrega versionada via **`/release`**.
 - [ ] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-030**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação no repositório; issue [#45](https://github.com/ModernDelphiWorks/FluentSQL/issues/45); entrega versionada via **`/release`**.
 - [ ] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (renomear **tabela**; API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-031**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; esta linha cobre o restante alargamento.*
+- [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (API fluente + serialização Firebird e PostgreSQL, **ADR-034**); integração no builder base e testes em `test.ddl.pas`.
+- [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (API fluente + serialização Firebird e PostgreSQL, **ADR-035**); suporte a chaves estrangeiras no builder de DDL e testes em `test.ddl.pas`.
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; esta linha cobre o restante alargamento.*
 
 ---
 
@@ -142,9 +144,12 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 ## Histórico de evolução do roadmap
 
-| Data | Mudança | Referência |
+| Date | Mudança | Referência |
 |------|---------|------------|
-| 2026-04-08 | Introduzidas política de artefato vivo, gatilhos de atualização, bloco **Estado atual**, fase **Meta — Governança** e esta tabela de histórico (demanda ESP-007). | GitHub [#15](https://github.com/ModernDelphiWorks/FluentSQL/issues/15), `.claude/pipeline/esp.md`, `adr.md`, `plan.md` |
+| 2026-04-13 | Entregue **ESP-035** — DDL Foreign Keys (References); código + testes + docs no repo. | `.claude/pipeline/implement-report.md` |
+| 2026-04-13 | Entregue **ESP-034** — Advanced DDL (NotNull, Default, PK); código + testes + docs no repo. | `.claude/pipeline/implement-report.md` |
+| 2026-04-13 | Planeada **ESP-035** — DDL Foreign Keys (References); **ADR-035** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-13 | Planeada **ESP-034** — Advanced DDL (NotNull, Default, PK); **ADR-034** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-08 | Reconciliação **Fase 0** e checklist **R1–R6** com evidências do repositório (CHANGELOG 1.0.x, Boss, testes, docs); **Estado atual** aponta **Fase 1 — parametrização**; dívida interna `FCQL*` documentada (ADR-008). | GitHub [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17), **ESP-008** (`.claude/pipeline/esp.md`), **ADR-008** (`.claude/pipeline/adr.md`), `.claude/pipeline/implement-report.md` |
 | 2026-04-08 | Planejada **ESP-009** — baseline de parametrização DML (fixture `test.core.params.pas`, placeholders `:pN` vs `?`, redução de `SqlParamsToStr` em valores); **ADR-009** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-08 | Release **v1.0.3**: primeiro incremento **ESP-009** (`IN` / `NOT IN` com listas parametrizadas, fixture `test.core.params.pas` em Firebird e MySQL). Caveats: [#20](https://github.com/ModernDelphiWorks/FluentSQL/issues/20). | GitHub [#19](https://github.com/ModernDelphiWorks/FluentSQL/issues/19), `CHANGELOG.md` **[1.0.3]** |
