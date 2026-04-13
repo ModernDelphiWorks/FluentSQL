@@ -35,6 +35,8 @@ type
     FTypeArg: Integer;
     FNotNull: Boolean;
     FPrimaryKey: Boolean;
+    FUnique: Boolean;
+    FCheckCondition: string;
     FDefaultValue: string;
     FReferenceTable: string;
     FReferenceColumn: string;
@@ -49,11 +51,15 @@ type
     function GetTypeArg: Integer;
     function GetNotNull: Boolean;
     function GetIsPrimaryKey: Boolean;
+    function GetIsUnique: Boolean;
+    function GetCheckCondition: string;
     function GetDefaultValue: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     procedure SetNotNull(AValue: Boolean);
     procedure SetPrimaryKey(AValue: Boolean);
+    procedure SetUnique(AValue: Boolean);
+    procedure SetCheck(const ACondition: string);
     procedure SetDefaultValue(const AValue: string);
     procedure SetReferences(const ATableName, AColumnName: string);
   end;
@@ -83,6 +89,8 @@ type
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder;
+    function Unique: IFluentDDLBuilder;
+    function Check(const ACondition: string): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
@@ -129,6 +137,8 @@ type
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder;
+    function Unique: IFluentDDLAlterTableAddBuilder;
+    function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
@@ -233,15 +243,21 @@ type
     function AsString: string;
   end;
 
-function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
-function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
-function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
-function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
-function NewFluentDDLAlterTableRenameColumn(const ADialect: TFluentSQLDriver; const ATableName, AOldColumnName,
-  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
-function NewFluentDDLTruncateTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
+  TFluentSchema = class(TInterfacedObject, IFluentSchema)
+  strict private
+    FDialect: TFluentSQLDriver;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver);
+    function CreateTable(const ATableName: string): IFluentDDLBuilder;
+    function DropTable(const ATableName: string): IFluentDDLDropBuilder;
+    function AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
+    function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
+    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+    function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+    function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+  end;
+
 
 implementation
 
@@ -304,6 +320,16 @@ begin
   Result := FPrimaryKey;
 end;
 
+function TFluentDDLColumn.GetIsUnique: Boolean;
+begin
+  Result := FUnique;
+end;
+
+function TFluentDDLColumn.GetCheckCondition: string;
+begin
+  Result := FCheckCondition;
+end;
+
 function TFluentDDLColumn.GetDefaultValue: string;
 begin
   Result := FDefaultValue;
@@ -327,6 +353,16 @@ end;
 procedure TFluentDDLColumn.SetPrimaryKey(AValue: Boolean);
 begin
   FPrimaryKey := AValue;
+end;
+
+procedure TFluentDDLColumn.SetUnique(AValue: Boolean);
+begin
+  FUnique := AValue;
+end;
+
+procedure TFluentDDLColumn.SetCheck(const ACondition: string);
+begin
+  FCheckCondition := ACondition;
 end;
 
 procedure TFluentDDLColumn.SetDefaultValue(const AValue: string);
@@ -438,6 +474,20 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLBuilder.Unique: IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetUnique(True);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.Check(const ACondition: string): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetCheck(ACondition);
+  Result := Self;
+end;
+
 function TFluentDDLBuilder.DefaultValue(const AValue: string): IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
@@ -453,17 +503,19 @@ begin
 end;
 
 function TFluentDDLBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
   if FColumns.Count = 0 then
     raise EArgumentException.Create('DDL: at least one column is required');
-  Result := DDLCreateTableSQL(Self as IFluentDDLTableDef);
-end;
-
-function NewFluentDDLTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
-begin
-  Result := TFluentDDLBuilder.Create(ADialect, ATableName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateTable(Self as IFluentDDLTableDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLDropBuilder }
@@ -498,15 +550,17 @@ begin
 end;
 
 function TFluentDDLDropBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
-  Result := DDLDropTableSQL(Self as IFluentDDLDropTableDef);
-end;
-
-function NewFluentDDLDropTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
-begin
-  Result := TFluentDDLDropBuilder.Create(ADialect, ATableName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropTable(Self as IFluentDDLDropTableDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLAlterTableAddBuilder }
@@ -612,6 +666,20 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableAddBuilder.Unique: IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetUnique(True);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetCheck(ACondition);
+  Result := Self;
+end;
+
 function TFluentDDLAlterTableAddBuilder.DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn then
@@ -627,17 +695,19 @@ begin
 end;
 
 function TFluentDDLAlterTableAddBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
   if not FHasColumn then
     raise EArgumentException.Create('DDL ALTER TABLE: a column definition is required');
-  Result := DDLAlterTableAddColumnSQL(Self as IFluentDDLAlterTableAddColumnDef);
-end;
-
-function NewFluentDDLAlterTableAddColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
-begin
-  Result := TFluentDDLAlterTableAddBuilder.Create(ADialect, ATableName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.AlterTableAddColumn(Self as IFluentDDLAlterTableAddColumnDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLAlterTableDropBuilder }
@@ -682,17 +752,19 @@ begin
 end;
 
 function TFluentDDLAlterTableDropBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
   if not FHasDrop then
     raise EArgumentException.Create('DDL ALTER TABLE DROP COLUMN: a column target is required');
-  Result := DDLAlterTableDropColumnSQL(Self as IFluentDDLAlterTableDropColumnDef);
-end;
-
-function NewFluentDDLAlterTableDropColumn(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
-begin
-  Result := TFluentDDLAlterTableDropBuilder.Create(ADialect, ATableName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.AlterTableDropColumn(Self as IFluentDDLAlterTableDropColumnDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLAlterTableRenameColumnBuilder }
@@ -728,14 +800,15 @@ begin
 end;
 
 function TFluentDDLAlterTableRenameColumnBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
-  Result := DDLAlterTableRenameColumnSQL(Self as IFluentDDLAlterTableRenameColumnDef);
-end;
-
-function NewFluentDDLAlterTableRenameColumn(const ADialect: TFluentSQLDriver; const ATableName, AOldColumnName,
-  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-begin
-  Result := TFluentDDLAlterTableRenameColumnBuilder.Create(ADialect, ATableName, AOldColumnName, ANewColumnName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.AlterTableRenameColumn(Self as IFluentDDLAlterTableRenameColumnDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLCreateIndexBuilder }
@@ -805,6 +878,8 @@ begin
 end;
 
 function TFluentDDLCreateIndexBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FIndexName) = '' then
     raise EArgumentException.Create('DDL: index name is required');
@@ -812,12 +887,12 @@ begin
     raise EArgumentException.Create('DDL: table name is required');
   if FColumns.Count = 0 then
     raise EArgumentException.Create('DDL CREATE INDEX: at least one column is required');
-  Result := DDLCreateIndexSQL(Self as IFluentDDLCreateIndexDef);
-end;
-
-function NewFluentDDLCreateIndex(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-begin
-  Result := TFluentDDLCreateIndexBuilder.Create(ADialect, AIndexName, ATableName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateIndex(Self as IFluentDDLCreateIndexDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLDropIndexBuilder }
@@ -876,15 +951,17 @@ begin
 end;
 
 function TFluentDDLDropIndexBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FIndexName) = '' then
     raise EArgumentException.Create('DDL: index name is required');
-  Result := DDLDropIndexSQL(Self as IFluentDDLDropIndexDef);
-end;
-
-function NewFluentDDLDropIndex(const ADialect: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
-begin
-  Result := TFluentDDLDropIndexBuilder.Create(ADialect, AIndexName);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropIndex(Self as IFluentDDLDropIndexDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
 { TFluentDDLTruncateTableBuilder }
@@ -931,13 +1008,62 @@ begin
 end;
 
 function TFluentDDLTruncateTableBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
 begin
-  Result := DDLTruncateTableSQL(Self as IFluentDDLTruncateTableDef);
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.TruncateTable(Self as IFluentDDLTruncateTableDef);
+  finally
+    LSerializer.Free;
+  end;
 end;
 
-function NewFluentDDLTruncateTable(const ADialect: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
+{ TFluentSchema }
+
+constructor TFluentSchema.Create(const ADialect: TFluentSQLDriver);
 begin
-  Result := TFluentDDLTruncateTableBuilder.Create(ADialect, ATableName);
+  FDialect := ADialect;
+end;
+
+function TFluentSchema.CreateTable(const ATableName: string): IFluentDDLBuilder;
+begin
+  Result := TFluentDDLBuilder.Create(FDialect, ATableName);
+end;
+
+function TFluentSchema.DropTable(const ATableName: string): IFluentDDLDropBuilder;
+begin
+  Result := TFluentDDLDropBuilder.Create(FDialect, ATableName);
+end;
+
+function TFluentSchema.AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := TFluentDDLAlterTableAddBuilder.Create(FDialect, ATableName);
+end;
+
+function TFluentSchema.AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := TFluentDDLAlterTableDropBuilder.Create(FDialect, ATableName);
+end;
+
+function TFluentSchema.AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+begin
+  Result := TFluentDDLAlterTableRenameColumnBuilder.Create(FDialect, ATableName, AOldColumnName, ANewColumnName);
+end;
+
+function TFluentSchema.CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+begin
+  Result := TFluentDDLCreateIndexBuilder.Create(FDialect, AIndexName, ATableName);
+end;
+
+function TFluentSchema.DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
+begin
+  Result := TFluentDDLDropIndexBuilder.Create(FDialect, AIndexName);
+end;
+
+function TFluentSchema.TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+begin
+  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, ATableName);
 end;
 
 end.
