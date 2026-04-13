@@ -72,7 +72,7 @@ uses
   {$IFDEF FIREBIRD}FluentSQL.SerializeFirebird, FluentSQL.SelectFirebird, FluentSQL.FunctionsFirebird, FluentSQL.DDL.Serialize.Firebird,{$ENDIF}
   {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.SelectMSSQL, FluentSQL.FunctionsMSSQL,{$ENDIF}
   {$IFDEF MYSQL}FluentSQL.SerializeMySQL, FluentSQL.SelectMySQL, FluentSQL.FunctionsMySQL, FluentSQL.DDL.Serialize.MySQL,{$ENDIF}
-  {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.SelectSQLite, FluentSQL.FunctionsSQLite,{$ENDIF}
+  {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.Select.SQLite, FluentSQL.FunctionsSQLite, FluentSQL.DDL.Serialize.SQLite,{$ENDIF}
   {$IFDEF INTERBASE}FluentSQL.SerializeInterbase, FluentSQL.SelectInterbase, FluentSQL.FunctionsInterbase,{$ENDIF}
   {$IFDEF DB2}FluentSQL.SerializeDB2, FluentSQL.SelectDB2, FluentSQL.FunctionsDB2,{$ENDIF}
   {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.SelectOracle, FluentSQL.FunctionsOracle,{$ENDIF}
@@ -185,6 +185,7 @@ begin
   Self.RegisterSerialize(dbnSQLite, TFluentSQLSerializerSQLite.Create);
   Self.RegisterSelect(dbnSQLite, TFluentSQLSelectSQLite.Create);
   Self.RegisterFunctions(dbnSQLite, TFluentSQLFunctionsSQLite.Create);
+  Self.RegisterDDLSerialize(dbnSQLite, TFluentDDLSerializerSQLite.Create);
 end;
 {$ENDIF}
 
