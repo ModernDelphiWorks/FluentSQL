@@ -15,6 +15,7 @@ Documentation aligned with release **v1.1.1** (2026-04-10): **ESP-016** (per-dia
 | DDL (`ALTER TABLE ADD COLUMN`, ESP-019) | **`CreateFluentDDLAlterTableAddColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableAddBuilder`**; exatamente uma chamada `Column*` antes de **`AsString`**. Ver [DDL — ALTER TABLE ADD COLUMN](../guides/ddl-alter-table-add-column.md). |
 | DDL (`ALTER TABLE DROP COLUMN`, ESP-020) | **`CreateFluentDDLAlterTableDropColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableDropBuilder`**; exatamente uma **`DropColumn`** antes de **`AsString`**. Ver [DDL — ALTER TABLE DROP COLUMN](../guides/ddl-alter-table-drop-column.md). |
 | DDL (`ALTER TABLE RENAME COLUMN`, ESP-030) | **`CreateFluentDDLAlterTableRenameColumn(ADialect, 'TABELA', 'COLUNA_ANTIGA', 'COLUNA_NOVA')`** devolve **`IFluentDDLAlterTableRenameColumnBuilder`**; **`AsString`** gera o texto conforme **ADR-030** (PostgreSQL, Firebird, MySQL). Ver [DDL — ALTER TABLE RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
+| Performance (Cache, ESP-032) | **`.WithCache(provider)`** e **`.WithTTL(seconds)`**: injecta cache provider (ex: Redis) e define tempo de vida; o SQL é gerado apenas uma vez. Ver [Cache Distribuído](../guides/cache-distribuido.md). |
 | DDL (`CREATE INDEX`, ESP-022) | **`CreateFluentDDLCreateIndex(ADialect, 'INDICE', 'TABELA')`** devolve **`IFluentDDLCreateIndexBuilder`**; uma ou mais **`Column`**; opcional **`Unique`**. Ver [DDL — CREATE INDEX](../guides/ddl-create-index.md). |
 | DDL (`DROP INDEX`, ESP-025 / ESP-026 / ESP-027 / ESP-028) | **`CreateFluentDDLDropIndex(ADialect, 'INDICE')`** devolve **`IFluentDDLDropIndexBuilder`**; **`AsString`** gera **`DROP INDEX`**; opcional **`.OnTable`** para **`dbnMySQL`** (**`DROP INDEX … ON …`**, **ADR-028**); opcional **`.IfExists`** para **`DROP INDEX IF EXISTS`** (**ADR-026**, não mapeado para MySQL nesta build); opcional **`.Concurrently`** só em **PostgreSQL** para **`DROP INDEX CONCURRENTLY`** (**ADR-027**). Ver [DDL — DROP INDEX](../guides/ddl-drop-index.md). |
 | DDL (`TRUNCATE TABLE`, ESP-029) | **`CreateFluentDDLTruncateTable(ADialect, 'TABELA')`** devolve **`IFluentDDLTruncateTableBuilder`**; **`AsString`** gera **`TRUNCATE TABLE`**; opcional **`.RestartIdentity`** e **`.Cascade`** só em **PostgreSQL** (**ADR-029**). Ver [DDL — TRUNCATE TABLE](../guides/ddl-truncate-table.md). |
@@ -46,9 +47,10 @@ Documentation aligned with release **v1.1.1** (2026-04-10): **ESP-016** (per-dia
 ## Suggested reading in code
 
 - `FluentSQL.Insert.pas` — `AddRow`, batch serialize, `EFluentSQLInsertBatch`.
-- `FluentSQL.pas` — set operations, merged `Params`, `InValues` / `NotIn`, `Column` / `CaseExpr` / `Expression`, `AddRow` delegation.
+- `FluentSQL.pas` — set operations, merged `Params`, `InValues` / `NotIn`, `Column` / `CaseExpr` / `Expression`, `AddRow` delegation and ESP-032 (Cache).
 - `FluentSQL.DDL.pas` / `FluentSQL.DDL.Serialize.pas` — DDL builders and `DDLCreateTableSQL` / `DDLDropTableSQL` / `DDLAlterTableAddColumnSQL` / `DDLAlterTableDropColumnSQL` / `DDLAlterTableRenameColumnSQL` / `DDLCreateIndexSQL`.
 - `FluentSQL.Expression.pas` — `TFluentSQLCriteriaExpression`, `FSQLParams`, ESP-011.
+
 - `FluentSQL.Cases.pas` — `When` / `CASE` with `array of const`.
 - `FluentSQL.Operators.pas` — `IsIn` / `IsNotIn` (arrays vs string).
 - `FluentSQL.Params.pas` — `TFluentSQLMergedParams`.

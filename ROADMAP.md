@@ -92,8 +92,20 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-027** — DDL alargado (7ª vertical): **`DROP INDEX CONCURRENTLY`** (PostgreSQL, **ADR-027**); testes em `test.ddl.pas` e guia em `docs-src`; issue [#42](https://github.com/ModernDelphiWorks/FluentSQL/issues/42); *ver `.claude/pipeline/esp.md` / `plan.md`.*
 - [ ] **ESP-028** — DDL alargado (8ª vertical): **`DROP INDEX … ON …` (MySQL / MariaDB)** (**ADR-028**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação + QA **[#43](https://github.com/ModernDelphiWorks/FluentSQL/issues/43)**; entrega versionada via **`/release`**.
 - [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entrega versionada via **`/release`**.
-- [ ] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-030**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column e **RENAME COLUMN**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; esta linha cobre o restante alargamento.*
+- [ ] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-030**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação no repositório; issue [#45](https://github.com/ModernDelphiWorks/FluentSQL/issues/45); entrega versionada via **`/release`**.
+- [ ] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (renomear **tabela**; API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-031**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; esta linha cobre o restante alargamento.*
+
+---
+
+### Fase 4 — Performance e Extensões Distribuídas
+
+**Objetivo:** Introduzir optimizações para ambientes de larga escala e alta disponibilidade, permitindo que o FluentSQL se integre com caches distribuídas para evitar redundância de processamento.
+
+**Previsão:** Q1 2027
+
+- [x] **ESP-032 — Distributed Cache Support (Redis):** API de cache no Core + Provedor Redis opcional; suporte a hashing de AST para chaves de cache; issue [#47](https://github.com/ModernDelphiWorks/FluentSQL/issues/47).
+
 
 ### Meta — Governança do roadmap (contínuo)
 
@@ -201,4 +213,5 @@ Este checklist detalha as tarefas técnicas necessárias para completar as fases
 ### Critérios de Aceite Gerais
 - [ ] Testes unitários passando em todos os dialetos.
 - [ ] Sem quebras de compatibilidade (Breaking Changes).
-- [ ] Documentação atualizada.
+- [x] Documentação atualizada.
+| 2026-04-13 | **Standardization & Phase 4** | Limpeza do dir root (policy .local-readonly); Início da **Fase 4**; planeada **ESP-032: Distributed Cache Support (Redis)**; baseline pipeline R23. |

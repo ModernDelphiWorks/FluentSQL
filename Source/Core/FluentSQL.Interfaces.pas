@@ -40,6 +40,7 @@ type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
+  IFluentSQLCacheProvider = interface;
 
   IFluentSQLParam = interface
     ['{3320078D-5B6A-4A8E-8C79-D8763B8F8942}']
@@ -290,6 +291,10 @@ type
     function ForDialectOnly(const ADialect: TFluentSQLDriver; const ASqlFragment: string): IFluentSQL; overload;
     /// <summary>ESP-016: same as string overload; scalars bind via IFluentSQLParams (placeholders :pN in AST dialect).</summary>
     function ForDialectOnly(const ADialect: TFluentSQLDriver; const AExpression: array of const): IFluentSQL; overload;
+    /// <summary>ESP-032: inject an optional cache provider.</summary>
+    function WithCache(const AProvider: IFluentSQLCacheProvider): IFluentSQL;
+    /// <summary>ESP-032: set TTL for the cached SQL string.</summary>
+    function WithTTL(const ASeconds: Integer): IFluentSQL;
     //
     function AsFun: IFluentSQLFunctions;
     function AsString: String;
@@ -795,7 +800,9 @@ type
     function AsString: string;
   end;
 
+
   /// <summary>ESP-022 / ADR-022: read-only view of CREATE INDEX for serializers.</summary>
+
   IFluentDDLCreateIndexDef = interface
     ['{A1C24E5F-B37D-4D8E-9A0B-1C2D3E4F5A6B}']
     function GetDialect: TFluentSQLDriver;

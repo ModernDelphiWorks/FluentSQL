@@ -42,6 +42,7 @@ const sidebars: SidebarsConfig = {
             'fluentsql/guides/ddl-alter-table-add-column',
             'fluentsql/guides/ddl-alter-table-drop-column',
             'fluentsql/guides/ddl-alter-table-rename-column',
+            'fluentsql/guides/cache-distribuido',
             'fluentsql/guides/ddl-create-index',
             'fluentsql/guides/ddl-truncate-table',
           ],
