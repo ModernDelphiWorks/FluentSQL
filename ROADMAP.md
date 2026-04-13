@@ -96,7 +96,9 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (renomear **tabela**; API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-031**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
 - [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (API fluente + serialização Firebird e PostgreSQL, **ADR-034**); integração no builder base e testes em `test.ddl.pas`.
 - [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (API fluente + serialização Firebird e PostgreSQL, **ADR-035**); suporte a chaves estrangeiras no builder de DDL e testes em `test.ddl.pas`.
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; esta linha cobre o restante alargamento.*
+- [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído; arquitetura desacoplada e API Hub `FluentSQL.Schema` implementada).
+- [ ] **ESP-036** — Advanced DDL: **Unique & Check Constraints** (Em andamento; inclui revisão geral de qualidade DDL).
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; **Unique/Check** — **ESP-036**; **Refactor Drivers** — **ESP-037**; esta linha cobre o restante alargamento.*
 
 ---
 
@@ -146,6 +148,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-13 | Planeada **ESP-036** — Advanced DDL (Unique, Check); **ADR-036** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Entregue **ESP-035** — DDL Foreign Keys (References); código + testes + docs no repo. | `.claude/pipeline/implement-report.md` |
 | 2026-04-13 | Entregue **ESP-034** — Advanced DDL (NotNull, Default, PK); código + testes + docs no repo. | `.claude/pipeline/implement-report.md` |
 | 2026-04-13 | Planeada **ESP-035** — DDL Foreign Keys (References); **ADR-035** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |

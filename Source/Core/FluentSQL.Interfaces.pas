@@ -20,6 +20,9 @@ unit FluentSQL.Interfaces;
 
 interface
 
+uses
+  FluentSQL.Cache.Interfaces;
+
 type
   TExpressionOperation = (opNone, opAND, opOR, opOperation, opFunction);
   TOperator = (opeNone, opeWhere, opeAND, opeOR);
@@ -40,7 +43,6 @@ type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
-  IFluentSQLCacheProvider = interface;
 
   IFluentSQLParam = interface
     ['{3320078D-5B6A-4A8E-8C79-D8763B8F8942}']
@@ -634,6 +636,49 @@ type
     function IsNotExists(const AValue: String): String; overload;
   end;
 
+  // Forward declarations for DDL structures used by IFluentDDLSerialize and IFluentSchema
+  IFluentDDLTableDef = interface;
+  IFluentDDLDropTableDef = interface;
+  IFluentDDLAlterTableAddColumnDef = interface;
+  IFluentDDLAlterTableDropColumnDef = interface;
+  IFluentDDLAlterTableRenameColumnDef = interface;
+  IFluentDDLCreateIndexDef = interface;
+  IFluentDDLDropIndexDef = interface;
+  IFluentDDLTruncateTableDef = interface;
+
+  IFluentDDLBuilder = interface;
+  IFluentDDLDropBuilder = interface;
+  IFluentDDLAlterTableAddBuilder = interface;
+  IFluentDDLAlterTableDropBuilder = interface;
+  IFluentDDLAlterTableRenameColumnBuilder = interface;
+  IFluentDDLCreateIndexBuilder = interface;
+  IFluentDDLDropIndexBuilder = interface;
+  IFluentDDLTruncateTableBuilder = interface;
+
+  IFluentDDLSerialize = interface
+    ['{84D6A23D-B5F1-4F2E-A9C1-D3E4F5A6B7C8}']
+    function CreateTable(const ADef: IFluentDDLTableDef): string;
+    function DropTable(const ADef: IFluentDDLDropTableDef): string;
+    function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string;
+    function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
+    function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
+    function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
+    function DropIndex(const ADef: IFluentDDLDropIndexDef): string;
+    function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+  end;
+
+  IFluentSchema = interface
+    ['{B1A2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}']
+    function CreateTable(const ATableName: string): IFluentDDLBuilder;
+    function DropTable(const ATableName: string): IFluentDDLDropBuilder;
+    function AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
+    function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
+    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+    function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+    function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+  end;
+
   IFluentSQLFunctions = interface
     ['{5035E399-D3F0-48C6-BACB-9CA6D94B2BE7}']
     // Aggregation functions
@@ -691,6 +736,8 @@ type
     function GetTypeArg: Integer;
     function GetNotNull: Boolean;
     function GetIsPrimaryKey: Boolean;
+    function GetIsUnique: Boolean;
+    function GetCheckCondition: string;
     function GetDefaultValue: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
@@ -699,6 +746,8 @@ type
     property TypeArg: Integer read GetTypeArg;
     property NotNull: Boolean read GetNotNull;
     property IsPrimaryKey: Boolean read GetIsPrimaryKey;
+    property IsUnique: Boolean read GetIsUnique;
+    property CheckCondition: string read GetCheckCondition;
     property DefaultValue: string read GetDefaultValue;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
@@ -726,6 +775,8 @@ type
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder;
+    function Unique: IFluentDDLBuilder;
+    function Check(const ACondition: string): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
@@ -775,6 +826,8 @@ type
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder;
+    function Unique: IFluentDDLAlterTableAddBuilder;
+    function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;

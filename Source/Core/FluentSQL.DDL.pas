@@ -803,6 +803,15 @@ function TFluentDDLAlterTableRenameColumnBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
 begin
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if Trim(FOldColumnName) = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME: old column name is required');
+  if Trim(FNewColumnName) = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME: new column name is required');
+  if SameText(Trim(FOldColumnName), Trim(FNewColumnName)) then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME: old and new names must be different');
+
   LSerializer := TFluentDDLSerialize.Create;
   try
     Result := LSerializer.AlterTableRenameColumn(Self as IFluentDDLAlterTableRenameColumnDef);
@@ -1011,6 +1020,9 @@ function TFluentDDLTruncateTableBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
 begin
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+
   LSerializer := TFluentDDLSerialize.Create;
   try
     Result := LSerializer.TruncateTable(Self as IFluentDDLTruncateTableDef);
