@@ -40,6 +40,12 @@ type
   TFluentSQLDriver = FluentSQL.Interfaces.TFluentSQLDriver;
   FluentSQLFun = FluentSQL.Functions.TFluentSQLFunctions;
 
+  FluentSQL = record
+  public
+    class function Query(const ADatabase: TFluentSQLDriver): IFluentSQL; static;
+    class function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema; static;
+  end;
+
   TFluentSQL = class(TInterfacedObject, IFluentSQL)
   strict private
     class var FDatabaseDafault: TFluentSQLDriver;
@@ -229,29 +235,23 @@ function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
 
 function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
 
-function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
-
-function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
-
-function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
-
-function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
-
-function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
-  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-
-
-function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-
-
-function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
-
-function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
 
 implementation
 
 uses
   FluentSQL.DDL;
+
+{ FluentSQL }
+
+class function FluentSQL.Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
+begin
+  Result := TCQ(ADatabase);
+end;
+
+class function FluentSQL.Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
+begin
+  Result := TFluentSchema.Create(ADatabase);
+end;
 
 function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
@@ -263,48 +263,6 @@ begin
   Result := TCQ(ADatabase);
 end;
 
-function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
-begin
-  Result := NewFluentDDLTable(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
-begin
-  Result := NewFluentDDLDropTable(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
-begin
-  Result := NewFluentDDLAlterTableAddColumn(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
-begin
-  Result := NewFluentDDLAlterTableDropColumn(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
-  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-begin
-  Result := NewFluentDDLAlterTableRenameColumn(ADatabase, ATableName, AOldColumnName, ANewColumnName);
-end;
-
-
-function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-
-begin
-  Result := NewFluentDDLCreateIndex(ADatabase, AIndexName, ATableName);
-end;
-
-function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
-begin
-  Result := NewFluentDDLDropIndex(ADatabase, AIndexName);
-end;
-
-function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
-begin
-  Result := NewFluentDDLTruncateTable(ADatabase, ATableName);
-end;
 
 { TFluentSQL }
 
