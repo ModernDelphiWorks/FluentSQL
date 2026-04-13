@@ -58,7 +58,7 @@ procedure TTestCoreParams.TestParamExtraction;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .All
     .From('CLIENTES')
@@ -80,7 +80,7 @@ procedure TTestCoreParams.TestMultipleParams;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnMySQL)
+  LQuery := FluentSQL.Query(dbnMySQL)
     .Select
     .All
     .From('PRODUTOS')
@@ -95,7 +95,7 @@ procedure TTestCoreParams.TestInsertUpdateParams;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnPostgreSQL)
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'ISAQUE')
@@ -111,7 +111,7 @@ procedure TTestCoreParams.TestWhereArrayOfConst;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .All
     .From('CLIENTES')
@@ -125,7 +125,7 @@ procedure TTestCoreParams.TestHavingArrayOfConst;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .All
     .From('PEDIDOS')
@@ -140,7 +140,7 @@ procedure TTestCoreParams.TestInsertValuesArrayOfConst;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnPostgreSQL)
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'TESTE')
@@ -155,7 +155,7 @@ procedure TTestCoreParams.TestCaseWhenArrayOfConst;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('TIPO_CLIENTE')
@@ -178,7 +178,7 @@ procedure TTestCoreParams.TestCriteriaExpressionArrayOfConstViaWhere;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .All
     .From('CLIENTES');
@@ -193,7 +193,7 @@ var
   LQuery: IFluentSQL;
   LExpr: IFluentSQLCriteriaExpression;
 begin
-  LQuery := CreateFluentSQL(dbnMySQL)
+  LQuery := FluentSQL.Query(dbnMySQL)
     .Select
     .All
     .From('PEDIDOS');
@@ -210,7 +210,7 @@ procedure TTestCoreParams.TestColumnArrayOfConstFirebird;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column(['QTD', '*', 2])
     .From('ITENS');
@@ -224,7 +224,7 @@ procedure TTestCoreParams.TestColumnArrayOfConstMySQL;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnMySQL)
+  LQuery := FluentSQL.Query(dbnMySQL)
     .Select
     .Column(['PRECO', '+', 10])
     .From('PRODUTOS');
@@ -237,7 +237,7 @@ procedure TTestCoreParams.TestCaseExprArrayOfConstFirebird;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('TIPO_CLIENTE')
@@ -262,7 +262,7 @@ procedure TTestCoreParams.TestCaseExprArrayOfConstMySQL;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnMySQL)
+  LQuery := FluentSQL.Query(dbnMySQL)
     .Select
     .Column('ID')
     .Column('TIPO_CLIENTE')
@@ -286,7 +286,7 @@ procedure TTestCoreParams.TestInsertBatchTwoRowsFirebird;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'ANA')
@@ -308,7 +308,7 @@ procedure TTestCoreParams.TestInsertBatchTwoRowsMySQL;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnMySQL)
+  LQuery := FluentSQL.Query(dbnMySQL)
     .Insert
     .Into('USUARIOS')
     .SetValue('NOME', 'ANA')
@@ -326,7 +326,7 @@ procedure TTestCoreParams.TestDialectOnlyOmittedWhenNotTargetDialect;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Insert
     .Into('T')
     .SetValue('A', 1)
@@ -340,7 +340,7 @@ procedure TTestCoreParams.TestDialectOnlyEmittedForTargetDialect;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnPostgreSQL)
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
     .Insert
     .Into('T')
     .SetValue('A', 1)
@@ -353,7 +353,7 @@ procedure TTestCoreParams.TestDialectOnlyArrayOfConstBindsParams;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := CreateFluentSQL(dbnFirebird)
+  LQuery := FluentSQL.Query(dbnFirebird)
     .Select
     .All
     .From('T')

@@ -46,7 +46,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <= 10.9)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -59,7 +59,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <= 10)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -72,7 +72,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR < 10.9)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -85,7 +85,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR < 10)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')

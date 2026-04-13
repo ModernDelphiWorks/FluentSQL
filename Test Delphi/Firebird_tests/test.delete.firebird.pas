@@ -42,7 +42,7 @@ var
   LAsString: String;
 begin
   LAsString := 'DELETE FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Delete
                                       .From('CLIENTES')
                                       .AsString);
@@ -53,7 +53,7 @@ var
   LAsString: String;
 begin
   LAsString := 'DELETE FROM CLIENTES WHERE ID_CLIENTE = 1';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Delete
                                       .From('CLIENTES')
                                       .Where('ID_CLIENTE = 1')
