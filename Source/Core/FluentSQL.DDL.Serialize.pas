@@ -82,6 +82,23 @@ begin
   end;
 end;
 
+function MapConstraints(const ADialect: TFluentSQLDriver; const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.DefaultValue <> '' then
+    Result := Result + ' DEFAULT ' + ACol.DefaultValue;
+  if ACol.NotNull then
+    Result := Result + ' NOT NULL';
+  if ACol.IsPrimaryKey then
+    Result := Result + ' PRIMARY KEY';
+  if ACol.ReferenceTable <> '' then
+  begin
+    Result := Result + ' REFERENCES ' + ACol.ReferenceTable;
+    if ACol.ReferenceColumn <> '' then
+      Result := Result + '(' + ACol.ReferenceColumn + ')';
+  end;
+end;
+
 function MapLogicalType(const ADialect: TFluentSQLDriver; const ACol: IFluentDDLColumn): string;
 begin
   case ADialect of
@@ -94,6 +111,7 @@ begin
       'DDL CREATE TABLE (ESP-017) is not implemented for dialect %d in this build',
       [Ord(ADialect)]);
   end;
+  Result := Result + MapConstraints(ADialect, ACol);
 end;
 
 function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;

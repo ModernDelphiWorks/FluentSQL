@@ -689,9 +689,19 @@ type
     function GetLogicalType: TDDLLogicalType;
     /// <summary>For <c>dltVarChar</c>: max length; otherwise 0.</summary>
     function GetTypeArg: Integer;
+    function GetNotNull: Boolean;
+    function GetIsPrimaryKey: Boolean;
+    function GetDefaultValue: string;
+    function GetReferenceTable: string;
+    function GetReferenceColumn: string;
     property Name: string read GetName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
+    property NotNull: Boolean read GetNotNull;
+    property IsPrimaryKey: Boolean read GetIsPrimaryKey;
+    property DefaultValue: string read GetDefaultValue;
+    property ReferenceTable: string read GetReferenceTable;
+    property ReferenceColumn: string read GetReferenceColumn;
   end;
 
   IFluentDDLTableDef = interface
@@ -714,6 +724,10 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLBuilder;
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
+    function NotNull: IFluentDDLBuilder;
+    function PrimaryKey: IFluentDDLBuilder;
+    function DefaultValue(const AValue: string): IFluentDDLBuilder;
+    function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
   end;
 
@@ -759,6 +773,10 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function NotNull: IFluentDDLAlterTableAddBuilder;
+    function PrimaryKey: IFluentDDLAlterTableAddBuilder;
+    function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
+    function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
 

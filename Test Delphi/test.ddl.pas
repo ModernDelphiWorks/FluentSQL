@@ -14,6 +14,8 @@ type
     [Test]
     procedure TestCreateTable_PostgreSQL_GeneratesExpected;
     [Test]
+    procedure TestCreateTable_WithConstraints_GeneratesExpected;
+    [Test]
     procedure TestLongTextAndBlob_DivergeBetweenFirebirdAndPostgreSQL;
   end;
 
@@ -39,6 +41,8 @@ type
     procedure TestAlterTableAddColumn_PostgreSQL_VarChar_GeneratesExpected;
     [Test]
     procedure TestAlterTableAddColumn_Firebird_Boolean_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddColumn_WithReferences_GeneratesExpected;
     [Test]
     procedure TestAlterTableAddColumn_SecondColumn_RaisesArgumentException;
     [Test]
@@ -231,6 +235,21 @@ begin
     LSql);
 end;
 
+procedure TTestDDLCreateTable.TestCreateTable_WithConstraints_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTable(dbnPostgreSQL, 'USUARIOS')
+    .ColumnInteger('ID').PrimaryKey
+    .ColumnVarChar('NOME', 100).NotNull
+    .ColumnVarChar('EMAIL', 255).DefaultValue('''anon@example.com''')
+    .ColumnInteger('PERFIL_ID').References('PERFIS', 'ID')
+    .AsString;
+  Assert.AreEqual(
+    'CREATE TABLE USUARIOS (ID INTEGER PRIMARY KEY, NOME VARCHAR(100) NOT NULL, EMAIL VARCHAR(255) DEFAULT ''anon@example.com'', PERFIL_ID INTEGER REFERENCES PERFIS(ID))',
+    LSql);
+end;
+
 procedure TTestDDLCreateTable.TestLongTextAndBlob_DivergeBetweenFirebirdAndPostgreSQL;
 var
   LFirebirdSql, LPostgreSql: string;
@@ -313,6 +332,16 @@ begin
     .ColumnBoolean('ATIVO')
     .AsString;
   Assert.AreEqual('ALTER TABLE CLIENTES ADD ATIVO BOOLEAN', LSql);
+end;
+
+procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_WithReferences_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableAddColumn(dbnFirebird, 'PEDIDOS')
+    .ColumnInteger('CLIENTE_ID').References('CLIENTES', 'ID')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE PEDIDOS ADD CLIENTE_ID INTEGER REFERENCES CLIENTES(ID)', LSql);
 end;
 
 procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_SecondColumn_RaisesArgumentException;
