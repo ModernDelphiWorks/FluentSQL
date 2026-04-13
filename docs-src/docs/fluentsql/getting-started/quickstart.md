@@ -28,6 +28,24 @@ begin
 end;
 ```
 
+## Exemplo DDL (ESP-017 / ESP-034)
+
+A partir da **v1.1.0**, você também pode gerar comandos `CREATE TABLE` de forma fluente:
+
+```pascal
+uses FluentSQL;
+
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTable(dbnPostgreSQL, 'USUARIOS')
+    .ColumnInteger('ID').PrimaryKey
+    .ColumnVarChar('NOME', 100).NotNull
+    .ColumnBoolean('ATIVO').DefaultValue(True)
+    .AsString;
+end;
+```
+
 ## SQL e parâmetros
 
 - Use `.AsString` para obter o texto SQL gerado.

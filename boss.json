@@ -1,7 +1,7 @@
 {
 	"name": "FluentSQL",
 	"description": "FluentSQL — fluent API for building SQL across multiple database dialects (Delphi/Lazarus)",
-	"version": "1.1.1",
+	"version": "1.2.0",
 	"homepage": "https://github.com/ModernDelphiWorks/FluentSQL",
 	"license": "MIT",
 	"mainsrc": "./Source",
