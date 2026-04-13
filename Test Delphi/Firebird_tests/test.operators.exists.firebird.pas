@@ -40,11 +40,11 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (EXISTS (SELECT IDCLIENTE FROM PEDIDOS WHERE (PEDIDOS.IDCLIENTE = CLIENTES.IDCLIENTE)))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
-                                 .Where.Exists( CreateFluentSQL(dbnFirebird)
+                                 .Where.Exists( FluentSQL.Query(dbnFirebird)
                                                         .Select
                                                         .Column('IDCLIENTE')
                                                         .From('PEDIDOS')
@@ -58,11 +58,11 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (NOT EXISTS (SELECT IDCLIENTE FROM PEDIDOS WHERE (PEDIDOS.IDCLIENTE = CLIENTES.IDCLIENTE)))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
-                                 .Where.NotExists( CreateFluentSQL(dbnFirebird)
+                                 .Where.NotExists( FluentSQL.Query(dbnFirebird)
                                                         .Select
                                                         .Column('IDCLIENTE')
                                                         .From('PEDIDOS')

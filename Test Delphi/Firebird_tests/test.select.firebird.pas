@@ -70,7 +70,7 @@ begin
                'FROM CLIENTES AS C) AS CLIENTES '+
                'WHERE (ROWNUMBER > 0 AND ROWNUMBER <= 3) '+
                'ORDER BY ID_CLIENTE';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                               .Select
                               .Column('ID_CLIENTE')
                               .Skip(0).First(3)
@@ -84,7 +84,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES AS CLI';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
                                       .From('CLIENTES').Alias('CLI')
@@ -96,7 +96,7 @@ var
   LAsString: String;
 begin
   LAsString := 'clientes.Find( {} )';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMongoDB)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMongoDB)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -108,7 +108,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -121,7 +121,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE ID_CLIENTE = 1';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -134,7 +134,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND (ID >= 10) AND (ID <= 20)';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -149,7 +149,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND ((ID >= 10) OR (ID <= 20))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -164,7 +164,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT ID_CLIENTE, NOME_CLIENTE FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .Column('ID_CLIENTE')
                                       .Column('NOME_CLIENTE')
@@ -177,7 +177,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT ID_CLIENTE, NOME_CLIENTE, (CASE TIPO_CLIENTE WHEN 0 THEN ''FISICA'' WHEN 1 THEN ''JURIDICA'' ELSE ''PRODUTOR'' END) AS TIPO_PESSOA FROM CLIENTES';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .Column('ID_CLIENTE')
                                       .Column('NOME_CLIENTE')
@@ -198,7 +198,7 @@ var
 begin
   LAsString := 'SELECT FIRST 3 SKIP 0 * FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE';
   TFluentSQL.SetDatabaseDafault(dbnFirebird);
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .First(3).Skip(0)
@@ -213,7 +213,7 @@ var
 begin
   LAsString := 'SELECT DISTINCT FIRST 3 SKIP 0 CLI.ID_CLIENTE FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE';
   TFluentSQL.SetDatabaseDafault(dbnFirebird);
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .Distinct
                                  .Column('CLI.ID_CLIENTE')
@@ -228,7 +228,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMSSQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .First(3).Skip(3)
@@ -242,7 +242,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE LIMIT 3 OFFSET 0';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
                                       .First(3).Skip(0)
@@ -256,7 +256,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (SELECT * FROM CLIENTES ORDER BY ID_CLIENTE) T) WHERE ROWNUM <= 3 AND ROWINI > 0';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnOracle)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnOracle)
                                       .Select
                                       .All
                                       .First(3).Skip(0)

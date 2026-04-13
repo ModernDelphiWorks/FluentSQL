@@ -7,6 +7,8 @@ program PTestFluentSQLFirebird;
 {$DEFINE MYSQL}
 {$DEFINE POSTGRESQL}
 {$DEFINE MONGODB}
+{$DEFINE SQLITE}
+{$DEFINE MSSQL}
 uses
   System.SysUtils,
   {$IFDEF TESTINSIGHT}
@@ -21,6 +23,7 @@ uses
   test.ddl in '..\test.ddl.pas',
   test.operators.isin.firebird in 'test.operators.isin.firebird.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
+  FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',
   FluentSQL.Cases in '..\..\Source\Core\FluentSQL.Cases.pas',
   FluentSQL.Core in '..\..\Source\Core\FluentSQL.Core.pas',
   FluentSQL.Delete in '..\..\Source\Core\FluentSQL.Delete.pas',
@@ -44,7 +47,11 @@ uses
   FluentSQL.Select in '..\..\Source\Core\FluentSQL.Select.pas',
   FluentSQL.Serialize in '..\..\Source\Core\FluentSQL.Serialize.pas',
   FluentSQL.DDL.Serialize in '..\..\Source\Core\FluentSQL.DDL.Serialize.pas',
+  FluentSQL.DDL.SerializeAbstract in '..\..\Source\Core\FluentSQL.DDL.SerializeAbstract.pas',
   FluentSQL.DDL in '..\..\Source\Core\FluentSQL.DDL.pas',
+  FluentSQL.DDL.Serialize.Firebird in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Firebird.pas',
+  FluentSQL.DDL.Serialize.MySQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MySQL.pas',
+  FluentSQL.DDL.Serialize.PostgreSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.PostgreSQL.pas',
   FluentSQL.Update in '..\..\Source\Core\FluentSQL.Update.pas',
   FluentSQL.Utils in '..\..\Source\Core\FluentSQL.Utils.pas',
   FluentSQL.Where in '..\..\Source\Core\FluentSQL.Where.pas',
@@ -83,7 +90,9 @@ uses
   FluentSQL.SerializeMySQL in '..\..\Source\Drivers\FluentSQL.SerializeMySQL.pas',
   FluentSQL.SerializeOracle in '..\..\Source\Drivers\FluentSQL.SerializeOracle.pas',
   FluentSQL.SerializePostgreSQL in '..\..\Source\Drivers\FluentSQL.SerializePostgreSQL.pas',
-  FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas';
+  FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas',
+  FluentSQL.DDL.Serialize.SQLite in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas',
+  FluentSQL.DDL.Serialize.MSSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas';
 
 { keep comment here to protect the following conditional from being removed by the IDE when adding a unit }
 {$IFNDEF TESTINSIGHT}

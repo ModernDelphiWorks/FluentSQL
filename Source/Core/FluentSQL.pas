@@ -225,33 +225,63 @@ type
     function WithTTL(const ASeconds: Integer): IFluentSQL;
   end;
 
-function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
 
-function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL; deprecated 'Use ''FluentSQL.Query'' instead';
 
-function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
+function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL; deprecated 'Use ''FluentSQL.Query'' instead';
 
-function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
+function Func(const ADatabase: TFluentSQLDriver): IFluentSQLFunctions;
 
-function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
-
-function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
-
-function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
-  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-
-
-function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-
-
-function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
-
-function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
 
 implementation
 
 uses
   FluentSQL.DDL;
+
+{ FluentSQL }
+
+type
+  TStaticFuncWrapper = class(TInterfacedObject, IFluentSQLFunctions)
+  private
+    FRegister: TFluentSQLRegister;
+    FFuncs: IFluentSQLFunctions;
+  public
+    constructor Create(const ADatabase: TFluentSQLDriver);
+    destructor Destroy; override;
+    property Funcs: IFluentSQLFunctions read FFuncs implements IFluentSQLFunctions;
+  end;
+
+constructor TStaticFuncWrapper.Create(const ADatabase: TFluentSQLDriver);
+begin
+  inherited Create;
+  FRegister := TFluentSQLRegister.Create;
+  FFuncs := TFluentSQLFunctions.Create(ADatabase, FRegister);
+end;
+
+destructor TStaticFuncWrapper.Destroy;
+begin
+  FFuncs := nil;
+  FRegister.Free;
+  inherited;
+end;
+
+function Func(const ADatabase: TFluentSQLDriver): IFluentSQLFunctions;
+begin
+  Result := TStaticFuncWrapper.Create(ADatabase);
+end;
+
+function Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
+begin
+  // A chamada interna para o construtor evita o warning the deprecation 
+  Result := TFluentSQL.Create(ADatabase);
+end;
+
+function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
+begin
+  Result := TFluentSchema.Create(ADatabase);
+end;
 
 function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
@@ -260,51 +290,9 @@ end;
 
 function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
-  Result := TCQ(ADatabase);
+  Result := TFluentSQL.Create(ADatabase);
 end;
 
-function CreateFluentDDLTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLBuilder;
-begin
-  Result := NewFluentDDLTable(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLDropTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLDropBuilder;
-begin
-  Result := NewFluentDDLDropTable(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableAddBuilder;
-begin
-  Result := NewFluentDDLAlterTableAddColumn(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
-begin
-  Result := NewFluentDDLAlterTableDropColumn(ADatabase, ATableName);
-end;
-
-function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
-  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-begin
-  Result := NewFluentDDLAlterTableRenameColumn(ADatabase, ATableName, AOldColumnName, ANewColumnName);
-end;
-
-
-function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-
-begin
-  Result := NewFluentDDLCreateIndex(ADatabase, AIndexName, ATableName);
-end;
-
-function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
-begin
-  Result := NewFluentDDLDropIndex(ADatabase, AIndexName);
-end;
-
-function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
-begin
-  Result := NewFluentDDLTruncateTable(ADatabase, ATableName);
-end;
 
 { TFluentSQL }
 

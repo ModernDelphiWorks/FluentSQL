@@ -53,7 +53,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR IN (:p1, :p2, :p3))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -66,7 +66,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR IN (:p1, :p2, :p3))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -79,7 +79,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR IN (:p1, :p2, :p3))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -92,11 +92,11 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID IN (SELECT IDCLIENTE FROM PEDIDOS))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
-                                 .Where('ID').InValues(CreateFluentSQL(dbnFirebird)
+                                 .Where('ID').InValues(FluentSQL.Query(dbnFirebird)
                                                         .Select
                                                         .Column('IDCLIENTE')
                                                         .From('PEDIDOS').AsString)
@@ -108,7 +108,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR NOT IN (:p1, :p2, :p3))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -121,7 +121,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR NOT IN (:p1, :p2, :p3))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -134,7 +134,7 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR NOT IN (:p1, :p2, :p3))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
@@ -147,11 +147,11 @@ var
   LAsString : String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID NOT IN (SELECT IDCLIENTE FROM PEDIDOS))';
-  Assert.AreEqual(LAsString, CreateFluentSQL(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
                                  .From('CLIENTES')
-                                 .Where('ID').NotIn( CreateFluentSQL(dbnFirebird)
+                                 .Where('ID').NotIn( FluentSQL.Query(dbnFirebird)
                                                         .Select
                                                         .Column('IDCLIENTE')
                                                         .From('PEDIDOS').AsString)
