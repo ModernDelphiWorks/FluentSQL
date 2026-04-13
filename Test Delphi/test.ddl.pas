@@ -217,6 +217,32 @@ type
     procedure TestTruncateTable_SQLite_GeneratesDeleteFrom;
   end;
 
+  [TestFixture]
+  TTestDDLMSSQL = class
+  public
+    [Test]
+    procedure TestCreateTable_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropTable_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropTableIfExists_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddColumn_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableDropColumn_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropIndexIfExists_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_MSSQL_GeneratesExpected;
+  end;
+
+
 implementation
 
 uses
@@ -395,7 +421,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMSSQL).AlterTableAdd('T') // MSSQL is still unsupported in DDL
+      FluentSQL.Schema(dbnDB2).AlterTableAdd('T')
         .ColumnInteger('C')
         .AsString;
     end,
@@ -440,7 +466,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMSSQL).AlterTableDrop('T')
+      FluentSQL.Schema(dbnDB2).AlterTableDrop('T')
         .DropColumn('C')
         .AsString;
     end,
@@ -540,7 +566,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMSSQL).AlterTableRename('T', 'A', 'B').AsString;
+      FluentSQL.Schema(dbnDB2).AlterTableRename('T', 'A', 'B').AsString;
     end,
     ENotSupportedException);
 end;
@@ -676,7 +702,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMSSQL).CreateIndex('IX_X', 'T')
+      FluentSQL.Schema(dbnDB2).CreateIndex('IX_X', 'T')
         .Column('A')
         .AsString;
     end,
@@ -1111,5 +1137,104 @@ begin
   LSql := FluentSQL.Schema(dbnSQLite).TruncateTable('CLIENTES').AsString;
   Assert.AreEqual('DELETE FROM CLIENTES', LSql);
 end;
+
+{ TTestDDLMSSQL }
+
+procedure TTestDDLMSSQL.TestCreateTable_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('CLIENTES')
+    .ColumnInteger('ID')
+    .ColumnVarChar('NOME', 100)
+    .ColumnBoolean('ATIVO')
+    .ColumnDateTime('CRIADO_EM')
+    .ColumnLongText('BIO')
+    .ColumnBlob('FOTO')
+    .AsString;
+  Assert.AreEqual(
+    'CREATE TABLE CLIENTES (ID INT, NOME VARCHAR(100), ATIVO BIT, CRIADO_EM DATETIME2, BIO VARCHAR(MAX), FOTO VARBINARY(MAX))',
+    LSql);
+end;
+
+procedure TTestDDLMSSQL.TestDropTable_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).DropTable('CLIENTES').AsString;
+  Assert.AreEqual('DROP TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestDropTableIfExists_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).DropTable('CLIENTES').IfExists.AsString;
+  Assert.AreEqual('DROP TABLE IF EXISTS CLIENTES', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestAlterTableAddColumn_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAdd('CLIENTES')
+    .ColumnVarChar('EMAIL', 150)
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ADD EMAIL VARCHAR(150)', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestAlterTableDropColumn_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableDrop('CLIENTES')
+    .DropColumn('LEGADO')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES DROP COLUMN LEGADO', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestAlterTableRenameColumn_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableRename('CLIENTES', 'NOME', 'RAZAO_SOCIAL')
+    .AsString;
+  Assert.AreEqual('EXEC sp_rename ''CLIENTES.NOME'', ''RAZAO_SOCIAL'', ''COLUMN''', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestCreateIndex_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateIndex('IX_CLI_NOME', 'CLIENTES')
+    .Column('NOME')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX IX_CLI_NOME ON CLIENTES (NOME)', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestDropIndex_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).DropIndex('IX_CLI_NOME').OnTable('CLIENTES').AsString;
+  Assert.AreEqual('DROP INDEX IX_CLI_NOME ON CLIENTES', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestDropIndexIfExists_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).DropIndex('IX_CLI_NOME').OnTable('CLIENTES').IfExists.AsString;
+  Assert.AreEqual('DROP INDEX IF EXISTS IX_CLI_NOME ON CLIENTES', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestTruncateTable_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).TruncateTable('CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
 
 end.

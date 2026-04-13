@@ -98,7 +98,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (API fluente + serialização Firebird e PostgreSQL, **ADR-035**); suporte a chaves estrangeiras no builder de DDL e testes em `test.ddl.pas`.
 - [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído; arquitetura desacoplada e API Hub `FluentSQL.Schema` implementada).
 - [x] **ESP-036** — Advanced DDL: **Unique & Check Constraints** (Concluído; suporte universal FB/PG/MySQL).
-- [x] **ESP-040** — DDL Support: **SQLite** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE).
+- [x] **ESP-040** — DDL Support: **SQLite** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE — entregue 2026-04-13).
+- [x] **ESP-041** — DDL Support: **MS SQL Server** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE via `sp_rename` — entregue 2026-04-13).
 - [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; **Unique/Check** — **ESP-036**; **Refactor Drivers** — **ESP-037**; esta linha cobre o restante alargamento.*
 
 ---
