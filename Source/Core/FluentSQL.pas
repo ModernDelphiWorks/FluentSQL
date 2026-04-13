@@ -33,7 +33,8 @@ uses
   FluentSQL.Expression,
   FluentSQL.Register,
   FluentSQL.Params,
-  FluentSQL.SerializeMongoDB;
+  FluentSQL.SerializeMongoDB,
+  FluentSQL.Cache.Interfaces;
 
 type
   TFluentSQLDriver = FluentSQL.Interfaces.TFluentSQLDriver;
@@ -63,6 +64,8 @@ type
     FFunction: IFluentSQLFunctions;
     FAST: IFluentSQLAST;
     FRegister: TFluentSQLRegister;
+    FCacheProvider: IFluentSQLCacheProvider;
+    FCacheTTL: Integer;
     procedure _AssertSection(ASections: TSections);
     procedure _AssertOperator(AOperators: TOperators);
     procedure _AssertHaveName;
@@ -218,6 +221,8 @@ type
     /// <summary>MongoDB (dbnMongoDB): fragmento JSON da secção SELECT (ADR-013 §2b); vazio noutros dialetos.</summary>
     function MongoSelectFragment: String;
     function Params: IFluentSQLParams;
+    function WithCache(const AProvider: IFluentSQLCacheProvider): IFluentSQL;
+    function WithTTL(const ASeconds: Integer): IFluentSQL;
   end;
 
 function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
@@ -232,7 +237,16 @@ function CreateFluentDDLAlterTableAddColumn(const ADatabase: TFluentSQLDriver; c
 
 function CreateFluentDDLAlterTableDropColumn(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLAlterTableDropBuilder;
 
+function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
+  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+
+
 function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+
+
+function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
+
+function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
 
 implementation
 
@@ -269,9 +283,27 @@ begin
   Result := NewFluentDDLAlterTableDropColumn(ADatabase, ATableName);
 end;
 
+function CreateFluentDDLAlterTableRenameColumn(const ADatabase: TFluentSQLDriver; const ATableName, AOldColumnName,
+  ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+begin
+  Result := NewFluentDDLAlterTableRenameColumn(ADatabase, ATableName, AOldColumnName, ANewColumnName);
+end;
+
+
 function CreateFluentDDLCreateIndex(const ADatabase: TFluentSQLDriver; const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+
 begin
   Result := NewFluentDDLCreateIndex(ADatabase, AIndexName, ATableName);
+end;
+
+function CreateFluentDDLDropIndex(const ADatabase: TFluentSQLDriver; const AIndexName: string): IFluentDDLDropIndexBuilder;
+begin
+  Result := NewFluentDDLDropIndex(ADatabase, AIndexName);
+end;
+
+function CreateFluentDDLTruncateTable(const ADatabase: TFluentSQLDriver; const ATableName: string): IFluentDDLTruncateTableBuilder;
+begin
+  Result := NewFluentDDLTruncateTable(ADatabase, ATableName);
 end;
 
 { TFluentSQL }
@@ -503,9 +535,51 @@ begin
 end;
 
 function TFluentSQL.AsString: String;
+var
+  LKey: string;
+  I: Integer;
+  LDialectItem: TDialectOnlyFragment;
 begin
   FActiveOperator := opeNone;
+
+  if Assigned(FCacheProvider) then
+  begin
+    // Generate deterministic key based on Dialect and all AST sections to avoid collisions (Review ESP-032 rejection)
+    LKey := Format('dialect:%d|select:%s|insert:%s|update:%s|delete:%s|where:%s|joins:%s|groupby:%s|having:%s|orderby:%s|union:%s|alias:%s', [
+      Integer(FDatabase),
+      FAST.Select.Serialize,
+      FAST.Insert.Serialize,
+      FAST.Update.Serialize,
+      FAST.Delete.Serialize,
+      FAST.Where.Serialize,
+      FAST.Joins.Serialize,
+      FAST.GroupBy.Serialize,
+      FAST.Having.Serialize,
+      FAST.OrderBy.Serialize,
+      FAST.UnionType,
+      FAST.WithAlias
+    ]);
+
+    if Assigned(FAST.UnionQuery) then
+      LKey := LKey + '|unionquery:' + FAST.UnionQuery.AsString;
+
+    for I := 0 to FAST.DialectOnlyCount - 1 do
+    begin
+      LDialectItem := FAST.GetDialectOnlyItem(I);
+      LKey := LKey + Format('|dialectonly:%d:%s', [Integer(LDialectItem.Dialect), LDialectItem.Sql]);
+    end;
+
+    LKey := TUtils.GetHash(LKey);
+
+    Result := FCacheProvider.Get(LKey);
+    if Result <> '' then
+      Exit;
+  end;
+
   Result := FRegister.Serialize(FDatabase).AsString(FAST);
+
+  if Assigned(FCacheProvider) and (Result <> '') then
+    FCacheProvider.SetCache(LKey, Result, FCacheTTL);
 end;
 
 function TFluentSQL.MongoSelectFragment: String;
@@ -597,6 +671,19 @@ begin
   FFunction := TFluentSQLFunctions.Create(FDatabase, FRegister);
   FAST.Clear;
   FActiveOperator := opeNone;
+  FCacheTTL := 3600; // Default TTL: 1 hour
+end;
+
+function TFluentSQL.WithCache(const AProvider: IFluentSQLCacheProvider): IFluentSQL;
+begin
+  FCacheProvider := AProvider;
+  Result := Self;
+end;
+
+function TFluentSQL.WithTTL(const ASeconds: Integer): IFluentSQL;
+begin
+  FCacheTTL := ASeconds;
+  Result := Self;
 end;
 
 function TFluentSQL._CreateJoin(AjoinType: TJoinType; const ATableName: String): IFluentSQL;

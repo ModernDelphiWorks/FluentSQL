@@ -32,7 +32,7 @@ Outros motores levantam **`ENotSupportedException`** com mensagem que referencia
 ## Limitações declaradas
 
 - **Uma coluna** por `AsString`; várias colunas implicam **várias** cadeias na aplicação.
-- Sem **`DROP COLUMN IF EXISTS`**, **`CASCADE`** / **`RESTRICT`**, **`ALTER COLUMN`**, renomear coluna ou constraints nesta entrega.
+- Sem **`DROP COLUMN IF EXISTS`**, **`CASCADE`** / **`RESTRICT`**, **`ALTER COLUMN`**, ou renomear coluna nesta entrega (para **`RENAME COLUMN`**, ver [ddl-alter-table-rename-column](./ddl-alter-table-rename-column.md) — **ESP-030**).
 - Para **`ALTER TABLE ADD COLUMN`**, ver [ddl-alter-table-add-column](./ddl-alter-table-add-column.md) (**ESP-019**). Para **`CREATE TABLE`** e **`DROP TABLE`**, ver [ddl-create-table](./ddl-create-table.md) e [ddl-drop-table](./ddl-drop-table.md).
 
 ## Leitura no código

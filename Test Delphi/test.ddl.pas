@@ -61,6 +61,33 @@ type
   end;
 
   [TestFixture]
+  TTestDDLAlterTableRenameColumn = class
+  public
+    [Test]
+    procedure TestAlterTableRenameColumn_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_TrimsIdentifiersInOutput;
+    [Test]
+    procedure TestAlterTableRenameColumn_EmptyTableName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_EmptyOldName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_EmptyNewName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_SameOldAndNew_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_TrimmedEqualNames_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameColumn_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestAlterTableRenameColumn_UnsupportedDialect_MessageReferencesESP030;
+  end;
+
+  [TestFixture]
   TTestDDLCreateIndex = class
   public
     [Test]
@@ -89,6 +116,84 @@ type
     procedure TestCreateIndex_UnsupportedDialect_RaisesNotSupported;
     [Test]
     procedure TestCreateIndex_UnsupportedDialect_MessageReferencesESP022;
+  end;
+
+  [TestFixture]
+  TTestDDLDropIndex = class
+  public
+    [Test]
+    procedure TestDropIndex_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_Firebird_IfExists_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_IfExists_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_Concurrently_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_Concurrently_IfExists_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_IfExists_Concurrently_SameOutput;
+    [Test]
+    procedure TestDropIndex_Firebird_Concurrently_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_Firebird_Concurrently_MessageReferencesESP027;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_Concurrently_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_Concurrently_MessageReferencesESP027;
+    [Test]
+    procedure TestDropIndex_EmptyIndexName_RaisesArgumentException;
+    [Test]
+    procedure TestDropIndex_MySQL_WithoutOnTable_RaisesArgumentException;
+    [Test]
+    procedure TestDropIndex_MySQL_WithoutOnTable_MessageReferencesESP028;
+    [Test]
+    procedure TestDropIndex_MySQL_OnTable_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_MySQL_OnTable_IfExists_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_MySQL_OnTable_IfExists_MessageReferencesESP028;
+    [Test]
+    procedure TestDropIndex_Firebird_OnTable_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_PostgreSQL_OnTable_RaisesNotSupported;
+    [Test]
+    procedure TestDropIndex_UnsupportedDialect_RaisesNotSupported;
+  end;
+
+  [TestFixture]
+  TTestDDLTruncateTable = class
+  public
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_RestartIdentity_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_Cascade_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_RestartIdentityAndCascade_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_CascadeThenRestartIdentity_SameOutput;
+    [Test]
+    procedure TestTruncateTable_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_Firebird_RestartIdentity_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_Firebird_Cascade_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_MySQL_RestartIdentity_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_MySQL_Cascade_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_Firebird_Modifier_MessageReferencesESP029;
+    [Test]
+    procedure TestTruncateTable_UnsupportedDialect_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_EmptyTableName_RaisesArgumentException;
   end;
 
 implementation
@@ -300,6 +405,122 @@ begin
   Assert.IsTrue(Pos('ESP-020', LMsg) > 0);
 end;
 
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'CLIENTES', 'LEGADO', 'NOVO_NOME')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES RENAME COLUMN LEGADO TO NOVO_NOME', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnMySQL, 'pedidos', 'status_id', 'status_ref')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE pedidos RENAME COLUMN status_id TO status_ref', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnFirebird, 'CLIENTES', 'LEGADO', 'NOVO_NOME')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ALTER LEGADO TO NOVO_NOME', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_TrimsIdentifiersInOutput;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, '  T  ', '  a  ', '  b  ')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE T RENAME COLUMN a TO b', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyTableName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, '', 'A', 'B').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyOldName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', '  ', 'B').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyNewName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', 'A', '').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_SameOldAndNew_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', 'X', 'X').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_TrimmedEqualNames_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnPostgreSQL, 'T', 'X', '  X  ').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLAlterTableRenameColumn(dbnMSSQL, 'T', 'A', 'B').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_UnsupportedDialect_MessageReferencesESP030;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLAlterTableRenameColumn(dbnMSSQL, 'T', 'A', 'B').AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-030', LMsg) > 0);
+end;
+
 procedure TTestDDLCreateIndex.TestCreateIndex_Firebird_GeneratesExpected;
 var
   LSql: string;
@@ -454,6 +675,366 @@ begin
   end;
   Assert.IsTrue(LRaised);
   Assert.IsTrue(Pos('ESP-022', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').AsString;
+  Assert.AreEqual('DROP INDEX IX_CLI_NOME', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').AsString;
+  Assert.AreEqual('DROP INDEX ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_IfExists_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').IfExists.AsString;
+  Assert.AreEqual('DROP INDEX IF EXISTS IX_CLI_NOME', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_IfExists_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').IfExists.AsString;
+  Assert.AreEqual('DROP INDEX IF EXISTS ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_Concurrently_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').Concurrently.AsString;
+  Assert.AreEqual('DROP INDEX CONCURRENTLY ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_Concurrently_IfExists_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').Concurrently.IfExists.AsString;
+  Assert.AreEqual('DROP INDEX CONCURRENTLY IF EXISTS ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_IfExists_Concurrently_SameOutput;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').IfExists.Concurrently.AsString;
+  Assert.AreEqual('DROP INDEX CONCURRENTLY IF EXISTS ix_orders_status', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_Concurrently_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').Concurrently.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_Concurrently_MessageReferencesESP027;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').Concurrently.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-027', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_Concurrently_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').Concurrently.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_Concurrently_MessageReferencesESP027;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').Concurrently.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-027', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_EmptyIndexName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnFirebird, '   ').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_WithoutOnTable_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_WithoutOnTable_MessageReferencesESP028;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').AsString;
+  except
+    on E: EArgumentException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-028', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_OnTable_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLDropIndex(dbnMySQL, 'ix_orders_status').OnTable('orders').AsString;
+  Assert.AreEqual('DROP INDEX ix_orders_status ON orders', LSql);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_OnTable_IfExists_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').OnTable('T').IfExists.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_MySQL_OnTable_IfExists_MessageReferencesESP028;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLDropIndex(dbnMySQL, 'IX_X').OnTable('T').IfExists.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-028', LMsg) > 0);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_Firebird_OnTable_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnFirebird, 'IX_CLI_NOME').OnTable('CLIENTES').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_PostgreSQL_OnTable_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnPostgreSQL, 'ix_orders_status').OnTable('orders').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLDropIndex(dbnOracle, 'IX_X').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_RestartIdentity_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'logs').RestartIdentity.AsString;
+  Assert.AreEqual('TRUNCATE TABLE logs RESTART IDENTITY', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_Cascade_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'orders').Cascade.AsString;
+  Assert.AreEqual('TRUNCATE TABLE orders CASCADE', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_RestartIdentityAndCascade_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'orders').RestartIdentity.Cascade.AsString;
+  Assert.AreEqual('TRUNCATE TABLE orders RESTART IDENTITY CASCADE', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_CascadeThenRestartIdentity_SameOutput;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnPostgreSQL, 'orders').Cascade.RestartIdentity.AsString;
+  Assert.AreEqual('TRUNCATE TABLE orders RESTART IDENTITY CASCADE', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnFirebird, 'CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := CreateFluentDDLTruncateTable(dbnMySQL, 'CLIENTES').AsString;
+  Assert.AreEqual('TRUNCATE TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_RestartIdentity_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnFirebird, 'T').RestartIdentity.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_Cascade_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnFirebird, 'T').Cascade.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_RestartIdentity_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnMySQL, 'T').RestartIdentity.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_Cascade_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnMySQL, 'T').Cascade.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_Modifier_MessageReferencesESP029;
+var
+  LRaised: Boolean;
+  LMsg: string;
+begin
+  LRaised := False;
+  LMsg := '';
+  try
+    CreateFluentDDLTruncateTable(dbnFirebird, 'T').RestartIdentity.AsString;
+  except
+    on E: ENotSupportedException do
+    begin
+      LRaised := True;
+      LMsg := E.Message;
+    end;
+  end;
+  Assert.IsTrue(LRaised);
+  Assert.IsTrue(Pos('ESP-029', LMsg) > 0);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_UnsupportedDialect_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnOracle, 'T').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_EmptyTableName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      CreateFluentDDLTruncateTable(dbnPostgreSQL, '   ').AsString;
+    end,
+    EArgumentException);
 end;
 
 end.

@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-10
+**Última atualização:** 2026-04-13
 
 ## Como este roadmap evolui
 
@@ -26,6 +26,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
 - **Visibilidade de execução (ESP-024):** especificação e ADR em `.claude/pipeline/esp.md` (**ESP-024**) e **ADR-024** em `adr.md`. Quadro executivo e pendências rastreáveis: [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) na raiz (versionado).
+- **DDL — próxima vertical planeada (pipeline):** **ESP-030** — **`ALTER TABLE … RENAME COLUMN`** (**ADR-030**); artefactos em `.claude/pipeline/`; issue GitHub a criar no **`/task`**. **ESP-029** ([#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44)) — **`TRUNCATE TABLE`**: código no repositório; fecho versionado típico **`/develop`** / **`/release`**. **ESP-028** ([#43](https://github.com/ModernDelphiWorks/FluentSQL/issues/43)) — implementação + QA no repositório; fecho versionado em paralelo conforme política. **ESP-025** … **ESP-027** (`DROP INDEX` / **`IF EXISTS`** / **`CONCURRENTLY`**): implementação no repositório; issues [#40](https://github.com/ModernDelphiWorks/FluentSQL/issues/40), [#41](https://github.com/ModernDelphiWorks/FluentSQL/issues/41), [#42](https://github.com/ModernDelphiWorks/FluentSQL/issues/42); fechos versionados e checkboxes do roadmap via **`/develop`** / **`/release`** conforme política.
 - **Décalage roadmap ↔ changelog:** o quadro abaixo agrupa entregas DDL em **v1.1.0** (**ESP-017** … **ESP-019**); a última secção **versionada** em `CHANGELOG.md` neste ramo continua **[1.0.9]** até existir **`/release`** que publique a versão correspondente — nota transparente em [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) (secção 1).
 
 ---
@@ -86,7 +87,27 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-019** — DDL alargado (2ª vertical): **`ALTER TABLE … ADD COLUMN`** com **ADR-019** — entregue **v1.1.0** **2026-04-09** ([#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)).
 - [ ] **ESP-020** — DDL alargado (3ª vertical): **`ALTER TABLE … DROP COLUMN`** com **ADR-020**, testes Firebird + PostgreSQL e guia em `docs-src`; detalhe em `.claude/pipeline/esp.md` / `plan.md`.
 - [ ] **ESP-022** — DDL alargado (4ª vertical): **`CREATE INDEX`** (API fluente + serialização **Firebird** e **PostgreSQL**, **ADR-022**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column), **DROP INDEX** e restantes índices/alterações (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; esta linha cobre o restante alargamento.*
+- [ ] **ESP-025** — DDL alargado (5ª vertical): **`DROP INDEX`** (API fluente + serialização **Firebird** e **PostgreSQL**, **ADR-025**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [ ] **ESP-026** — DDL alargado (6ª vertical): **`DROP INDEX IF EXISTS`** (opt-in na fluent API + serialização **Firebird** e **PostgreSQL**, **ADR-026**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [ ] **ESP-027** — DDL alargado (7ª vertical): **`DROP INDEX CONCURRENTLY`** (PostgreSQL, **ADR-027**); testes em `test.ddl.pas` e guia em `docs-src`; issue [#42](https://github.com/ModernDelphiWorks/FluentSQL/issues/42); *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [ ] **ESP-028** — DDL alargado (8ª vertical): **`DROP INDEX … ON …` (MySQL / MariaDB)** (**ADR-028**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação + QA **[#43](https://github.com/ModernDelphiWorks/FluentSQL/issues/43)**; entrega versionada via **`/release`**.
+- [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entrega versionada via **`/release`**.
+- [ ] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-030**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação no repositório; issue [#45](https://github.com/ModernDelphiWorks/FluentSQL/issues/45); entrega versionada via **`/release`**.
+- [ ] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (renomear **tabela**; API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-031**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
+- [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (API fluente + serialização Firebird e PostgreSQL, **ADR-034**); integração no builder base e testes em `test.ddl.pas`.
+- [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (API fluente + serialização Firebird e PostgreSQL, **ADR-035**); suporte a chaves estrangeiras no builder de DDL e testes em `test.ddl.pas`.
+- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; esta linha cobre o restante alargamento.*
+
+---
+
+### Fase 4 — Performance e Extensões Distribuídas
+
+**Objetivo:** Introduzir optimizações para ambientes de larga escala e alta disponibilidade, permitindo que o FluentSQL se integre com caches distribuídas para evitar redundância de processamento.
+
+**Previsão:** Q1 2027
+
+- [x] **ESP-032 — Distributed Cache Support (Redis):** API de cache no Core + Provedor Redis opcional; suporte a hashing de AST para chaves de cache; issue [#47](https://github.com/ModernDelphiWorks/FluentSQL/issues/47).
+
 
 ### Meta — Governança do roadmap (contínuo)
 
@@ -123,9 +144,12 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 ## Histórico de evolução do roadmap
 
-| Data | Mudança | Referência |
+| Date | Mudança | Referência |
 |------|---------|------------|
-| 2026-04-08 | Introduzidas política de artefato vivo, gatilhos de atualização, bloco **Estado atual**, fase **Meta — Governança** e esta tabela de histórico (demanda ESP-007). | GitHub [#15](https://github.com/ModernDelphiWorks/FluentSQL/issues/15), `.claude/pipeline/esp.md`, `adr.md`, `plan.md` |
+| 2026-04-13 | Entregue **ESP-035** — DDL Foreign Keys (References); código + testes + docs no repo. | `.claude/pipeline/implement-report.md` |
+| 2026-04-13 | Entregue **ESP-034** — Advanced DDL (NotNull, Default, PK); código + testes + docs no repo. | `.claude/pipeline/implement-report.md` |
+| 2026-04-13 | Planeada **ESP-035** — DDL Foreign Keys (References); **ADR-035** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-13 | Planeada **ESP-034** — Advanced DDL (NotNull, Default, PK); **ADR-034** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-08 | Reconciliação **Fase 0** e checklist **R1–R6** com evidências do repositório (CHANGELOG 1.0.x, Boss, testes, docs); **Estado atual** aponta **Fase 1 — parametrização**; dívida interna `FCQL*` documentada (ADR-008). | GitHub [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17), **ESP-008** (`.claude/pipeline/esp.md`), **ADR-008** (`.claude/pipeline/adr.md`), `.claude/pipeline/implement-report.md` |
 | 2026-04-08 | Planejada **ESP-009** — baseline de parametrização DML (fixture `test.core.params.pas`, placeholders `:pN` vs `?`, redução de `SqlParamsToStr` em valores); **ADR-009** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-08 | Release **v1.0.3**: primeiro incremento **ESP-009** (`IN` / `NOT IN` com listas parametrizadas, fixture `test.core.params.pas` em Firebird e MySQL). Caveats: [#20](https://github.com/ModernDelphiWorks/FluentSQL/issues/20). | GitHub [#19](https://github.com/ModernDelphiWorks/FluentSQL/issues/19), `CHANGELOG.md` **[1.0.3]** |
@@ -154,6 +178,11 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | 2026-04-09 | **`/architect` (próxima demanda de produto):** planeada **ESP-022** — **`CREATE INDEX`** (Firebird + PostgreSQL, **ADR-022**); *nota:* **ESP-021** já usada no pipeline para trabalho documental (non-goals / **ADR-021**). Pendente **`/release`** para fecho versionado de **ESP-020** (**#34**) antes ou em paralelo à esteira de implementação, conforme política. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 | 2026-04-10 | **`/architect` — ESP-024:** **ADR-024** e texto em `esp.md` / `plan.md` / `task-input.md` (visibilidade de execução); roadmap alinhado; rascunho inicial de conteúdo para `VISIBILIDADE-EXECUCAO.md`. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 | 2026-04-10 | **ESP-024 — issue [#38](https://github.com/ModernDelphiWorks/FluentSQL/issues/38):** `VISIBILIDADE-EXECUCAO.md` **versionado** na raiz; removida exclusão em `.gitignore`; roadmap com ponte explícita ao documento e décalage. | `VISIBILIDADE-EXECUCAO.md`, `ROADMAP.md`, `.gitignore` |
+| 2026-04-10 | **`/architect` (próxima demanda de produto):** planeada **ESP-025** — **`DROP INDEX`** (**ADR-025**); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; item na Fase 3; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-10 | **`/architect` (próxima demanda):** planeada **ESP-026** — **`DROP INDEX IF EXISTS`** (**ADR-026**); substitui **ESP-025** como “próxima vertical” no estado actual; artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; novo item na Fase 3; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-10 | **`/architect` (próxima demanda de produto):** planeada **ESP-028** — **`DROP INDEX … ON …` (MySQL / MariaDB)** (**ADR-028**); sucede **ESP-027** (código **CONCURRENTLY** no repositório, [#42](https://github.com/ModernDelphiWorks/FluentSQL/issues/42)); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; Fase 3 com novos itens **ESP-027** / **ESP-028**; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-10 | **`/architect` (próxima demanda):** após **ESP-028** implementado e QA **#43** — planeada **ESP-029** **`TRUNCATE TABLE`** (**ADR-029**); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; Fase 3 com item **ESP-029**; **Estado actual** e checklist rodada 20; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
+| 2026-04-10 | **`/architect` (próxima demanda):** após **ESP-029** com código no repo (**#44**) — planeada **ESP-030** **`ALTER TABLE … RENAME COLUMN`** (**ADR-030**); artefactos `esp.md`, `adr.md`, `plan.md`, `task-input.md`; Fase 3 com item **ESP-030**; checklist rodada 21; próximo passo **`/task`** (issue a criar). | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md`, `checklist.md`, `ROADMAP.md` |
 
 ---
 
@@ -189,4 +218,5 @@ Este checklist detalha as tarefas técnicas necessárias para completar as fases
 ### Critérios de Aceite Gerais
 - [ ] Testes unitários passando em todos os dialetos.
 - [ ] Sem quebras de compatibilidade (Breaking Changes).
-- [ ] Documentação atualizada.
+- [x] Documentação atualizada.
+| 2026-04-13 | **Standardization & Phase 4** | Limpeza do dir root (policy .local-readonly); Início da **Fase 4**; planeada **ESP-032: Distributed Cache Support (Redis)**; baseline pipeline R23. |
