@@ -33,6 +33,7 @@ type
     FCQLSelect: TDictionary<string, IFluentSQLSelect>;
     FCQLWhere: TDictionary<string, IFluentSQLWhere>;
     FCQLFunctions: TDictionary<string, IFluentSQLFunctions>;
+    FCQLDDLSerialize: TDictionary<string, IFluentDDLSerialize>;
   private
     procedure _RegisterDrivers;
     {$IFDEF FIREBIRD}procedure _RegisterFirebird;{$ENDIF}
@@ -61,20 +62,22 @@ type
     function Functions(const ADriverName: TFluentSQLDriver): IFluentSQLFunctions;
     procedure RegisterSerialize(const ADriverName: TFluentSQLDriver; const ACQLSelect: IFluentSQLSerialize);
     function Serialize(const ADriverName: TFluentSQLDriver): IFluentSQLSerialize;
+    procedure RegisterDDLSerialize(const ADriverName: TFluentSQLDriver; const ACQLDDLSerialize: IFluentDDLSerialize);
+    function DDLSerialize(const ADriverName: TFluentSQLDriver): IFluentDDLSerialize;
   end;
 
 implementation
 
 uses
-  {$IFDEF FIREBIRD}FluentSQL.SerializeFirebird, FluentSQL.SelectFirebird, FluentSQL.FunctionsFirebird,{$ENDIF}
-  {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.SelectMSSQL, FluentSQL.FunctionsMSSQL,{$ENDIF}
-  {$IFDEF MYSQL}FluentSQL.SerializeMySQL, FluentSQL.SelectMySQL, FluentSQL.FunctionsMySQL,{$ENDIF}
-  {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.SelectSQLite, FluentSQL.FunctionsSQLite,{$ENDIF}
+  {$IFDEF FIREBIRD}FluentSQL.SerializeFirebird, FluentSQL.SelectFirebird, FluentSQL.FunctionsFirebird, FluentSQL.DDL.Serialize.Firebird,{$ENDIF}
+  {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.SelectMSSQL, FluentSQL.FunctionsMSSQL, FluentSQL.DDL.Serialize.MSSQL,{$ENDIF}
+  {$IFDEF MYSQL}FluentSQL.SerializeMySQL, FluentSQL.SelectMySQL, FluentSQL.FunctionsMySQL, FluentSQL.DDL.Serialize.MySQL,{$ENDIF}
+  {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.Select.SQLite, FluentSQL.FunctionsSQLite, FluentSQL.DDL.Serialize.SQLite,{$ENDIF}
   {$IFDEF INTERBASE}FluentSQL.SerializeInterbase, FluentSQL.SelectInterbase, FluentSQL.FunctionsInterbase,{$ENDIF}
   {$IFDEF DB2}FluentSQL.SerializeDB2, FluentSQL.SelectDB2, FluentSQL.FunctionsDB2,{$ENDIF}
   {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.SelectOracle, FluentSQL.FunctionsOracle,{$ENDIF}
   {$IFDEF INFORMIX}FluentSQL.SerializeInformix, FluentSQL.SelectInformix, FluentSQL.FunctionsInformix,{$ENDIF}
-  {$IFDEF POSTGRESQL}FluentSQL.SerializePostgreSQL, FluentSQL.SelectPostgreSQL, FluentSQL.FunctionsPostgreSQL,{$ENDIF}
+  {$IFDEF POSTGRESQL}FluentSQL.SerializePostgreSQL, FluentSQL.SelectPostgreSQL, FluentSQL.FunctionsPostgreSQL, FluentSQL.DDL.Serialize.PostgreSQL,{$ENDIF}
   {$IFDEF ADS}FluentSQL.SerializeADS, FluentSQL.SelectADS, FluentSQL.FunctionsADS,{$ENDIF}
   {$IFDEF ASA}FluentSQL.SerializeASA, FluentSQL.SelectASA, FluentSQL.FunctionsASA,{$ENDIF}
   {$IFDEF ABSOLUTEDB}FluentSQL.SerializeAbsoluteDB, FluentSQL.SelectAbsoluteDB, FluentSQL.FunctionsAbsoluteDB,{$ENDIF}
@@ -96,6 +99,7 @@ begin
   FCQLWhere := TDictionary<string, IFluentSQLWhere>.Create;
   FCQLSerialize := TDictionary<string, IFluentSQLSerialize>.Create;
   FCQLFunctions := TDictionary<string, IFluentSQLFunctions>.Create;
+  FCQLDDLSerialize := TDictionary<string, IFluentDDLSerialize>.Create;
 
   _RegisterDrivers;
 end;
@@ -119,6 +123,11 @@ begin
   for LKey in FCQLFunctions.Keys do
     FCQLFunctions[LKey] := nil;
   FCQLFunctions.Free;
+
+  for LKey in FCQLDDLSerialize.Keys do
+    FCQLDDLSerialize[LKey] := nil;
+  FCQLDDLSerialize.Free;
+
   inherited;
 end;
 
@@ -147,6 +156,7 @@ begin
   Self.RegisterSerialize(dbnFirebird, TFluentSQLSerializerFirebird.Create);
   Self.RegisterSelect(dbnFirebird, TFluentSQLSelectFirebird.Create);
   Self.RegisterFunctions(dbnFirebird, TFluentSQLFunctionsFirebird.Create);
+  Self.RegisterDDLSerialize(dbnFirebird, TFluentDDLSerializerFirebird.Create);
 end;
 {$ENDIF}
 
@@ -156,6 +166,7 @@ begin
   Self.RegisterSerialize(dbnMSSQL, TFluentSQLSerializerMSSQL.Create);
   Self.RegisterSelect(dbnMSSQL, TFluentSQLSelectMSSQL.Create);
   Self.RegisterFunctions(dbnMSSQL, TFluentSQLFunctionsMSSQL.Create);
+  Self.RegisterDDLSerialize(dbnMSSQL, TFluentDDLSerializerMSSQL.Create);
 end;
 {$ENDIF}
 
@@ -165,6 +176,7 @@ begin
   Self.RegisterSerialize(dbnMySQL, TFluentSQLSerializerMySQL.Create);
   Self.RegisterSelect(dbnMySQL, TFluentSQLSelectMySQL.Create);
   Self.RegisterFunctions(dbnMySQL, TFluentSQLFunctionsMySQL.Create);
+  Self.RegisterDDLSerialize(dbnMySQL, TFluentDDLSerializerMySQL.Create);
 end;
 {$ENDIF}
 
@@ -174,6 +186,7 @@ begin
   Self.RegisterSerialize(dbnSQLite, TFluentSQLSerializerSQLite.Create);
   Self.RegisterSelect(dbnSQLite, TFluentSQLSelectSQLite.Create);
   Self.RegisterFunctions(dbnSQLite, TFluentSQLFunctionsSQLite.Create);
+  Self.RegisterDDLSerialize(dbnSQLite, TFluentDDLSerializerSQLite.Create);
 end;
 {$ENDIF}
 
@@ -219,6 +232,7 @@ begin
   Self.RegisterSerialize(dbnPostgreSQL, TFluentSQLSerializerPostgreSQL.Create);
   Self.RegisterSelect(dbnPostgreSQL, TFluentSQLSelectPostgreSQL.Create);
   Self.RegisterFunctions(dbnPostgreSQL, TFluentSQLFunctionsPostgreSQL.Create);
+  Self.RegisterDDLSerialize(dbnPostgreSQL, TFluentDDLSerializerPostgreSQL.Create);
 end;
 {$ENDIF}
 
@@ -325,6 +339,19 @@ end;
 procedure TFluentSQLRegister.RegisterWhere(const ADriverName: TFluentSQLDriver; const ACQLWhere: IFluentSQLWhere);
 begin
   FCQLWhere.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLWhere);
+end;
+
+function TFluentSQLRegister.DDLSerialize(const ADriverName: TFluentSQLDriver): IFluentDDLSerialize;
+begin
+  if not FCQLDDLSerialize.ContainsKey(TStrDBEngineName[ADriverName]) then
+    raise ENotSupportedException.Create('O DDL serialize do banco ' + TStrDBEngineName[ADriverName] + ' no est registrado!');
+
+  Result := FCQLDDLSerialize[TStrDBEngineName[ADriverName]];
+end;
+
+procedure TFluentSQLRegister.RegisterDDLSerialize(const ADriverName: TFluentSQLDriver; const ACQLDDLSerialize: IFluentDDLSerialize);
+begin
+  FCQLDDLSerialize.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLDDLSerialize);
 end;
 
 end.

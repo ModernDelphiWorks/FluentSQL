@@ -94,7 +94,7 @@ begin
     LProvider := TFluentSQLRedisCacheProvider.Create(LMock.Execute);
     
     // First call: Miss
-    S1 := CreateFluentSQL(dbnFirebird)
+    S1 := FluentSQL.Query(dbnFirebird)
       .WithCache(LProvider)
       .Select.All.From('USERS')
       .AsString;
@@ -102,7 +102,7 @@ begin
     Assert.AreEqual(2, LMock.CallCount); // 1 GET (miss) + 1 SET
     
     // Second call: Hit (re-runing same builder logic)
-    S2 := CreateFluentSQL(dbnFirebird)
+    S2 := FluentSQL.Query(dbnFirebird)
       .WithCache(LProvider)
       .Select.All.From('USERS')
       .AsString;
@@ -123,7 +123,7 @@ begin
   try
     LProvider := TFluentSQLRedisCacheProvider.Create(LMock.Execute);
     
-    CreateFluentSQL(dbnFirebird)
+    FluentSQL.Query(dbnFirebird)
       .WithCache(LProvider)
       .Select.All.From('USERS')
       .AsString;
@@ -145,13 +145,13 @@ begin
     LProvider := TFluentSQLRedisCacheProvider.Create(LMock.Execute);
     
     // Query without OrderBy
-    S1 := CreateFluentSQL(dbnFirebird)
+    S1 := FluentSQL.Query(dbnFirebird)
       .WithCache(LProvider)
       .Select.All.From('USERS')
       .AsString;
       
     // Query WITH OrderBy
-    S2 := CreateFluentSQL(dbnFirebird)
+    S2 := FluentSQL.Query(dbnFirebird)
       .WithCache(LProvider)
       .Select.All.From('USERS')
       .OrderBy('ID')
@@ -176,7 +176,7 @@ begin
     LProvider := TFluentSQLRedisCacheProvider.Create(LMock.Execute);
     
     // FailNext throws on the first call (GET)
-    S := CreateFluentSQL(dbnFirebird)
+    S := FluentSQL.Query(dbnFirebird)
       .WithCache(LProvider)
       .Select.All.From('USERS')
       .AsString;

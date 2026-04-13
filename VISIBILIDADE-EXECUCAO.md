@@ -48,7 +48,8 @@ Resumo derivado do **`ROADMAP.md`** (checkboxes `[x]` e texto **Estado actual**)
 | MongoDB ESP-014 | **CHANGELOG [1.0.8]** |
 | Batch INSERT ESP-015 | **CHANGELOG [1.0.9]** |
 | ESP-016 — extensão explícita por motor | Fecho formal referido no **ROADMAP** (issue **#27**). |
-| ESP-017 … ESP-019 (DDL: CREATE/DROP/ALTER ADD COLUMN) | Marcadas como entregues no **ROADMAP** (v1.1.0 / 2026-04-09); **confirmar** alinhamento com **`CHANGELOG`** quando a versão correspondente existir (ver nota na secção 1). |
+| ESP-017 … ESP-039 (DDL e Core) | Suporte completo a DDL (CREATE, DROP, ALTER, INDEX, TRUNCATE) em FB/PG/MySQL; refatoração de entrypoints e remoção de globais concluídas em **2026-04-13**. |
+| ESP-040 — Suporte DDL SQLite | Planeado para a próxima rodada operacional. |
 | Operações de conjunto no núcleo | `UNION`, `UNION ALL`, `INTERSECT` — conforme **ROADMAP** Fase 2. |
 
 ---
@@ -62,9 +63,7 @@ Lista **apenas** a partir de itens ainda **abertos** no `ROADMAP.md` ou da **est
 | Local no ROADMAP | Item (resumo) |
 |------------------|----------------|
 | Fase 1 | Linha principal **Prepared Statements (Parametrização)** permanece `[ ]` no roadmap; o texto do mesmo bloco lista incrementos já entregues — **o fecho total da linha** depende de reconciliação explícita contigo (o que falta para marcar a caixa). |
-| Fase 3 | **ESP-020** — `ALTER TABLE … DROP COLUMN` (**ADR-020**, issue **#34**) — `[ ]` |
-| Fase 3 | **ESP-022** — `CREATE INDEX` (Firebird + PostgreSQL, **ADR-022**, issue **#35**) — `[ ]` |
-| Fase 3 | **DDL fluente (âmbito alargado)** — além de ADD/DROP column e CREATE INDEX — `[ ]` (avaliar portabilidade; específico de motor → ESP-016 ou app). |
+| Fase 3 | **ESP-040** — `DDL SQLite Support` — `[ ]` |
 | Meta — Governança | Atualizar registo de sprints / histórico / rever previsões — itens `[ ]` conforme tabela no roadmap. |
 | Registro de sprints | **Sprint 1** — `[ ]` |
 | Checklist de execução (final do ROADMAP) | Vários itens em **Sprint 1** (slices de parametrização) e **Slice 4 ESP-016** ainda `[ ]`; critérios gerais (testes todos os dialetos, sem breaking, docs) `[ ]` — **sincronizar** com o estado real da suíte e da CI (pode haver obsolescência parcial face às entregas já listadas no changelog). |

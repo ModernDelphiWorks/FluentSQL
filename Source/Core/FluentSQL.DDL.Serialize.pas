@@ -1,7 +1,9 @@
 {
   ------------------------------------------------------------------------------
   FluentSQL
-  ESP-017: CREATE TABLE string generation per dialect (no execution).
+  DDL Serialization Proxy (ESP-037).
+  Delegates DDL generation to registered drivers via the Driver/Registry
+  architecture. Public surface: TFluentDDLSerialize class only.
 
   SPDX-License-Identifier: MIT
   Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
@@ -13,366 +15,130 @@
 
 unit FluentSQL.DDL.Serialize;
 
+interface
+
 {$ifdef fpc}
   {$mode delphi}{$H+}
 {$endif}
 
-interface
-
 uses
   SysUtils,
-  FluentSQL.Interfaces;
+  FluentSQL.Interfaces,
+  FluentSQL.DDL.SerializeAbstract;
 
-function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
-function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
-function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef): string;
-function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
-function DDLAlterTableRenameColumnSQL(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
-function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
-function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
-function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
+type
+  TFluentDDLSerialize = class(TFluentDDLSerializeAbstract, IFluentDDLSerialize)
+  public
+    function CreateTable(const ADef: IFluentDDLTableDef): string; override;
+    function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
+    function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
+    function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
+    function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
+    function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
+    function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+  end;
 
 implementation
 
-function MapLogicalTypeFirebird(const ACol: IFluentDDLColumn): string;
-begin
-  case ACol.LogicalType of
-    dltInteger:
-      Result := 'INTEGER';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'TIMESTAMP';
-    dltLongText:
-      Result := 'BLOB SUB_TYPE 1';
-    dltBlob:
-      Result := 'BLOB SUB_TYPE 0';
-  else
-    raise ENotSupportedException.Create('DDL: unknown logical type');
-  end;
-end;
+uses
+  FluentSQL.Register;
 
-function MapLogicalTypePostgreSQL(const ACol: IFluentDDLColumn): string;
-begin
-  case ACol.LogicalType of
-    dltInteger:
-      Result := 'INTEGER';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'TIMESTAMP';
-    dltLongText:
-      Result := 'TEXT';
-    dltBlob:
-      Result := 'BYTEA';
-  else
-    raise ENotSupportedException.Create('DDL: unknown logical type');
-  end;
-end;
+{ TFluentDDLSerialize }
 
-function MapLogicalType(const ADialect: TFluentSQLDriver; const ACol: IFluentDDLColumn): string;
-begin
-  case ADialect of
-    dbnFirebird:
-      Result := MapLogicalTypeFirebird(ACol);
-    dbnPostgreSQL:
-      Result := MapLogicalTypePostgreSQL(ACol);
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL CREATE TABLE (ESP-017) is not implemented for dialect %d in this build',
-      [Ord(ADialect)]);
-  end;
-end;
-
-function DDLCreateTableSQL(const ADef: IFluentDDLTableDef): string;
+function TFluentDDLSerialize.CreateTable(const ADef: IFluentDDLTableDef): string;
 var
-  LI: Integer;
-  LParts: string;
-  LCol: IFluentDDLColumn;
+  LReg: TFluentSQLRegister;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  if ADef.GetColumnCount <= 0 then
-    raise EArgumentException.Create('DDL: empty column list');
-
-  LParts := '';
-  for LI := 0 to ADef.GetColumnCount - 1 do
-  begin
-    LCol := ADef.GetColumn(LI);
-    if LParts <> '' then
-      LParts := LParts + ', ';
-    LParts := LParts + LCol.Name + ' ' + MapLogicalType(ADef.Dialect, LCol);
-  end;
-
-  Result := 'CREATE TABLE ' + ADef.TableName + ' (' + LParts + ')';
-end;
-
-function DDLDropTableSQL(const ADef: IFluentDDLDropTableDef): string;
-begin
-  if not Assigned(ADef) then
-    Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
-
-  case ADef.Dialect of
-    dbnPostgreSQL:
-      if ADef.GetIfExists then
-        Result := 'DROP TABLE IF EXISTS ' + ADef.TableName
-      else
-        Result := 'DROP TABLE ' + ADef.TableName;
-    dbnFirebird:
-      if ADef.GetIfExists then
-        raise ENotSupportedException.Create(
-          'DDL DROP TABLE: IF EXISTS is not emitted for Firebird in this build; use CreateFluentDDLDropTable(...).AsString ' +
-          'without IfExists, or compose dialect-specific SQL in the application (e.g. Firebird 4+).')
-      else
-        Result := 'DROP TABLE ' + ADef.TableName;
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL DROP TABLE (ESP-018) is not implemented for dialect %d in this build',
-      [Ord(ADef.Dialect)]);
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateTable(ADef);
+  finally
+    LReg.Free;
   end;
 end;
 
-function DDLAlterTableAddColumnSQL(const ADef: IFluentDDLAlterTableAddColumnDef): string;
+function TFluentDDLSerialize.DropTable(const ADef: IFluentDDLDropTableDef): string;
 var
-  LCol: IFluentDDLColumn;
+  LReg: TFluentSQLRegister;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
-  LCol := ADef.Column;
-  if not Assigned(LCol) then
-    raise EArgumentException.Create('DDL ALTER TABLE: a column definition is required');
-  if Trim(LCol.Name) = '' then
-    raise EArgumentException.Create('DDL: column name is required');
-
-  case ADef.Dialect of
-    dbnFirebird, dbnPostgreSQL:
-      Result := 'ALTER TABLE ' + ADef.TableName + ' ADD ' + LCol.Name + ' ' +
-        MapLogicalType(ADef.Dialect, LCol);
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL ALTER TABLE ADD COLUMN (ESP-019) is not implemented for dialect %d in this build',
-      [Ord(ADef.Dialect)]);
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropTable(ADef);
+  finally
+    LReg.Free;
   end;
 end;
 
-function DDLAlterTableDropColumnSQL(const ADef: IFluentDDLAlterTableDropColumnDef): string;
-begin
-  if not Assigned(ADef) then
-    Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
-  if Trim(ADef.ColumnName) = '' then
-    raise EArgumentException.Create('DDL ALTER TABLE DROP COLUMN: a column target is required');
-
-  case ADef.Dialect of
-    dbnFirebird:
-      Result := 'ALTER TABLE ' + ADef.TableName + ' DROP ' + ADef.ColumnName;
-    dbnPostgreSQL:
-      Result := 'ALTER TABLE ' + ADef.TableName + ' DROP COLUMN ' + ADef.ColumnName;
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL ALTER TABLE DROP COLUMN (ESP-020) is not implemented for dialect %d in this build',
-      [Ord(ADef.Dialect)]);
-  end;
-end;
-
-function DDLAlterTableRenameColumnSQL(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
+function TFluentDDLSerialize.AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string;
 var
-  LTable: string;
-  LOld: string;
-  LNew: string;
+  LReg: TFluentSQLRegister;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  LTable := Trim(ADef.GetTableName);
-  LOld := Trim(ADef.GetOldColumnName);
-  LNew := Trim(ADef.GetNewColumnName);
-  if LTable = '' then
-    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): table name is required');
-  if LOld = '' then
-    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): old column name is required');
-  if LNew = '' then
-    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): new column name is required');
-  if LOld = LNew then
-    raise EArgumentException.Create('DDL ALTER TABLE RENAME COLUMN (ESP-030): old and new column names must differ');
-
-  case ADef.Dialect of
-    dbnPostgreSQL:
-      Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
-    dbnMySQL:
-      Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
-    dbnFirebird:
-      Result := 'ALTER TABLE ' + LTable + ' ALTER ' + LOld + ' TO ' + LNew;
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL ALTER TABLE RENAME COLUMN (ESP-030) is not implemented for dialect %d in this build',
-      [Ord(ADef.Dialect)]);
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableAddColumn(ADef);
+  finally
+    LReg.Free;
   end;
 end;
 
-function DDLCreateIndexSQL(const ADef: IFluentDDLCreateIndexDef): string;
+function TFluentDDLSerialize.AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
 var
-  I: Integer;
-  LCols: string;
+  LReg: TFluentSQLRegister;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  if Trim(ADef.IndexName) = '' then
-    raise EArgumentException.Create('DDL: index name is required');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
-  if ADef.GetColumnCount <= 0 then
-    raise EArgumentException.Create('DDL CREATE INDEX: at least one column is required');
-
-  LCols := '';
-  for I := 0 to ADef.GetColumnCount - 1 do
-  begin
-    if LCols <> '' then
-      LCols := LCols + ', ';
-    LCols := LCols + ADef.GetColumnName(I);
-  end;
-
-  case ADef.Dialect of
-    dbnFirebird, dbnPostgreSQL:
-      begin
-        if ADef.IsUnique then
-          Result := 'CREATE UNIQUE INDEX ' + ADef.IndexName + ' ON ' + ADef.TableName + ' (' + LCols + ')'
-        else
-          Result := 'CREATE INDEX ' + ADef.IndexName + ' ON ' + ADef.TableName + ' (' + LCols + ')';
-      end;
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL CREATE INDEX (ESP-022) is not implemented for dialect %d in this build',
-      [Ord(ADef.Dialect)]);
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableDropColumn(ADef);
+  finally
+    LReg.Free;
   end;
 end;
 
-function DDLDropIndexSQL(const ADef: IFluentDDLDropIndexDef): string;
+function TFluentDDLSerialize.AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
 var
-  LTable: string;
+  LReg: TFluentSQLRegister;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  if Trim(ADef.IndexName) = '' then
-    raise EArgumentException.Create('DDL: index name is required');
-
-  LTable := Trim(ADef.GetTableName);
-
-  case ADef.Dialect of
-    dbnPostgreSQL:
-      begin
-        if LTable <> '' then
-          raise ENotSupportedException.Create(
-            'DDL DROP INDEX: ON TABLE is not used for PostgreSQL in this vertical (ESP-028 / ADR-028).');
-        if ADef.GetConcurrently then
-        begin
-          if ADef.GetIfExists then
-            Result := 'DROP INDEX CONCURRENTLY IF EXISTS ' + ADef.IndexName
-          else
-            Result := 'DROP INDEX CONCURRENTLY ' + ADef.IndexName;
-        end
-        else if ADef.GetIfExists then
-          Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
-        else
-          Result := 'DROP INDEX ' + ADef.IndexName;
-      end;
-    dbnFirebird:
-      begin
-        if LTable <> '' then
-          raise ENotSupportedException.Create(
-            'DDL DROP INDEX: ON TABLE is not used for Firebird in this vertical (ESP-028 / ADR-028).');
-        if ADef.GetConcurrently then
-          raise ENotSupportedException.Create(
-            'DDL DROP INDEX CONCURRENTLY (ESP-027) is not supported for Firebird; only PostgreSQL maps CONCURRENTLY (ADR-027). Use IF EXISTS without CONCURRENTLY per ADR-026.');
-        if ADef.GetIfExists then
-          Result := 'DROP INDEX IF EXISTS ' + ADef.IndexName
-        else
-          Result := 'DROP INDEX ' + ADef.IndexName;
-      end;
-    dbnMySQL:
-      begin
-        if ADef.GetConcurrently then
-          raise ENotSupportedException.Create(
-            'DDL DROP INDEX CONCURRENTLY (ESP-027 / ESP-028) is not supported for MySQL; only PostgreSQL maps CONCURRENTLY (ADR-027).');
-        if LTable = '' then
-          raise EArgumentException.Create(
-            'DDL DROP INDEX: table name is required for MySQL (DROP INDEX ... ON ...); see ESP-028 / ADR-028.');
-        if ADef.GetIfExists then
-          raise ENotSupportedException.Create(
-            'DDL DROP INDEX IF EXISTS is not emitted for MySQL / MariaDB in this build for the standalone DROP INDEX ... ON ... form (ESP-028 / ADR-028); use dialect-specific SQL or omit IfExists.')
-        else
-          Result := 'DROP INDEX ' + ADef.IndexName + ' ON ' + LTable;
-      end;
-  else
-    begin
-      if LTable <> '' then
-        raise ENotSupportedException.Create(
-          'DDL DROP INDEX: ON TABLE is only mapped for dbnMySQL in this vertical (ESP-028 / ADR-028).');
-      if ADef.GetConcurrently then
-        raise ENotSupportedException.CreateFmt(
-          'DDL DROP INDEX CONCURRENTLY (ESP-027) is not implemented for dialect %d; only PostgreSQL supports CONCURRENTLY in this build.',
-          [Ord(ADef.Dialect)])
-      else
-        raise ENotSupportedException.CreateFmt(
-          'DDL DROP INDEX (ESP-026) is not implemented for dialect %d in this build (ESP-025 baseline).',
-          [Ord(ADef.Dialect)]);
-    end;
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableRenameColumn(ADef);
+  finally
+    LReg.Free;
   end;
 end;
 
-function DDLTruncateTableSQL(const ADef: IFluentDDLTruncateTableDef): string;
+function TFluentDDLSerialize.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
 var
-  LName: string;
+  LReg: TFluentSQLRegister;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  LName := Trim(ADef.GetTableName);
-  if LName = '' then
-    raise EArgumentException.Create('DDL TRUNCATE TABLE: table name is required (ESP-029 / ADR-029).');
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateIndex(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
 
-  case ADef.Dialect of
-    dbnPostgreSQL:
-      begin
-        Result := 'TRUNCATE TABLE ' + LName;
-        if ADef.GetRestartIdentity then
-          Result := Result + ' RESTART IDENTITY';
-        if ADef.GetCascade then
-          Result := Result + ' CASCADE';
-      end;
-    dbnFirebird:
-      begin
-        if ADef.GetRestartIdentity or ADef.GetCascade then
-          raise ENotSupportedException.Create(
-            'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
-        Result := 'TRUNCATE TABLE ' + LName;
-      end;
-    dbnMySQL:
-      begin
-        if ADef.GetRestartIdentity or ADef.GetCascade then
-          raise ENotSupportedException.Create(
-            'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
-        Result := 'TRUNCATE TABLE ' + LName;
-      end;
-  else
-    raise ENotSupportedException.CreateFmt(
-      'DDL TRUNCATE TABLE (ESP-029) is not implemented for dialect %d in this build',
-      [Ord(ADef.Dialect)]);
+function TFluentDDLSerialize.DropIndex(const ADef: IFluentDDLDropIndexDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropIndex(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).TruncateTable(ADef);
+  finally
+    LReg.Free;
   end;
 end;
 
