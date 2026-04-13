@@ -194,6 +194,29 @@ type
     procedure TestTruncateTable_EmptyTableName_RaisesArgumentException;
   end;
 
+  [TestFixture]
+  TTestDDLSQLite = class
+  public
+    [Test]
+    procedure TestCreateTable_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestDropTable_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestDropTableIfExists_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddColumn_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameColumn_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestDropIndex_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestDropIndexIfExists_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestTruncateTable_SQLite_GeneratesDeleteFrom;
+  end;
+
 implementation
 
 uses
@@ -1002,6 +1025,91 @@ begin
       FluentSQL.Schema(dbnPostgreSQL).TruncateTable('   ').AsString;
     end,
     EArgumentException);
+end;
+
+{ TTestDDLSQLite }
+
+procedure TTestDDLSQLite.TestCreateTable_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).CreateTable('CLIENTES')
+    .ColumnInteger('ID').PrimaryKey
+    .ColumnVarChar('NOME', 100).NotNull
+    .ColumnBoolean('ATIVO')
+    .AsString;
+  Assert.AreEqual(
+    'CREATE TABLE CLIENTES (ID INTEGER PRIMARY KEY, NOME TEXT NOT NULL, ATIVO BOOLEAN)',
+    LSql);
+end;
+
+procedure TTestDDLSQLite.TestDropTable_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).DropTable('CLIENTES').AsString;
+  Assert.AreEqual('DROP TABLE CLIENTES', LSql);
+end;
+
+procedure TTestDDLSQLite.TestDropTableIfExists_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).DropTable('CLIENTES').IfExists.AsString;
+  Assert.AreEqual('DROP TABLE IF EXISTS CLIENTES', LSql);
+end;
+
+procedure TTestDDLSQLite.TestAlterTableAddColumn_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).AlterTableAdd('CLIENTES')
+    .ColumnVarChar('EMAIL', 150)
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES ADD COLUMN EMAIL TEXT', LSql);
+end;
+
+procedure TTestDDLSQLite.TestAlterTableRenameColumn_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).AlterTableRename('CLIENTES', 'NOME', 'RAZAO_SOCIAL')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE CLIENTES RENAME COLUMN NOME TO RAZAO_SOCIAL', LSql);
+end;
+
+procedure TTestDDLSQLite.TestCreateIndex_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).CreateIndex('IX_CLI_NOME', 'CLIENTES')
+    .Column('NOME')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX IX_CLI_NOME ON CLIENTES (NOME)', LSql);
+end;
+
+procedure TTestDDLSQLite.TestDropIndex_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).DropIndex('IX_CLI_NOME').AsString;
+  Assert.AreEqual('DROP INDEX IX_CLI_NOME', LSql);
+end;
+
+procedure TTestDDLSQLite.TestDropIndexIfExists_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).DropIndex('IX_CLI_NOME').IfExists.AsString;
+  Assert.AreEqual('DROP INDEX IF EXISTS IX_CLI_NOME', LSql);
+end;
+
+procedure TTestDDLSQLite.TestTruncateTable_SQLite_GeneratesDeleteFrom;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).TruncateTable('CLIENTES').AsString;
+  Assert.AreEqual('DELETE FROM CLIENTES', LSql);
 end;
 
 end.

@@ -7,6 +7,7 @@ program PTestFluentSQLFirebird;
 {$DEFINE MYSQL}
 {$DEFINE POSTGRESQL}
 {$DEFINE MONGODB}
+{$DEFINE SQLITE}
 uses
   System.SysUtils,
   {$IFDEF TESTINSIGHT}
@@ -88,7 +89,8 @@ uses
   FluentSQL.SerializeMySQL in '..\..\Source\Drivers\FluentSQL.SerializeMySQL.pas',
   FluentSQL.SerializeOracle in '..\..\Source\Drivers\FluentSQL.SerializeOracle.pas',
   FluentSQL.SerializePostgreSQL in '..\..\Source\Drivers\FluentSQL.SerializePostgreSQL.pas',
-  FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas';
+  FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas',
+  FluentSQL.DDL.Serialize.SQLite in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas';
 
 { keep comment here to protect the following conditional from being removed by the IDE when adding a unit }
 {$IFNDEF TESTINSIGHT}
