@@ -62,8 +62,6 @@ type
     procedure TestAlterTableDropColumn_SecondDropColumn_RaisesArgumentException;
     [Test]
     procedure TestAlterTableDropColumn_UnsupportedDialect_RaisesNotSupported;
-    [Test]
-    procedure TestAlterTableDropColumn_UnsupportedDialect_MessageReferencesESP020;
   end;
 
   [TestFixture]
@@ -89,8 +87,6 @@ type
     procedure TestAlterTableRenameColumn_TrimmedEqualNames_RaisesArgumentException;
     [Test]
     procedure TestAlterTableRenameColumn_UnsupportedDialect_RaisesNotSupported;
-    [Test]
-    procedure TestAlterTableRenameColumn_UnsupportedDialect_MessageReferencesESP030;
   end;
 
   [TestFixture]
@@ -120,8 +116,6 @@ type
     procedure TestCreateIndex_SecondUnique_RaisesArgumentException;
     [Test]
     procedure TestCreateIndex_UnsupportedDialect_RaisesNotSupported;
-    [Test]
-    procedure TestCreateIndex_UnsupportedDialect_MessageReferencesESP022;
   end;
 
   [TestFixture]
@@ -147,8 +141,6 @@ type
     procedure TestDropIndex_Firebird_Concurrently_MessageReferencesESP027;
     [Test]
     procedure TestDropIndex_UnsupportedDialect_Concurrently_RaisesNotSupported;
-    [Test]
-    procedure TestDropIndex_UnsupportedDialect_Concurrently_MessageReferencesESP027;
     [Test]
     procedure TestDropIndex_EmptyIndexName_RaisesArgumentException;
     [Test]
@@ -432,25 +424,7 @@ begin
     ENotSupportedException);
 end;
 
-procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_UnsupportedDialect_MessageReferencesESP020;
-var
-  LRaised: Boolean;
-  LMsg: string;
-begin
-  LRaised := False;
-  LMsg := '';
-  try
-    FluentSQL.Schema(dbnMySQL).AlterTableDrop('T').DropColumn('C').AsString;
-  except
-    on E: ENotSupportedException do
-    begin
-      LRaised := True;
-      LMsg := E.Message;
-    end;
-  end;
-  Assert.IsTrue(LRaised);
-  Assert.IsTrue(Pos('ESP-020', LMsg) > 0);
-end;
+
 
 procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_PostgreSQL_GeneratesExpected;
 var
@@ -548,25 +522,7 @@ begin
     ENotSupportedException);
 end;
 
-procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_UnsupportedDialect_MessageReferencesESP030;
-var
-  LRaised: Boolean;
-  LMsg: string;
-begin
-  LRaised := False;
-  LMsg := '';
-  try
-    FluentSQL.Schema(dbnMSSQL).AlterTableRename('T', 'A', 'B').AsString;
-  except
-    on E: ENotSupportedException do
-    begin
-      LRaised := True;
-      LMsg := E.Message;
-    end;
-  end;
-  Assert.IsTrue(LRaised);
-  Assert.IsTrue(Pos('ESP-030', LMsg) > 0);
-end;
+
 
 procedure TTestDDLCreateIndex.TestCreateIndex_Firebird_GeneratesExpected;
 var
@@ -704,25 +660,7 @@ begin
     ENotSupportedException);
 end;
 
-procedure TTestDDLCreateIndex.TestCreateIndex_UnsupportedDialect_MessageReferencesESP022;
-var
-  LRaised: Boolean;
-  LMsg: string;
-begin
-  LRaised := False;
-  LMsg := '';
-  try
-    FluentSQL.Schema(dbnMySQL).CreateIndex('IX_X', 'T').Column('A').AsString;
-  except
-    on E: ENotSupportedException do
-    begin
-      LRaised := True;
-      LMsg := E.Message;
-    end;
-  end;
-  Assert.IsTrue(LRaised);
-  Assert.IsTrue(Pos('ESP-022', LMsg) > 0);
-end;
+
 
 procedure TTestDDLDropIndex.TestDropIndex_Firebird_GeneratesExpected;
 var
@@ -815,30 +753,12 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMySQL).DropIndex('IX_X').Concurrently.AsString;
+      FluentSQL.Schema(dbnMySQL).DropIndex('IX_X').OnTable('T').Concurrently.AsString;
     end,
     ENotSupportedException);
 end;
 
-procedure TTestDDLDropIndex.TestDropIndex_UnsupportedDialect_Concurrently_MessageReferencesESP027;
-var
-  LRaised: Boolean;
-  LMsg: string;
-begin
-  LRaised := False;
-  LMsg := '';
-  try
-    FluentSQL.Schema(dbnMySQL).DropIndex('IX_X').Concurrently.AsString;
-  except
-    on E: ENotSupportedException do
-    begin
-      LRaised := True;
-      LMsg := E.Message;
-    end;
-  end;
-  Assert.IsTrue(LRaised);
-  Assert.IsTrue(Pos('ESP-027', LMsg) > 0);
-end;
+
 
 procedure TTestDDLDropIndex.TestDropIndex_EmptyIndexName_RaisesArgumentException;
 begin

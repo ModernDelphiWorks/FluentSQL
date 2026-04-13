@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{19B7F211-DDB6-40A6-96C7-33A77ADC8B45}</ProjectGuid>
         <ProjectVersion>20.3</ProjectVersion>
@@ -123,6 +123,11 @@
         <DCCReference Include="..\..\Source\Core\FluentSQL.Section.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Select.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Serialize.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.DDL.Serialize.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.DDL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.Firebird.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.MySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.PostgreSQL.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Update.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Utils.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Where.pas"/>

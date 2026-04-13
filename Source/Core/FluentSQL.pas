@@ -40,12 +40,6 @@ type
   TFluentSQLDriver = FluentSQL.Interfaces.TFluentSQLDriver;
   FluentSQLFun = FluentSQL.Functions.TFluentSQLFunctions;
 
-  FluentSQL = record
-  public
-    class function Query(const ADatabase: TFluentSQLDriver): IFluentSQL; static;
-    class function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema; static;
-  end;
-
   TFluentSQL = class(TInterfacedObject, IFluentSQL)
   strict private
     class var FDatabaseDafault: TFluentSQLDriver;
@@ -231,6 +225,9 @@ type
     function WithTTL(const ASeconds: Integer): IFluentSQL;
   end;
 
+function Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
+
 function TCQ(const ADatabase: TFluentSQLDriver): IFluentSQL;
 
 function CreateFluentSQL(const ADatabase: TFluentSQLDriver): IFluentSQL;
@@ -243,12 +240,12 @@ uses
 
 { FluentSQL }
 
-class function FluentSQL.Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
+function Query(const ADatabase: TFluentSQLDriver): IFluentSQL;
 begin
   Result := TCQ(ADatabase);
 end;
 
-class function FluentSQL.Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
+function Schema(const ADatabase: TFluentSQLDriver): IFluentSchema;
 begin
   Result := TFluentSchema.Create(ADatabase);
 end;

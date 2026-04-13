@@ -1,0 +1,111 @@
+{
+  ------------------------------------------------------------------------------
+  FluentSQL
+  Abstract base class for DDL serialization (ESP-037).
+  Follows the project's "Helpful Abstract" pattern for better Developer Experience.
+
+  SPDX-License-Identifier: MIT
+  Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
+
+  Licensed under the MIT License.
+  See the LICENSE file in the project root for full license information.
+  ------------------------------------------------------------------------------
+}
+
+unit FluentSQL.DDL.SerializeAbstract;
+
+interface
+
+{$ifdef fpc}
+  {$mode delphi}{$H+}
+{$endif}
+
+uses
+  SysUtils,
+  FluentSQL.Interfaces;
+
+const
+  ABSTRACT_METHOD_ERROR = 'Abstract method "%s" called in %s. ' +
+                          'Derived classes must override this method to provide a concrete implementation.';
+
+type
+  TFluentDDLSerializeAbstract = class(TInterfacedObject, IFluentDDLSerialize)
+  protected
+    function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
+  public
+    function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
+    function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
+    function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; virtual;
+    function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; virtual;
+    function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; virtual;
+    function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; virtual;
+    function DropIndex(const ADef: IFluentDDLDropIndexDef): string; virtual;
+    function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; virtual;
+  end;
+
+implementation
+
+{ TFluentDDLSerializeAbstract }
+
+function TFluentDDLSerializeAbstract.MapConstraints(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.DefaultValue <> '' then
+    Result := Result + ' DEFAULT ' + ACol.DefaultValue;
+  if ACol.NotNull then
+    Result := Result + ' NOT NULL';
+  if ACol.IsPrimaryKey then
+    Result := Result + ' PRIMARY KEY';
+  if ACol.IsUnique then
+    Result := Result + ' UNIQUE';
+  if ACol.CheckCondition <> '' then
+    Result := Result + ' CHECK (' + ACol.CheckCondition + ')';
+  if ACol.ReferenceTable <> '' then
+  begin
+    Result := Result + ' REFERENCES ' + ACol.ReferenceTable;
+    if ACol.ReferenceColumn <> '' then
+      Result := Result + '(' + ACol.ReferenceColumn + ')';
+  end;
+end;
+
+function TFluentDDLSerializeAbstract.CreateTable(const ADef: IFluentDDLTableDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateTable', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropTable(const ADef: IFluentDDLDropTableDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropTable', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableAddColumn', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableDropColumn', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableRenameColumn', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateIndex', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropIndex(const ADef: IFluentDDLDropIndexDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropIndex', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['TruncateTable', Self.ClassName]);
+end;
+
+end.
