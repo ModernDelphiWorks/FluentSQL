@@ -33,7 +33,7 @@ Quando precisar de sintaxe **só de um motor**, siga **ESP-016** / **ADR-016** (
 
 ## Limitações do subconjunto
 
-- Apenas **`CREATE TABLE`** nesta página; para **`DROP TABLE`** ver [ddl-drop-table](./ddl-drop-table.md) (**ESP-018**); para **`ALTER TABLE ADD COLUMN`** ver [ddl-alter-table-add-column](./ddl-alter-table-add-column.md) (**ESP-019**). Sem `TRUNCATE`, índices, FK, `CHECK` complexo, etc.
+- Apenas **`CREATE TABLE`** nesta página; para **`DROP TABLE`** ver [ddl-drop-table](./ddl-drop-table.md) (**ESP-018**); para **`ALTER TABLE ADD COLUMN`** ver [ddl-alter-table-add-column](./ddl-alter-table-add-column.md) (**ESP-019**); para **Chaves Estrangeiras** ver [ddl-foreign-keys](./ddl-foreign-keys.md) (**ESP-035**). Sem `CHECK` complexo, etc.
 - Tipos lógicos fechados (`TDDLLogicalType` em `FluentSQL.Interfaces`); extensões proprietárias não entram no contrato portável sem novo ADR ou uso de **ESP-016** na camada DML/aplicação.
 
 ## Leitura no código

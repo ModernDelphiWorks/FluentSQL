@@ -41,7 +41,7 @@ Outros motores levantam **`ENotSupportedException`** com mensagem que referencia
 
 - **Uma coluna** por `AsString`; várias renomeações implicam **várias** cadeias na aplicação.
 - Sem **`CHANGE COLUMN`** com tipo (fora de âmbito; **ADR-030**).
-- Sem renomear **tabela** nesta entrega.
+- Sem renomear **tabela** nesta entrega — para isso ver [ddl-alter-table-rename-table](./ddl-alter-table-rename-table.md) (**ESP-031**).
 - Para **`ALTER TABLE DROP COLUMN`**, ver [ddl-alter-table-drop-column](./ddl-alter-table-drop-column.md) (**ESP-020**).
 
 ## Leitura no código
