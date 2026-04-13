@@ -70,7 +70,7 @@ implementation
 
 uses
   {$IFDEF FIREBIRD}FluentSQL.SerializeFirebird, FluentSQL.SelectFirebird, FluentSQL.FunctionsFirebird, FluentSQL.DDL.Serialize.Firebird,{$ENDIF}
-  {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.SelectMSSQL, FluentSQL.FunctionsMSSQL,{$ENDIF}
+  {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.SelectMSSQL, FluentSQL.FunctionsMSSQL, FluentSQL.DDL.Serialize.MSSQL,{$ENDIF}
   {$IFDEF MYSQL}FluentSQL.SerializeMySQL, FluentSQL.SelectMySQL, FluentSQL.FunctionsMySQL, FluentSQL.DDL.Serialize.MySQL,{$ENDIF}
   {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.Select.SQLite, FluentSQL.FunctionsSQLite, FluentSQL.DDL.Serialize.SQLite,{$ENDIF}
   {$IFDEF INTERBASE}FluentSQL.SerializeInterbase, FluentSQL.SelectInterbase, FluentSQL.FunctionsInterbase,{$ENDIF}
@@ -166,6 +166,7 @@ begin
   Self.RegisterSerialize(dbnMSSQL, TFluentSQLSerializerMSSQL.Create);
   Self.RegisterSelect(dbnMSSQL, TFluentSQLSelectMSSQL.Create);
   Self.RegisterFunctions(dbnMSSQL, TFluentSQLFunctionsMSSQL.Create);
+  Self.RegisterDDLSerialize(dbnMSSQL, TFluentDDLSerializerMSSQL.Create);
 end;
 {$ENDIF}
 

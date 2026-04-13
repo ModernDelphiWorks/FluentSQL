@@ -56,7 +56,7 @@
 
 // Banco de dados utiliza��o
 {$DEFINE FIREBIRD}
-{.$DEFINE MSSQL}
+{$DEFINE MSSQL}
 {$DEFINE MYSQL}
 {$DEFINE SQLITE}
 {.$DEFINE INTERBASE}
