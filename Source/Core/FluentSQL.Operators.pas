@@ -205,8 +205,8 @@ begin
       end;
     dftInteger:  Result := VarToStrDef(FValue, EmptyStr);
     dftFloat:    Result := ReplaceStr(FloatToStr(FValue), ',', '.');
-    dftDate:     Result := QuotedStr(TUtils.DateToSQLFormat(FDatabase, VarToDateTime(FValue)));
-    dftDateTime: Result := QuotedStr(TUtils.DateTimeToSQLFormat(FDatabase, VarToDateTime(FValue)));
+    dftDate:     Result := TUtils.DateToSQLFormat(FDatabase, VarToDateTime(FValue));
+    dftDateTime: Result := TUtils.DateTimeToSQLFormat(FDatabase, VarToDateTime(FValue));
     dftGuid:     Result := TUtils.GuidStrToSQLFormat(FDatabase, StringToGUID(FValue));
     dftArray:    Result := _ArrayValueToString;
     dftBoolean:  result := BoolToStr(FValue);

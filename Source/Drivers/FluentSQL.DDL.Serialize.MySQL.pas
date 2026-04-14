@@ -27,7 +27,9 @@ uses
 type
   TFluentDDLSerializerMySQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; virtual;
+    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function GetDialect: TFluentSQLDriver; override;
+    function Quote(const AName: string): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -42,6 +44,18 @@ type
 implementation
 
 { TFluentDDLSerializerMySQL }
+
+function TFluentDDLSerializerMySQL.Quote(const AName: string): string;
+begin
+  if (AName = '') or (AName.StartsWith('`')) then
+    Exit(AName);
+  Result := '`' + AName + '`';
+end;
+
+function TFluentDDLSerializerMySQL.GetDialect: TFluentSQLDriver;
+begin
+  Result := dbnMySQL;
+end;
 
 function TFluentDDLSerializerMySQL.MapLogicalType(const ACol: IFluentDDLColumn): string;
 begin
@@ -62,33 +76,21 @@ begin
       Result := 'LONGTEXT';
     dltBlob:
       Result := 'LONGBLOB';
+    dltGuid:
+      Result := 'CHAR(36)';
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
-  Result := Result + MapConstraints(ACol);
 end;
 
 function TFluentDDLSerializerMySQL.CreateTable(const ADef: IFluentDDLTableDef): string;
-var
-  LI: Integer;
-  LParts: string;
-  LCol: IFluentDDLColumn;
 begin
   if not Assigned(ADef) then
     Exit('');
   if ADef.GetColumnCount <= 0 then
     raise EArgumentException.Create('DDL: empty column list');
 
-  LParts := '';
-  for LI := 0 to ADef.GetColumnCount - 1 do
-  begin
-    LCol := ADef.GetColumn(LI);
-    if LParts <> '' then
-      LParts := LParts + ', ';
-    LParts := LParts + LCol.Name + ' ' + MapLogicalType(LCol);
-  end;
-
-  Result := 'CREATE TABLE ' + ADef.TableName + ' (' + LParts + ')';
+  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
 end;
 
 function TFluentDDLSerializerMySQL.DropTable(const ADef: IFluentDDLDropTableDef): string;
@@ -99,9 +101,9 @@ begin
     raise EArgumentException.Create('DDL: table name is required');
 
   if ADef.GetIfExists then
-    Result := 'DROP TABLE IF EXISTS ' + ADef.TableName
+    Result := 'DROP TABLE IF EXISTS ' + Quote(ADef.TableName)
   else
-    Result := 'DROP TABLE ' + ADef.TableName;
+    Result := 'DROP TABLE ' + Quote(ADef.TableName);
 end;
 
 function TFluentDDLSerializerMySQL.AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string;
@@ -110,60 +112,40 @@ var
 begin
   if not Assigned(ADef) then
     Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
   LCol := ADef.Column;
   if not Assigned(LCol) then
     raise EArgumentException.Create('DDL ALTER TABLE: a column definition is required');
-  if Trim(LCol.Name) = '' then
-    raise EArgumentException.Create('DDL: column name is required');
 
-  Result := 'ALTER TABLE ' + ADef.TableName + ' ADD COLUMN ' + LCol.Name + ' ' + MapLogicalType(LCol);
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ADD COLUMN ' + GetColumnDefinition(LCol);
 end;
 
 function TFluentDDLSerializerMySQL.AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
 begin
   if not Assigned(ADef) then
     Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
   if Trim(ADef.ColumnName) = '' then
     raise EArgumentException.Create('DDL ALTER TABLE DROP COLUMN: a column target is required');
 
-  Result := 'ALTER TABLE ' + ADef.TableName + ' DROP COLUMN ' + ADef.ColumnName;
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP COLUMN ' + Quote(ADef.ColumnName);
 end;
 
 function TFluentDDLSerializerMySQL.AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
-var
-  LTable, LOld, LNew: string;
 begin
   if not Assigned(ADef) then
     Exit('');
-  LTable := Trim(ADef.GetTableName);
-  LOld := Trim(ADef.GetOldColumnName);
-  LNew := Trim(ADef.GetNewColumnName);
-  Result := 'ALTER TABLE ' + LTable + ' RENAME COLUMN ' + LOld + ' TO ' + LNew;
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' RENAME COLUMN ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
 end;
 
+
+
 function TFluentDDLSerializerMySQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
-var
-  I: Integer;
-  LCols: string;
 begin
   if not Assigned(ADef) then
     Exit('');
-  LCols := '';
-  for I := 0 to ADef.GetColumnCount - 1 do
-  begin
-    if LCols <> '' then
-      LCols := LCols + ', ';
-    LCols := LCols + ADef.GetColumnName(I);
-  end;
-
   if ADef.IsUnique then
-    Result := 'CREATE UNIQUE INDEX ' + ADef.IndexName + ' ON ' + ADef.TableName + ' (' + LCols + ')'
+    Result := 'CREATE UNIQUE INDEX ' + Quote(ADef.IndexName) + ' ON ' + Quote(ADef.TableName) + ' (' + GetColumnNameList(ADef) + ')'
   else
-    Result := 'CREATE INDEX ' + ADef.IndexName + ' ON ' + ADef.TableName + ' (' + LCols + ')';
+    Result := 'CREATE INDEX ' + Quote(ADef.IndexName) + ' ON ' + Quote(ADef.TableName) + ' (' + GetColumnNameList(ADef) + ')';
 end;
 
 function TFluentDDLSerializerMySQL.DropIndex(const ADef: IFluentDDLDropIndexDef): string;
@@ -183,7 +165,7 @@ begin
     raise ENotSupportedException.Create(
       'DDL DROP INDEX CONCURRENTLY (ESP-027) is not supported for MySQL; only PostgreSQL maps CONCURRENTLY (ADR-027).');
 
-  Result := 'DROP INDEX ' + ADef.IndexName + ' ON ' + LTable;
+  Result := 'DROP INDEX ' + Quote(ADef.IndexName) + ' ON ' + Quote(LTable);
 end;
 
 function TFluentDDLSerializerMySQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
@@ -193,7 +175,7 @@ begin
   if ADef.GetRestartIdentity or ADef.GetCascade then
     raise ENotSupportedException.Create(
       'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
-  Result := 'TRUNCATE TABLE ' + ADef.TableName;
+  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
 end.
