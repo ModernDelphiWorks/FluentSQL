@@ -20,3 +20,8 @@ docs-src/.docusaurus/
 __history/
 __recovery/
 .local-readonly/
+
+# Tooling and Metadata
+.gemini/
+.codex/
+.agents/

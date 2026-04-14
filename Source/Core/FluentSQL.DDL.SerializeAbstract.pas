@@ -32,6 +32,12 @@ type
   TFluentDDLSerializeAbstract = class(TInterfacedObject, IFluentDDLSerialize)
   protected
     function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
+    function MapLogicalType(const ACol: IFluentDDLColumn): string; virtual; abstract;
+    function Quote(const AName: string): string; virtual;
+    function GetLiteralValue(const AValue: string): string; virtual;
+    function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
+    function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
+    function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -51,7 +57,7 @@ function TFluentDDLSerializeAbstract.MapConstraints(const ACol: IFluentDDLColumn
 begin
   Result := '';
   if ACol.DefaultValue <> '' then
-    Result := Result + ' DEFAULT ' + ACol.DefaultValue;
+    Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue);
   if ACol.NotNull then
     Result := Result + ' NOT NULL';
   if ACol.IsPrimaryKey then
@@ -62,9 +68,50 @@ begin
     Result := Result + ' CHECK (' + ACol.CheckCondition + ')';
   if ACol.ReferenceTable <> '' then
   begin
-    Result := Result + ' REFERENCES ' + ACol.ReferenceTable;
+    Result := Result + ' REFERENCES ' + Quote(ACol.ReferenceTable);
     if ACol.ReferenceColumn <> '' then
-      Result := Result + '(' + ACol.ReferenceColumn + ')';
+      Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
+  end;
+end;
+
+function TFluentDDLSerializeAbstract.Quote(const AName: string): string;
+begin
+  Result := AName;
+end;
+
+function TFluentDDLSerializeAbstract.GetLiteralValue(const AValue: string): string;
+begin
+  Result := AValue;
+end;
+
+function TFluentDDLSerializeAbstract.GetColumnDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + MapConstraints(ACol);
+end;
+
+function TFluentDDLSerializeAbstract.GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
+var
+  LI: Integer;
+begin
+  Result := '';
+  for LI := 0 to ADef.GetColumnCount - 1 do
+  begin
+    if Result <> '' then
+      Result := Result + ', ';
+    Result := Result + GetColumnDefinition(ADef.GetColumn(LI));
+  end;
+end;
+
+function TFluentDDLSerializeAbstract.GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
+var
+  LI: Integer;
+begin
+  Result := '';
+  for LI := 0 to ADef.GetColumnCount - 1 do
+  begin
+    if Result <> '' then
+      Result := Result + ', ';
+    Result := Result + Quote(ADef.GetColumnName(LI));
   end;
 end;
 
