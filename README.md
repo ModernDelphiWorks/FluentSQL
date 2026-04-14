@@ -15,7 +15,7 @@
 | Funcionalidade | Estado |
 |----------------|--------|
 | DML fluente (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) | ✅ |
-| DDL fluente (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP coluna — conforme dialeto e entregas) | ✅ |
+| DDL fluente (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP/RENAME — conforme dialeto e entregas) | ✅ |
 | Serialização multi-dialeto (`dbn*`, `Source/Drivers/`) | ✅ |
 | Parametrização (`IFluentSQLParams`, placeholders `:pN` / `?`) | ✅ |
 | `UNION` / `UNION ALL` / `INTERSECT` com `Params` mesclados | ✅ |
@@ -61,7 +61,7 @@ uses FluentSQL;
 var
   SQL: string;
 begin
-  SQL := CreateFluentSQL(dbnFirebird)
+  SQL := Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('NOME')
@@ -71,7 +71,7 @@ begin
 end;
 ```
 
-O atalho `TCQ(dbnFirebird)` na unit `FluentSQL` é equivalente a `CreateFluentSQL`. Em código reutilizável, prefere `IFluentSQL` / `FluentSQL.Interfaces`.
+O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Os atalhos anteriores `CreateFluentSQL` e `TCQ` encontram-se obsoletos. Para operações de definição de dados, utilize **`Schema(ADialect)`**. Em código reutilizável, prefira as interfaces definidas em `FluentSQL.Interfaces`.
 
 ---
 
@@ -110,7 +110,6 @@ Projetos **DUnitX** em `Test Delphi/`:
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Exemplo mínimo. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
-Comandos usados em automação: secção **Comandos** em [`.claude/SKILL.md`](.claude/SKILL.md) (ecossistema de agentes).
 
 **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Extensão por dialeto (fechamento ESP-016):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
