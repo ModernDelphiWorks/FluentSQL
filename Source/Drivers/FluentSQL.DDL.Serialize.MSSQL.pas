@@ -37,6 +37,7 @@ type
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -144,6 +145,13 @@ begin
     raise EArgumentException.Create('DDL MSSQL: old and new column names are required');
 
   Result := 'EXEC sp_rename ''' + Quote(ADef.TableName) + '.' + Quote(ADef.OldColumnName) + ''', ''' + ADef.NewColumnName + ''', ''COLUMN''';
+end;
+
+function TFluentDDLSerializerMSSQL.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'EXEC sp_rename ''' + ADef.OldTableName + ''', ''' + ADef.NewTableName + '''';
 end;
 
 function TFluentDDLSerializerMSSQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;

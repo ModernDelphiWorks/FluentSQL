@@ -180,6 +180,22 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLAlterTableRenameTableBuilder = class(TInterfacedObject, IFluentDDLAlterTableRenameTableBuilder,
+    IFluentDDLAlterTableRenameTableDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FOldTableName: string;
+    FNewTableName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AOldTableName, ANewTableName: string);
+    { IFluentDDLAlterTableRenameTableDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetOldTableName: string;
+    function GetNewTableName: string;
+    { IFluentDDLAlterTableRenameTableBuilder }
+    function AsString: string;
+  end;
+
   TFluentDDLCreateIndexBuilder = class(TInterfacedObject, IFluentDDLCreateIndexBuilder, IFluentDDLCreateIndexDef)
   strict private
     FDialect: TFluentSQLDriver;
@@ -253,7 +269,8 @@ type
     function DropTable(const ATableName: string): IFluentDDLDropBuilder;
     function AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
     function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
-    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder; overload;
+    function AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
@@ -262,12 +279,12 @@ type
 
 implementation
 
+uses
+  FluentSQL.DDL.Serialize;
+
 const
   S_OK = 0;
   E_NOINTERFACE = HResult($80004002);
-
-uses
-  FluentSQL.DDL.Serialize;
 
 { TFluentDDLColumn }
 
@@ -789,9 +806,9 @@ constructor TFluentDDLAlterTableRenameColumnBuilder.Create(const ADialect: TFlue
 begin
   inherited Create;
   FDialect := ADialect;
-  FTableName := ATableName;
-  FOldColumnName := AOldColumnName;
-  FNewColumnName := ANewColumnName;
+  FTableName := Trim(ATableName);
+  FOldColumnName := Trim(AOldColumnName);
+  FNewColumnName := Trim(ANewColumnName);
 end;
 
 function TFluentDDLAlterTableRenameColumnBuilder.GetDialect: TFluentSQLDriver;
@@ -830,6 +847,51 @@ begin
   LSerializer := TFluentDDLSerialize.Create;
   try
     Result := LSerializer.AlterTableRenameColumn(Self as IFluentDDLAlterTableRenameColumnDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLAlterTableRenameTableBuilder }
+
+constructor TFluentDDLAlterTableRenameTableBuilder.Create(const ADialect: TFluentSQLDriver; const AOldTableName,
+  ANewTableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FOldTableName := Trim(AOldTableName);
+  FNewTableName := Trim(ANewTableName);
+end;
+
+function TFluentDDLAlterTableRenameTableBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLAlterTableRenameTableBuilder.GetNewTableName: string;
+begin
+  Result := FNewTableName;
+end;
+
+function TFluentDDLAlterTableRenameTableBuilder.GetOldTableName: string;
+begin
+  Result := FOldTableName;
+end;
+
+function TFluentDDLAlterTableRenameTableBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FOldTableName) = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME: old table name is required');
+  if Trim(FNewTableName) = '' then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME: new table name is required');
+  if SameText(Trim(FOldTableName), Trim(FNewTableName)) then
+    raise EArgumentException.Create('DDL ALTER TABLE RENAME: old and new names must be different');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.AlterTableRenameTable(Self as IFluentDDLAlterTableRenameTableDef);
   finally
     LSerializer.Free;
   end;
@@ -1076,6 +1138,11 @@ end;
 function TFluentSchema.AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
 begin
   Result := TFluentDDLAlterTableRenameColumnBuilder.Create(FDialect, ATableName, AOldColumnName, ANewColumnName);
+end;
+
+function TFluentSchema.AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder;
+begin
+  Result := TFluentDDLAlterTableRenameTableBuilder.Create(FDialect, AOldTableName, ANewTableName);
 end;
 
 function TFluentSchema.CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
