@@ -87,6 +87,7 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLBuilder;
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
+    function ColumnGuid(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder;
     function Unique: IFluentDDLBuilder;
@@ -135,6 +136,7 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder;
     function Unique: IFluentDDLAlterTableAddBuilder;
@@ -460,6 +462,11 @@ begin
   Result := _AddColumn(AName, dltBlob, 0);
 end;
 
+function TFluentDDLBuilder.ColumnGuid(const AName: string): IFluentDDLBuilder;
+begin
+  Result := _AddColumn(AName, dltGuid, 0);
+end;
+
 function TFluentDDLBuilder.NotNull: IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
@@ -650,6 +657,11 @@ end;
 function TFluentDDLAlterTableAddBuilder.ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
 begin
   Result := _AddColumn(AName, dltBlob, 0);
+end;
+
+function TFluentDDLAlterTableAddBuilder.ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltGuid, 0);
 end;
 
 function TFluentDDLAlterTableAddBuilder.NotNull: IFluentDDLAlterTableAddBuilder;

@@ -76,6 +76,8 @@ begin
       Result := 'LONGTEXT';
     dltBlob:
       Result := 'LONGBLOB';
+    dltGuid:
+      Result := 'CHAR(36)';
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;

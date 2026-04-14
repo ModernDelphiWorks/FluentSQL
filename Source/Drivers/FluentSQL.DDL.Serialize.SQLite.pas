@@ -76,6 +76,8 @@ begin
       Result := 'TEXT';
     dltBlob:
       Result := 'BLOB';
+    dltGuid:
+      Result := 'GUID';
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;

@@ -725,7 +725,8 @@ type
     dltDate,
     dltDateTime,
     dltLongText,
-    dltBlob
+    dltBlob,
+    dltGuid
   );
 
   IFluentDDLColumn = interface
@@ -773,6 +774,7 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLBuilder;
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
+    function ColumnGuid(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder;
     function Unique: IFluentDDLBuilder;
@@ -824,6 +826,7 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder;
     function Unique: IFluentDDLAlterTableAddBuilder;

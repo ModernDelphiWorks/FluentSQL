@@ -192,7 +192,7 @@ begin
     dbnElevateDB,
     dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
   end;
-
+  Result := QuotedStr(Result);
 end;
 
 class function TUtils.DateToSQLFormat(const ADriverName: TFluentSQLDriver;
@@ -216,6 +216,7 @@ begin
     dbnElevateDB,
     dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
   end;
+  Result := QuotedStr(Result);
 end;
 
 class function TUtils.GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver;
