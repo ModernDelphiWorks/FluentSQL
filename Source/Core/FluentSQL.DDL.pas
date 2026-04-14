@@ -21,7 +21,6 @@ interface
 
 uses
   System.SysUtils,
-  Winapi.Windows,
   Generics.Collections,
   FluentSQL.Interfaces;
 
@@ -262,6 +261,10 @@ type
 
 
 implementation
+
+const
+  S_OK = 0;
+  E_NOINTERFACE = HResult($80004002);
 
 uses
   FluentSQL.DDL.Serialize;
