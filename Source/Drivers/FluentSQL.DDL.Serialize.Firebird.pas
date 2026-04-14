@@ -76,6 +76,8 @@ begin
       Result := 'BLOB SUB_TYPE 1';
     dltBlob:
       Result := 'BLOB SUB_TYPE 0';
+    dltGuid:
+      Result := 'CHAR(16) CHARACTER SET OCTETS';
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;

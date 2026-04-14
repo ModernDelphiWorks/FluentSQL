@@ -83,6 +83,8 @@ begin
       Result := 'VARCHAR(MAX)';
     dltBlob:
       Result := 'VARBINARY(MAX)';
+    dltGuid:
+      Result := 'UNIQUEIDENTIFIER';
   else
     raise ENotSupportedException.Create('DDL MSSQL: unknown logical type');
   end;

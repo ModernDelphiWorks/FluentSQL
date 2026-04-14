@@ -76,6 +76,8 @@ begin
       Result := 'TEXT';
     dltBlob:
       Result := 'BYTEA';
+    dltGuid:
+      Result := 'UUID';
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;

@@ -52,6 +52,10 @@ type
 
 implementation
 
+uses
+  DateUtils,
+  FluentSQL.Utils;
+
 { TFluentDDLSerializeAbstract }
 
 function TFluentDDLSerializeAbstract.MapConstraints(const ACol: IFluentDDLColumn): string;
@@ -82,12 +86,55 @@ end;
 
 function TFluentDDLSerializeAbstract.GetLiteralValue(const AValue: string;
   const ALogicalType: TDDLLogicalType): string;
+var
+  LDate: TDateTime;
+  LGUID: TGUID;
 begin
-  if (ALogicalType = dltBoolean) and (SameText(AValue, 'True') or SameText(AValue, 'False') or
-     SameText(AValue, 'T') or SameText(AValue, 'F') or SameText(AValue, '1') or SameText(AValue, '0')) then
-  begin
-    Exit(TUtils.BooleanToSQLFormat(GetDialect, SameText(AValue, 'True') or SameText(AValue, 'T') or SameText(AValue, '1')));
+  case ALogicalType of
+    dltBoolean:
+      if (SameText(AValue, 'True') or SameText(AValue, 'False') or
+          SameText(AValue, 'T') or SameText(AValue, 'F') or SameText(AValue, '1') or SameText(AValue, '0')) then
+      begin
+        Exit(TUtils.BooleanToSQLFormat(GetDialect, SameText(AValue, 'True') or SameText(AValue, 'T') or SameText(AValue, '1')));
+      end;
+
+    dltDate:
+      if TryStrToDate(AValue, LDate) then
+        Exit(TUtils.DateToSQLFormat(GetDialect, LDate))
+      else if (Length(AValue) = 10) and (AValue[5] = '-') and (AValue[8] = '-') then
+      begin
+        try
+          LDate := EncodeDate(StrToInt(Copy(AValue, 1, 4)), StrToInt(Copy(AValue, 6, 2)), StrToInt(Copy(AValue, 9, 2)));
+          Exit(TUtils.DateToSQLFormat(GetDialect, LDate));
+        except
+          // Fallback
+        end;
+      end;
+
+    dltDateTime:
+      if TryStrToDateTime(AValue, LDate) then
+        Exit(TUtils.DateTimeToSQLFormat(GetDialect, LDate))
+      else if (Length(AValue) >= 19) and (AValue[5] = '-') and (AValue[8] = '-') and (AValue[11] = ' ') then
+      begin
+        try
+          LDate := EncodeDateTime(
+            StrToInt(Copy(AValue, 1, 4)), StrToInt(Copy(AValue, 6, 2)), StrToInt(Copy(AValue, 9, 2)),
+            StrToInt(Copy(AValue, 12, 2)), StrToInt(Copy(AValue, 15, 2)), StrToInt(Copy(AValue, 18, 2)), 0);
+          Exit(TUtils.DateTimeToSQLFormat(GetDialect, LDate));
+        except
+          // Fallback
+        end;
+      end;
+
+    dltGuid:
+      try
+        LGUID := StringToGUID(AValue);
+        Exit(TUtils.GuidStrToSQLFormat(GetDialect, LGUID));
+      except
+        // Ignorar erro de parsing e retornar o valor original
+      end;
   end;
+
   Result := AValue;
 end;
 

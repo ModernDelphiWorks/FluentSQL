@@ -19,6 +19,10 @@ type
     procedure TestCreateTable_WithConstraints_GeneratesExpected;
     [Test]
     procedure TestLongTextAndBlob_DivergeBetweenFirebirdAndPostgreSQL;
+    [Test]
+    procedure TestGuidType_GeneratesExpectedPerDialect;
+    [Test]
+    procedure TestDateDefault_Firebird_GeneratesExpected;
   end;
 
   [TestFixture]
@@ -244,6 +248,8 @@ type
     procedure TestReservedWords_MSSQL;
     [Test]
     procedure TestBooleanDefault_MSSQL;
+    [Test]
+    procedure TestDateAndGuidDefault_MSSQL;
   end;
 
 
@@ -1264,5 +1270,45 @@ begin
   Assert.AreEqual('TRUNCATE TABLE [CLIENTES]', LSql);
 end;
 
+
+procedure TTestDDLCreateTable.TestGuidType_GeneratesExpectedPerDialect;
+begin
+  Assert.AreEqual('CREATE TABLE [T] ([G] UNIQUEIDENTIFIER)', 
+    FluentSQL.Schema(dbnMSSQL).CreateTable('T').ColumnGuid('G').AsString);
+    
+  Assert.AreEqual('CREATE TABLE "T" ("G" CHAR(16) CHARACTER SET OCTETS)', 
+    FluentSQL.Schema(dbnFirebird).CreateTable('T').ColumnGuid('G').AsString);
+    
+  Assert.AreEqual('CREATE TABLE "T" ("G" UUID)', 
+    FluentSQL.Schema(dbnPostgreSQL).CreateTable('T').ColumnGuid('G').AsString);
+    
+  Assert.AreEqual('CREATE TABLE `T` (`G` GUID)', 
+    FluentSQL.Schema(dbnSQLite).CreateTable('T').ColumnGuid('G').AsString);
+    
+  Assert.AreEqual('CREATE TABLE `T` (`G` CHAR(36))', 
+    FluentSQL.Schema(dbnMySQL).CreateTable('T').ColumnGuid('G').AsString);
+end;
+
+procedure TTestDDLCreateTable.TestDateDefault_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  // Firebird uses mm/dd/yyyy in this framework's Utils for historical reasons
+  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('T')
+    .ColumnDate('D').DefaultValue('2024-04-14')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE "T" ("D" DATE DEFAULT ''04/14/2024'')', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestDateAndGuidDefault_MSSQL;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('T')
+    .ColumnDate('D').DefaultValue('2024-04-14')
+    .ColumnGuid('G').DefaultValue('{00000000-0000-0000-0000-000000000000}')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE [T] ([D] DATE DEFAULT ''2024-04-14'', [G] UNIQUEIDENTIFIER DEFAULT ''{00000000-0000-0000-0000-000000000000}'')', LSql);
+end;
 
 end.
