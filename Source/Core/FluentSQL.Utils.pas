@@ -224,8 +224,13 @@ begin
     dbnFirebird,
     dbnInterbase: Result := Format('CHAR_TO_UUID(''%s'')', [AValue.ToString]);
 
+    dbnMSSQL,
+    dbnPostgreSQL,
+    dbnSQLite,
+    dbnMySQL: Result := Format('''%s''', [AValue.ToString]);
+
     else
-      raise Exception.Create('Converso de Guid no formato String no implementada.');
+      raise Exception.Create('Conversao de Guid no formato String para este dialeto nao implementada.');
   end;
 end;
 
