@@ -136,6 +136,8 @@ begin
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' RENAME COLUMN ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
 end;
 
+
+
 function TFluentDDLSerializerSQLite.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
 begin
   if not Assigned(ADef) then

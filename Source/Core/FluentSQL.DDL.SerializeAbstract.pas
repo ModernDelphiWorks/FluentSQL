@@ -45,6 +45,7 @@ type
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; virtual;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; virtual;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; virtual;
+    function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; virtual;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; virtual;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; virtual;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; virtual;
@@ -191,7 +192,14 @@ end;
 
 function TFluentDDLSerializeAbstract.AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
 begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableRenameColumn', Self.ClassName]);
+    raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableRenameColumn', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'ALTER TABLE ' + Quote(ADef.OldTableName) + ' RENAME TO ' + Quote(ADef.NewTableName);
 end;
 
 function TFluentDDLSerializeAbstract.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;

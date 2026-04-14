@@ -94,6 +94,27 @@ type
   end;
 
   [TestFixture]
+  TTestDDLAlterTableRenameTable = class
+  public
+    [Test]
+    procedure TestAlterTableRenameTable_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameTable_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameTable_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameTable_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameTable_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameTable_EmptyOldName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameTable_EmptyNewName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableRenameTable_SameOldAndNew_RaisesArgumentException;
+  end;
+
+  [TestFixture]
   TTestDDLCreateIndex = class
   public
     [Test]
@@ -218,6 +239,8 @@ type
     [Test]
     procedure TestDropIndexIfExists_SQLite_GeneratesExpected;
     [Test]
+    procedure TestAlterTableRenameTable_SQLite_GeneratesExpected;
+    [Test]
     procedure TestTruncateTable_SQLite_GeneratesDeleteFrom;
   end;
 
@@ -244,6 +267,8 @@ type
     procedure TestDropIndexIfExists_MSSQL_GeneratesExpected;
     [Test]
     procedure TestTruncateTable_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableRenameTable_MSSQL_GeneratesExpected;
     [Test]
     procedure TestReservedWords_MSSQL;
     [Test]
@@ -518,7 +543,7 @@ var
 begin
   LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('  T  ', '  a  ', '  b  ')
     .AsString;
-  Assert.AreEqual('ALTER TABLE T RENAME COLUMN a TO b', LSql);
+  Assert.AreEqual('ALTER TABLE "T" RENAME COLUMN "a" TO "b"', LSql);
 end;
 
 procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_EmptyTableName_RaisesArgumentException;
@@ -579,6 +604,78 @@ begin
       FluentSQL.Schema(dbnDB2).AlterTableRename('T', 'A', 'B').AsString;
     end,
     ENotSupportedException);
+end;
+
+{ TTestDDLAlterTableRenameTable }
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  Assert.AreEqual('ALTER TABLE "TAB_A" RENAME TO "TAB_B"', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  Assert.AreEqual('ALTER TABLE "TAB_A" TO "TAB_B"', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  Assert.AreEqual('ALTER TABLE `TAB_A` RENAME TO `TAB_B`', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  Assert.AreEqual('ALTER TABLE `TAB_A` RENAME TO `TAB_B`', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  Assert.AreEqual('EXEC sp_rename ''TAB_A'', ''TAB_B''', LSql);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_EmptyOldName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('', 'B').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_EmptyNewName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('A', '').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_SameOldAndNew_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('A', 'A').AsString;
+    end,
+    EArgumentException);
 end;
 
 
@@ -1140,6 +1237,14 @@ begin
   Assert.AreEqual('DROP INDEX IF EXISTS `IX_CLI_NOME`', LSql);
 end;
 
+procedure TTestDDLSQLite.TestAlterTableRenameTable_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).AlterTableRename('TAB_OLD', 'TAB_NEW').AsString;
+  Assert.AreEqual('ALTER TABLE `TAB_OLD` RENAME TO `TAB_NEW`', LSql);
+end;
+
 procedure TTestDDLSQLite.TestTruncateTable_SQLite_GeneratesDeleteFrom;
 var
   LSql: string;
@@ -1260,6 +1365,14 @@ begin
     .ColumnBoolean('LEGACY_F').DefaultValue('F')
     .AsString;
   Assert.AreEqual('CREATE TABLE [CONFIGS] ([ENABLED] BIT DEFAULT 1, [ACTIVE] BIT DEFAULT 0, [LEGACY_T] BIT DEFAULT 1, [LEGACY_F] BIT DEFAULT 0)', LSql);
+end;
+
+procedure TTestDDLMSSQL.TestAlterTableRenameTable_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableRename('OLD_NAME', 'NEW_NAME').AsString;
+  Assert.AreEqual('EXEC sp_rename ''OLD_NAME'', ''NEW_NAME''', LSql);
 end;
 
 procedure TTestDDLMSSQL.TestTruncateTable_MSSQL_GeneratesExpected;
