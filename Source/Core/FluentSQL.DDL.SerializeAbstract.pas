@@ -33,8 +33,9 @@ type
   protected
     function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
     function MapLogicalType(const ACol: IFluentDDLColumn): string; virtual; abstract;
+    function GetDialect: TFluentSQLDriver; virtual; abstract;
     function Quote(const AName: string): string; virtual;
-    function GetLiteralValue(const AValue: string): string; virtual;
+    function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
     function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
     function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
     function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
@@ -57,7 +58,7 @@ function TFluentDDLSerializeAbstract.MapConstraints(const ACol: IFluentDDLColumn
 begin
   Result := '';
   if ACol.DefaultValue <> '' then
-    Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue);
+    Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue, ACol.LogicalType);
   if ACol.NotNull then
     Result := Result + ' NOT NULL';
   if ACol.IsPrimaryKey then
@@ -79,8 +80,14 @@ begin
   Result := AName;
 end;
 
-function TFluentDDLSerializeAbstract.GetLiteralValue(const AValue: string): string;
+function TFluentDDLSerializeAbstract.GetLiteralValue(const AValue: string;
+  const ALogicalType: TDDLLogicalType): string;
 begin
+  if (ALogicalType = dltBoolean) and (SameText(AValue, 'True') or SameText(AValue, 'False') or
+     SameText(AValue, 'T') or SameText(AValue, 'F') or SameText(AValue, '1') or SameText(AValue, '0')) then
+  begin
+    Exit(TUtils.BooleanToSQLFormat(GetDialect, SameText(AValue, 'True') or SameText(AValue, 'T') or SameText(AValue, '1')));
+  end;
   Result := AValue;
 end;
 

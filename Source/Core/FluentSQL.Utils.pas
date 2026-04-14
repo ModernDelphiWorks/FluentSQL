@@ -46,6 +46,7 @@ type
     class function DateToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDate): String;
     class function DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDateTime): String;
     class function GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TGUID): String;
+    class function BooleanToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: Boolean): string;
     class function GetHash(const AString: String): String;
   end;
 
@@ -231,6 +232,17 @@ begin
 
     else
       raise Exception.Create('Conversao de Guid no formato String para este dialeto nao implementada.');
+  end;
+end;
+
+class function TUtils.BooleanToSQLFormat(const ADriverName: TFluentSQLDriver;
+  const AValue: Boolean): string;
+begin
+  case ADriverName of
+    dbnMSSQL:
+      if AValue then Result := '1' else Result := '0';
+  else
+    if AValue then Result := 'True' else Result := 'False';
   end;
 end;
 
