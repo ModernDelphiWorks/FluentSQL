@@ -20,3 +20,17 @@ docs-src/.docusaurus/
 __history/
 __recovery/
 .local-readonly/
+
+# Tooling and Metadata
+.gemini/
+.codex/
+.agents/
+
+# Test runner output files (agent pollution guard — ESP-046)
+test_output*.txt
+tests_output*.txt
+
+# Scratch/throwaway Delphi programs (agent pollution guard — ESP-046)
+test_*.dpr
+!Test Delphi/*_tests/PTestFluentSQL*.dpr
+!Test Delphi/*_tests/TestFluentSQL_*.dpr

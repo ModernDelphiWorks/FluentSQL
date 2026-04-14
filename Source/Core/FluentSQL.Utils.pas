@@ -46,6 +46,7 @@ type
     class function DateToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDate): String;
     class function DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDateTime): String;
     class function GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TGUID): String;
+    class function BooleanToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: Boolean): string;
     class function GetHash(const AString: String): String;
   end;
 
@@ -191,7 +192,7 @@ begin
     dbnElevateDB,
     dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
   end;
-
+  Result := QuotedStr(Result);
 end;
 
 class function TUtils.DateToSQLFormat(const ADriverName: TFluentSQLDriver;
@@ -215,6 +216,7 @@ begin
     dbnElevateDB,
     dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
   end;
+  Result := QuotedStr(Result);
 end;
 
 class function TUtils.GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver;
@@ -224,8 +226,24 @@ begin
     dbnFirebird,
     dbnInterbase: Result := Format('CHAR_TO_UUID(''%s'')', [AValue.ToString]);
 
+    dbnMSSQL,
+    dbnPostgreSQL,
+    dbnSQLite,
+    dbnMySQL: Result := Format('''%s''', [AValue.ToString]);
+
     else
-      raise Exception.Create('Converso de Guid no formato String no implementada.');
+      raise Exception.Create('Conversao de Guid no formato String para este dialeto nao implementada.');
+  end;
+end;
+
+class function TUtils.BooleanToSQLFormat(const ADriverName: TFluentSQLDriver;
+  const AValue: Boolean): string;
+begin
+  case ADriverName of
+    dbnMSSQL:
+      if AValue then Result := '1' else Result := '0';
+  else
+    if AValue then Result := 'True' else Result := 'False';
   end;
 end;
 

@@ -150,6 +150,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-14 | Planeada **ESP-045** — Estabilização de Literais DDL (Date, GUID); **ADR-045** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Planeada **ESP-040** — DDL Support for SQLite; **ADR-040** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Entregue **ESP-039** — Refatoração de Entrypoints (Query/Func); **ESP-038** — Cleanup Global Functions DDL. | `.claude/pipeline/implement-report.md` |
 | 2026-04-13 | Entregue **ESP-036** — Advanced DDL (Unique, Check); driver refactor EST-037 sustentado. | `.claude/pipeline/implement-report.md` |

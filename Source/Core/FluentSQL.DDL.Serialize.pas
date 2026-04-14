@@ -34,6 +34,7 @@ type
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -101,6 +102,18 @@ begin
   LReg := TFluentSQLRegister.Create;
   try
     Result := LReg.DDLSerialize(ADef.Dialect).AlterTableRenameColumn(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableRenameTable(ADef);
   finally
     LReg.Free;
   end;

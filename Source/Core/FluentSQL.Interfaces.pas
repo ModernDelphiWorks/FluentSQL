@@ -642,6 +642,7 @@ type
   IFluentDDLAlterTableAddColumnDef = interface;
   IFluentDDLAlterTableDropColumnDef = interface;
   IFluentDDLAlterTableRenameColumnDef = interface;
+  IFluentDDLAlterTableRenameTableDef = interface;
   IFluentDDLCreateIndexDef = interface;
   IFluentDDLDropIndexDef = interface;
   IFluentDDLTruncateTableDef = interface;
@@ -651,6 +652,7 @@ type
   IFluentDDLAlterTableAddBuilder = interface;
   IFluentDDLAlterTableDropBuilder = interface;
   IFluentDDLAlterTableRenameColumnBuilder = interface;
+  IFluentDDLAlterTableRenameTableBuilder = interface;
   IFluentDDLCreateIndexBuilder = interface;
   IFluentDDLDropIndexBuilder = interface;
   IFluentDDLTruncateTableBuilder = interface;
@@ -662,6 +664,7 @@ type
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
+    function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
@@ -673,7 +676,8 @@ type
     function DropTable(const ATableName: string): IFluentDDLDropBuilder;
     function AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
     function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
-    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder; overload;
+    function AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
@@ -725,7 +729,8 @@ type
     dltDate,
     dltDateTime,
     dltLongText,
-    dltBlob
+    dltBlob,
+    dltGuid
   );
 
   IFluentDDLColumn = interface
@@ -773,6 +778,7 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLBuilder;
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
+    function ColumnGuid(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder;
     function Unique: IFluentDDLBuilder;
@@ -824,6 +830,7 @@ type
     function ColumnDateTime(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder;
     function Unique: IFluentDDLAlterTableAddBuilder;
@@ -868,6 +875,23 @@ type
   /// <summary>ESP-030: fluent builder for ALTER TABLE RENAME COLUMN SQL text (factory fixes table, old and new names).</summary>
   IFluentDDLAlterTableRenameColumnBuilder = interface(IFluentDDLAlterTableRenameColumnDef)
     ['{B4D57F80-C592-7D0E-1A2B-3C4D5E6F7081}']
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-047 / ADR-047: read-only view of ALTER TABLE RENAME TABLE for serializers.</summary>
+  IFluentDDLAlterTableRenameTableDef = interface
+    ['{C5E1D2A3-B4C5-D6E7-F801-234567890ABC}']
+    function GetDialect: TFluentSQLDriver;
+    function GetOldTableName: string;
+    function GetNewTableName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property OldTableName: string read GetOldTableName;
+    property NewTableName: string read GetNewTableName;
+  end;
+
+  /// <summary>ESP-047: fluent builder for ALTER TABLE RENAME TABLE SQL text.</summary>
+  IFluentDDLAlterTableRenameTableBuilder = interface(IFluentDDLAlterTableRenameTableDef)
+    ['{D6F2E3B4-C5D6-E7F8-0123-4567890ABCDE}']
     function AsString: string;
   end;
 
