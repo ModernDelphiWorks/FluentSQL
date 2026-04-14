@@ -10,7 +10,7 @@ title: Início rápido
 
 ## Exemplo mínimo
 
-O repositório documenta o ponto de entrada **`CreateFluentSQL`** (e o atalho `TCQ`) com constantes de driver (`dbnFirebird`, etc.). Exemplo adaptado de `.claude/references/examples.md`:
+O ponto de entrada recomendado é **`Query(ADialect)`**. Exemplo:
 
 ```pascal
 uses FluentSQL;
@@ -18,7 +18,7 @@ uses FluentSQL;
 var
   SQL: string;
 begin
-  SQL := CreateFluentSQL(dbnFirebird)
+  SQL := Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('NOME')
@@ -28,9 +28,9 @@ begin
 end;
 ```
 
-## Exemplo DDL (ESP-017 / ESP-034)
+## Exemplo DDL
 
-A partir da **v1.1.0**, você também pode gerar comandos `CREATE TABLE` de forma fluente:
+Para gerar comandos de definição de dados (DDL), utilize a fábrica **`Schema(ADialect)`**:
 
 ```pascal
 uses FluentSQL;
@@ -38,7 +38,7 @@ uses FluentSQL;
 var
   LSql: string;
 begin
-  LSql := CreateFluentDDLTable(dbnPostgreSQL, 'USUARIOS')
+  LSql := Schema(dbnPostgreSQL).CreateTable('USUARIOS')
     .ColumnInteger('ID').PrimaryKey
     .ColumnVarChar('NOME', 100).NotNull
     .ColumnBoolean('ATIVO').DefaultValue(True)
