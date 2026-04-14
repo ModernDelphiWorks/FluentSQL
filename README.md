@@ -55,6 +55,8 @@ O manifesto Boss na raiz **não** impõe dependências transitórias obrigatóri
 
 ## Início rápido
 
+**DML (Consultas):**
+
 ```delphi
 uses FluentSQL;
 
@@ -63,15 +65,30 @@ var
 begin
   SQL := Query(dbnFirebird)
     .Select
-    .Column('ID')
-    .Column('NOME')
+    .Column('ID').Column('NOME')
     .From('CLIENTES')
     .Where('ATIVO').Equal(1)
     .AsString;
 end;
 ```
 
-O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Os atalhos anteriores `CreateFluentSQL` e `TCQ` encontram-se obsoletos. Para operações de definição de dados, utilize **`Schema(ADialect)`**. Em código reutilizável, prefira as interfaces definidas em `FluentSQL.Interfaces`.
+**DDL (Definição de dados):**
+
+```delphi
+uses FluentSQL;
+
+var
+  SQL: string;
+begin
+  SQL := Schema(dbnPostgreSQL)
+    .CreateTable('USUARIOS')
+    .ColumnInteger('ID').PrimaryKey
+    .ColumnVarChar('NOME', 100).NotNull
+    .AsString;
+end;
+```
+
+O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Para operações de definição de dados, utilize **`Schema(ADialect)`**. As fábricas legadas (`CreateFluentSQL`, `TCQ`, `CreateFluentDDLTable`, etc.) encontram-se obsoletas. Em código reutilizável, prefira as interfaces definidas em `FluentSQL.Interfaces`.
 
 ---
 
