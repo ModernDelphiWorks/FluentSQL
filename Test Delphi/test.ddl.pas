@@ -1250,8 +1250,10 @@ begin
   LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('CONFIGS')
     .ColumnBoolean('ENABLED').DefaultValue('True')
     .ColumnBoolean('ACTIVE').DefaultValue('False')
+    .ColumnBoolean('LEGACY_T').DefaultValue('T')
+    .ColumnBoolean('LEGACY_F').DefaultValue('F')
     .AsString;
-  Assert.AreEqual('CREATE TABLE [CONFIGS] ([ENABLED] BIT DEFAULT 1, [ACTIVE] BIT DEFAULT 0)', LSql);
+  Assert.AreEqual('CREATE TABLE [CONFIGS] ([ENABLED] BIT DEFAULT 1, [ACTIVE] BIT DEFAULT 0, [LEGACY_T] BIT DEFAULT 1, [LEGACY_F] BIT DEFAULT 0)', LSql);
 end;
 
 procedure TTestDDLMSSQL.TestTruncateTable_MSSQL_GeneratesExpected;

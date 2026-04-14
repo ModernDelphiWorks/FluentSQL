@@ -28,6 +28,7 @@ type
   TFluentDDLSerializerFirebird = class(TFluentDDLSerializeAbstract)
   protected
     function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
@@ -49,6 +50,11 @@ begin
   if (AName = '') or (AName.StartsWith('"')) then
     Exit(AName);
   Result := '"' + AName + '"';
+end;
+
+function TFluentDDLSerializerFirebird.GetDialect: TFluentSQLDriver;
+begin
+  Result := dbnFirebird;
 end;
 
 function TFluentDDLSerializerFirebird.MapLogicalType(const ACol: IFluentDDLColumn): string;

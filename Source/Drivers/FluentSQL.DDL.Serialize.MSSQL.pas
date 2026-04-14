@@ -28,8 +28,9 @@ type
   TFluentDDLSerializerMSSQL = class(TFluentDDLSerializeAbstract)
   protected
     function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
-    function GetLiteralValue(const AValue: string): string; override;
+    function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -52,13 +53,15 @@ begin
   Result := '[' + AName + ']';
 end;
 
-function TFluentDDLSerializerMSSQL.GetLiteralValue(const AValue: string): string;
+function TFluentDDLSerializerMSSQL.GetDialect: TFluentSQLDriver;
 begin
-  if SameText(AValue, 'True') then
-    Exit('1')
-  else if SameText(AValue, 'False') then
-    Exit('0');
-  Result := inherited GetLiteralValue(AValue);
+  Result := dbnMSSQL;
+end;
+
+function TFluentDDLSerializerMSSQL.GetLiteralValue(const AValue: string;
+  const ALogicalType: TDDLLogicalType): string;
+begin
+  Result := inherited GetLiteralValue(AValue, ALogicalType);
 end;
 
 function TFluentDDLSerializerMSSQL.MapLogicalType(const ACol: IFluentDDLColumn): string;
