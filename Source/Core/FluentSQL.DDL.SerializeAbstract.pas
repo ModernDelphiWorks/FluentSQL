@@ -44,6 +44,8 @@ type
     function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
     function GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string; virtual;
     function GetTableComment(const ATable: IFluentDDLTableDef): string; virtual;
+    function GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string; virtual;
+    function GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -76,6 +78,10 @@ begin
     Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue, ACol.LogicalType);
   if ACol.NotNull then
     Result := Result + ' NOT NULL';
+
+  if ACol.ConstraintName <> '' then
+    Result := Result + ' CONSTRAINT ' + Quote(ACol.ConstraintName);
+
   if ACol.IsPrimaryKey then
     Result := Result + ' PRIMARY KEY';
   if ACol.IsUnique then
@@ -204,6 +210,53 @@ end;
 function TFluentDDLSerializeAbstract.GetTableComment(const ATable: IFluentDDLTableDef): string;
 begin
   Result := '';
+end;
+
+function TFluentDDLSerializeAbstract.GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string;
+var
+  LI: Integer;
+begin
+  Result := '';
+  if AConstraint.Name <> '' then
+    Result := 'CONSTRAINT ' + Quote(AConstraint.Name) + ' ';
+
+  case AConstraint.ConstraintType of
+    dctPrimaryKey:
+    begin
+      Result := Result + 'PRIMARY KEY (';
+      for LI := 0 to AConstraint.GetColumnCount - 1 do
+      begin
+        if LI > 0 then Result := Result + ', ';
+        Result := Result + Quote(AConstraint.GetColumnName(LI));
+      end;
+      Result := Result + ')';
+    end;
+    dctUnique:
+    begin
+      Result := Result + 'UNIQUE (';
+      for LI := 0 to AConstraint.GetColumnCount - 1 do
+      begin
+        if LI > 0 then Result := Result + ', ';
+        Result := Result + Quote(AConstraint.GetColumnName(LI));
+      end;
+      Result := Result + ')';
+    end;
+    dctCheck:
+    begin
+      Result := Result + 'CHECK (' + AConstraint.GetCheckCondition + ')';
+    end;
+  end;
+end;
+
+function TFluentDDLSerializeAbstract.GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
+var
+  LI: Integer;
+begin
+  Result := '';
+  for LI := 0 to ADef.GetTableConstraintCount - 1 do
+  begin
+    Result := Result + ', ' + GetTableConstraintDefinition(ADef.GetTableConstraint(LI));
+  end;
 end;
 
 function TFluentDDLSerializeAbstract.CreateTable(const ADef: IFluentDDLTableDef): string;

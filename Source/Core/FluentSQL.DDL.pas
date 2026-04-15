@@ -42,6 +42,7 @@ type
     FReferenceTable: string;
     FReferenceColumn: string;
     FDescription: string;
+    FConstraintName: string;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -61,15 +62,33 @@ type
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     function GetDescription: string;
+    function GetConstraintName: string;
     procedure SetNotNull(AValue: Boolean);
-    procedure SetPrimaryKey(AValue: Boolean);
-    procedure SetUnique(AValue: Boolean);
-    procedure SetCheck(const ACondition: string);
+    procedure SetPrimaryKey(AValue: Boolean; const AName: string = '');
+    procedure SetUnique(AValue: Boolean; const AName: string = '');
+    procedure SetCheck(const ACondition: string; const AName: string = '');
     procedure SetDefaultValue(const AValue: string);
     procedure SetComputedBy(const AExpr: string);
     procedure SetIdentity(AValue: Boolean);
     procedure SetReferences(const ATableName, AColumnName: string);
     procedure SetDescription(const AText: string);
+  end;
+
+  /// <summary>ESP-055: concrete implementation of table-level constraints.</summary>
+  TFluentDDLTableConstraint = class(TInterfacedObject, IFluentDDLTableConstraint)
+  strict private
+    FName: string;
+    FConstraintType: TDDLConstraintType;
+    FColumns: TArray<string>;
+    FCheckCondition: string;
+  public
+    constructor Create(const AName: string; AType: TDDLConstraintType; const AColumns: array of string); overload;
+    constructor Create(const AName: string; const ACheckCondition: string); overload;
+    function GetName: string;
+    function GetConstraintType: TDDLConstraintType;
+    function GetColumnCount: Integer;
+    function GetColumnName(AIndex: Integer): string;
+    function GetCheckCondition: string;
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
@@ -78,7 +97,9 @@ type
     FTableName: string;
     FDescription: string;
     FColumns: TObjectList<TFluentDDLColumn>;
+    FTableConstraints: TObjectList<TFluentDDLTableConstraint>;
     function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
+    procedure _CheckPKDuplicity;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
     destructor Destroy; override;
@@ -87,6 +108,8 @@ type
     function GetTableName: string;
     function GetColumnCount: Integer;
     function GetColumn(AIndex: Integer): IFluentDDLColumn;
+    function GetTableConstraintCount: Integer;
+    function GetTableConstraint(AIndex: Integer): IFluentDDLTableConstraint;
     function GetDescription: string;
     { IFluentDDLBuilder }
     function ColumnInteger(const AName: string): IFluentDDLBuilder;
@@ -99,9 +122,13 @@ type
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function ColumnGuid(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
-    function PrimaryKey: IFluentDDLBuilder;
-    function Unique: IFluentDDLBuilder;
-    function Check(const ACondition: string): IFluentDDLBuilder;
+    function PrimaryKey: IFluentDDLBuilder; overload;
+    function PrimaryKey(const AName: string): IFluentDDLBuilder; overload;
+    function PrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLBuilder; overload;
+    function Unique: IFluentDDLBuilder; overload;
+    function Unique(const AName: string): IFluentDDLBuilder; overload;
+    function Unique(const AColumns: array of string; const AName: string = ''): IFluentDDLBuilder; overload;
+    function Check(const ACondition: string; const AName: string = ''): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity: IFluentDDLBuilder;
@@ -151,9 +178,11 @@ type
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
-    function PrimaryKey: IFluentDDLAlterTableAddBuilder;
-    function Unique: IFluentDDLAlterTableAddBuilder;
-    function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
+    function PrimaryKey: IFluentDDLAlterTableAddBuilder; overload;
+    function PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
+    function Unique: IFluentDDLAlterTableAddBuilder; overload;
+    function Unique(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
+    function Check(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity: IFluentDDLAlterTableAddBuilder;
@@ -329,7 +358,7 @@ type
     function GetOrReplace: Boolean;
     { IFluentDDLCreateViewBuilder }
     function OrReplace: IFluentDDLCreateViewBuilder;
-    function As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
+    function &As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
     function AsString: string;
   end;
 
@@ -505,24 +534,35 @@ begin
   Result := FDescription;
 end;
 
+function TFluentDDLColumn.GetConstraintName: string;
+begin
+  Result := FConstraintName;
+end;
+
 procedure TFluentDDLColumn.SetNotNull(AValue: Boolean);
 begin
   FNotNull := AValue;
 end;
 
-procedure TFluentDDLColumn.SetPrimaryKey(AValue: Boolean);
+procedure TFluentDDLColumn.SetPrimaryKey(AValue: Boolean; const AName: string = '');
 begin
   FPrimaryKey := AValue;
+  if AName <> '' then
+    FConstraintName := AName;
 end;
 
-procedure TFluentDDLColumn.SetUnique(AValue: Boolean);
+procedure TFluentDDLColumn.SetUnique(AValue: Boolean; const AName: string = '');
 begin
   FUnique := AValue;
+  if AName <> '' then
+    FConstraintName := AName;
 end;
 
-procedure TFluentDDLColumn.SetCheck(const ACondition: string);
+procedure TFluentDDLColumn.SetCheck(const ACondition: string; const AName: string = '');
 begin
   FCheckCondition := ACondition;
+  if AName <> '' then
+    FConstraintName := AName;
 end;
 
 procedure TFluentDDLColumn.SetDefaultValue(const AValue: string);
@@ -537,6 +577,54 @@ begin
   if (AExpr <> '') and (FDefaultValue <> '') then
     raise EArgumentException.Create('DDL: A column cannot have both DefaultValue and ComputedBy.');
   FComputedExpression := AExpr;
+end;
+
+{ TFluentDDLTableConstraint }
+
+constructor TFluentDDLTableConstraint.Create(const AName: string; AType: TDDLConstraintType;
+  const AColumns: array of string);
+var
+  I: Integer;
+begin
+  inherited Create;
+  FName := AName;
+  FConstraintType := AType;
+  SetLength(FColumns, Length(AColumns));
+  for I := 0 to High(AColumns) do
+    FColumns[I] := AColumns[I];
+end;
+
+constructor TFluentDDLTableConstraint.Create(const AName, ACheckCondition: string);
+begin
+  inherited Create;
+  FName := AName;
+  FConstraintType := dctCheck;
+  FCheckCondition := ACheckCondition;
+end;
+
+function TFluentDDLTableConstraint.GetCheckCondition: string;
+begin
+  Result := FCheckCondition;
+end;
+
+function TFluentDDLTableConstraint.GetColumnCount: Integer;
+begin
+  Result := Length(FColumns);
+end;
+
+function TFluentDDLTableConstraint.GetColumnName(AIndex: Integer): string;
+begin
+  Result := FColumns[AIndex];
+end;
+
+function TFluentDDLTableConstraint.GetConstraintType: TDDLConstraintType;
+begin
+  Result := FConstraintType;
+end;
+
+function TFluentDDLTableConstraint.GetName: string;
+begin
+  Result := FName;
 end;
 
 procedure TFluentDDLColumn.SetIdentity(AValue: Boolean);
@@ -565,10 +653,12 @@ begin
   FDialect := ADialect;
   FTableName := ATableName;
   FColumns := TObjectList<TFluentDDLColumn>.Create(True);
+  FTableConstraints := TObjectList<TFluentDDLTableConstraint>.Create(True);
 end;
 
 destructor TFluentDDLBuilder.Destroy;
 begin
+  FTableConstraints.Free;
   FColumns.Free;
   inherited;
 end;
@@ -593,9 +683,32 @@ begin
   Result := FColumns[AIndex];
 end;
 
+function TFluentDDLBuilder.GetTableConstraintCount: Integer;
+begin
+  Result := FTableConstraints.Count;
+end;
+
+function TFluentDDLBuilder.GetTableConstraint(AIndex: Integer): IFluentDDLTableConstraint;
+begin
+  Result := FTableConstraints[AIndex];
+end;
+
 function TFluentDDLBuilder.GetDescription: string;
 begin
   Result := FDescription;
+end;
+
+procedure TFluentDDLBuilder._CheckPKDuplicity;
+var
+  I: Integer;
+begin
+  for I := 0 to FColumns.Count - 1 do
+    if FColumns[I].GetIsPrimaryKey then
+      raise EArgumentException.Create('DDL: Table already has a Primary Key defined (inline).');
+
+  for I := 0 to FTableConstraints.Count - 1 do
+    if FTableConstraints[I].GetConstraintType = dctPrimaryKey then
+      raise EArgumentException.Create('DDL: Table already has a Primary Key defined (table constraint).');
 end;
 
 function TFluentDDLBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
@@ -661,7 +774,27 @@ end;
 function TFluentDDLBuilder.PrimaryKey: IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
+  begin
+    _CheckPKDuplicity;
     FColumns.Last.SetPrimaryKey(True);
+  end;
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.PrimaryKey(const AName: string): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+  begin
+    _CheckPKDuplicity;
+    FColumns.Last.SetPrimaryKey(True, AName);
+  end;
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.PrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLBuilder;
+begin
+  _CheckPKDuplicity;
+  FTableConstraints.Add(TFluentDDLTableConstraint.Create(AName, dctPrimaryKey, AColumns));
   Result := Self;
 end;
 
@@ -672,10 +805,25 @@ begin
   Result := Self;
 end;
 
-function TFluentDDLBuilder.Check(const ACondition: string): IFluentDDLBuilder;
+function TFluentDDLBuilder.Unique(const AName: string): IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
-    FColumns.Last.SetCheck(ACondition);
+    FColumns.Last.SetUnique(True, AName);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.Unique(const AColumns: array of string; const AName: string = ''): IFluentDDLBuilder;
+begin
+  FTableConstraints.Add(TFluentDDLTableConstraint.Create(AName, dctUnique, AColumns));
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.Check(const ACondition: string; const AName: string = ''): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetCheck(ACondition, AName)
+  else
+    FTableConstraints.Add(TFluentDDLTableConstraint.Create(AName, ACondition));
   Result := Self;
 end;
 
@@ -885,6 +1033,13 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableAddBuilder.PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetPrimaryKey(True, AName);
+  Result := Self;
+end;
+
 function TFluentDDLAlterTableAddBuilder.Unique: IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn then
@@ -892,10 +1047,17 @@ begin
   Result := Self;
 end;
 
-function TFluentDDLAlterTableAddBuilder.Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
+function TFluentDDLAlterTableAddBuilder.Unique(const AName: string): IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn then
-    FColumn.SetCheck(ACondition);
+    FColumn.SetUnique(True, AName);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.Check(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetCheck(ACondition, AName);
   Result := Self;
 end;
 
@@ -1491,7 +1653,7 @@ begin
   Result := Self;
 end;
 
-function TFluentDDLCreateViewBuilder.As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
+function TFluentDDLCreateViewBuilder.&As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
 begin
   FQuery := AQuery;
   Result := Self;

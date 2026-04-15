@@ -103,6 +103,9 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-040** — DDL Support: **SQLite** (Concluído).
 - [x] **ESP-041** — DDL Support: **MS SQL Server** (Concluído).
 - [x] **ESP-049** — DDL alargado (13ª vertical): **Computed Columns** (Concluído).
+- [x] **ESP-053** — DDL View Support (CREATE/DROP VIEW) — delivered 2026-04-15.
+- [x] **ESP-054** — DDL Sequence Support (CREATE/DROP SEQUENCE) — delivered 2026-04-15.
+- [x] **ESP-055** — DDL Advanced Constraints (Composite Keys & Named Constraints).
 - [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 
 ---
@@ -153,6 +156,10 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-15 | Entregue **ESP-055** — DDL Advanced Constraints (Composite Keys & Named Constraints); validado na rodada 46. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-054** — DDL Sequence Support; validado na rodada 45. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-053** — DDL View Support (CREATE/DROP VIEW); validado na rodada 44. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-052** — DDL Table and Column Comments Support; validado na rodada 43. | `.claude/pipeline/develop-report.md` |
 | 2026-04-15 | Planeada **ESP-052** — DDL Table and Column Comments Support; **ADR-052** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-15 | Entregue **ESP-051** — DDL Identity / Auto-Increment Support; validado na rodada 42. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Planeada **ESP-051** — Identity / Auto-Increment Support; **ADR-051** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
