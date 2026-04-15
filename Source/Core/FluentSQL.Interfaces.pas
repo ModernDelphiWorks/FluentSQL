@@ -754,6 +754,25 @@ type
     dltGuid
   );
 
+  /// <summary>ESP-055: types of constraints for table-level definitions.</summary>
+  TDDLConstraintType = (
+    dctPrimaryKey,
+    dctUnique,
+    dctCheck
+  );
+
+  /// <summary>ESP-055: represents a composite or named constraint at the table level.</summary>
+  IFluentDDLTableConstraint = interface
+    ['{6E7F8A91-0B1C-2D3E-4F5A-6B7C8D9E0F1A}']
+    function GetName: string;
+    function GetConstraintType: TDDLConstraintType;
+    function GetColumnCount: Integer;
+    function GetColumnName(AIndex: Integer): string;
+    function GetCheckCondition: string;
+    property Name: string read GetName;
+    property ConstraintType: TDDLConstraintType read GetConstraintType;
+  end;
+
   IFluentDDLColumn = interface
     ['{9E0DA634-9BA2-4CFC-8E3B-168651C8B02B}']
     function GetName: string;
@@ -770,6 +789,8 @@ type
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     function GetDescription: string;
+    /// <summary>ESP-055: optional explicit name for inline constraints (PK, UNIQUE, CHECK).</summary>
+    function GetConstraintName: string;
     property Name: string read GetName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
@@ -783,6 +804,7 @@ type
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
     property Description: string read GetDescription;
+    property ConstraintName: string read GetConstraintName;
   end;
 
   IFluentDDLTableDef = interface
@@ -791,6 +813,8 @@ type
     function GetTableName: string;
     function GetColumnCount: Integer;
     function GetColumn(AIndex: Integer): IFluentDDLColumn;
+    function GetTableConstraintCount: Integer;
+    function GetTableConstraint(AIndex: Integer): IFluentDDLTableConstraint;
     function GetDescription: string;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
@@ -809,9 +833,13 @@ type
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function ColumnGuid(const AName: string): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
-    function PrimaryKey: IFluentDDLBuilder;
-    function Unique: IFluentDDLBuilder;
-    function Check(const ACondition: string): IFluentDDLBuilder;
+    function PrimaryKey: IFluentDDLBuilder; overload;
+    function PrimaryKey(const AName: string): IFluentDDLBuilder; overload;
+    function PrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLBuilder; overload;
+    function Unique: IFluentDDLBuilder; overload;
+    function Unique(const AName: string): IFluentDDLBuilder; overload;
+    function Unique(const AColumns: array of string; const AName: string = ''): IFluentDDLBuilder; overload;
+    function Check(const ACondition: string; const AName: string = ''): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity: IFluentDDLBuilder;
@@ -864,9 +892,11 @@ type
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
-    function PrimaryKey: IFluentDDLAlterTableAddBuilder;
-    function Unique: IFluentDDLAlterTableAddBuilder;
-    function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
+    function PrimaryKey: IFluentDDLAlterTableAddBuilder; overload;
+    function PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
+    function Unique: IFluentDDLAlterTableAddBuilder; overload;
+    function Unique(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
+    function Check(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity: IFluentDDLAlterTableAddBuilder;
@@ -1058,7 +1088,7 @@ type
   IFluentDDLCreateViewBuilder = interface(IFluentDDLCreateViewDef)
     ['{73B9E0F2-5C8D-4E30-A1B1-3C4D5E6F7081}']
     function OrReplace: IFluentDDLCreateViewBuilder;
-    function As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
+    function &As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
     function AsString: string;
   end;
 

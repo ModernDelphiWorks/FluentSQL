@@ -150,7 +150,7 @@ begin
   if ADef.GetColumnCount <= 0 then
     raise EArgumentException.Create('DDL MSSQL: empty column list');
 
-  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + GetTableConstraintList(ADef) + ')';
   
   Result := Result + GetTableComment(ADef);
   for LI := 0 to ADef.GetColumnCount - 1 do

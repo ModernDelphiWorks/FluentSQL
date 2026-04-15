@@ -26,6 +26,25 @@ type
   end;
 
   [TestFixture]
+  TTestDDLConstraints = class
+  public
+    [Test]
+    procedure TestCompositePrimaryKey_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestCompositeUnique_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestNamedInlineConstraints_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestNamedCheckConstraint_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestTableLevelCheck_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestPrimaryKeyDuplicity_RaisesException;
+    [Test]
+    procedure TestNamedConstraint_AlterTableAdd_MSSQL_GeneratesExpected;
+  end;
+
+  [TestFixture]
   TTestDDLComputedColumns = class
   public
     [Test]
@@ -1703,7 +1722,7 @@ var
   LSql: string;
 begin
   LSql := FluentSQL.Schema(dbnPostgreSQL).CreateView('VW_CLIENTES')
-    .As(FluentSQL.Query(dbnPostgreSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnPostgreSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
 end;
@@ -1714,7 +1733,7 @@ var
 begin
   LSql := FluentSQL.Schema(dbnPostgreSQL).CreateView('VW_CLIENTES')
     .OrReplace
-    .As(FluentSQL.Query(dbnPostgreSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnPostgreSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE OR REPLACE VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
 end;
@@ -1724,7 +1743,7 @@ var
   LSql: string;
 begin
   LSql := FluentSQL.Schema(dbnFirebird).CreateView('VW_CLIENTES')
-    .As(FluentSQL.Query(dbnFirebird).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnFirebird).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
 end;
@@ -1735,7 +1754,7 @@ var
 begin
   LSql := FluentSQL.Schema(dbnFirebird).CreateView('VW_CLIENTES')
     .OrReplace
-    .As(FluentSQL.Query(dbnFirebird).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnFirebird).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE OR ALTER VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
 end;
@@ -1746,7 +1765,7 @@ var
 begin
   LSql := FluentSQL.Schema(dbnMySQL).CreateView('VW_CLIENTES')
     .OrReplace
-    .As(FluentSQL.Query(dbnMySQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnMySQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE OR REPLACE VIEW `VW_CLIENTES` AS SELECT `ID`, `NOME` FROM `CLIENTES`', LSql);
 end;
@@ -1757,7 +1776,7 @@ var
 begin
   LSql := FluentSQL.Schema(dbnMSSQL).CreateView('VW_CLIENTES')
     .OrReplace
-    .As(FluentSQL.Query(dbnMSSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnMSSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE OR ALTER VIEW [VW_CLIENTES] AS SELECT [ID], [NOME] FROM [CLIENTES]', LSql);
 end;
@@ -1767,7 +1786,7 @@ var
   LSql: string;
 begin
   LSql := FluentSQL.Schema(dbnSQLite).CreateView('VW_CLIENTES')
-    .As(FluentSQL.Query(dbnSQLite).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .&As(FluentSQL.Query(dbnSQLite).Select.Column(['ID', 'NOME']).From('CLIENTES'))
     .AsString;
   Assert.AreEqual('CREATE VIEW `VW_CLIENTES` AS SELECT `ID`, `NOME` FROM `CLIENTES`', LSql);
 end;
@@ -1807,5 +1826,94 @@ begin
     end,
     EArgumentException);
 end;
+
+{ TTestDDLConstraints }
+
+procedure TTestDDLConstraints.TestCompositePrimaryKey_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('ITEM_PEDIDO')
+    .ColumnInteger('PEDIDO_ID')
+    .ColumnInteger('ITEM_ID')
+    .PrimaryKey(['PEDIDO_ID', 'ITEM_ID'], 'PK_ITEM_PEDIDO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE "ITEM_PEDIDO" ("PEDIDO_ID" INTEGER, "ITEM_ID" INTEGER, CONSTRAINT "PK_ITEM_PEDIDO" PRIMARY KEY ("PEDIDO_ID", "ITEM_ID"))', LSql);
+end;
+
+procedure TTestDDLConstraints.TestCompositeUnique_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('CONTATOS')
+    .ColumnInteger('CLIENTE_ID')
+    .ColumnVarChar('TIPO', 20)
+    .Unique(['CLIENTE_ID', 'TIPO'], 'UK_CONTATO_TIPO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE "CONTATOS" ("CLIENTE_ID" INTEGER, "TIPO" VARCHAR(20), CONSTRAINT "UK_CONTATO_TIPO" UNIQUE ("CLIENTE_ID", "TIPO"))', LSql);
+end;
+
+procedure TTestDDLConstraints.TestNamedInlineConstraints_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('USUARIOS')
+    .ColumnInteger('ID').PrimaryKey('PK_USUARIOS')
+    .ColumnVarChar('EMAIL', 255).Unique('UK_USUARIOS_EMAIL')
+    .ColumnInteger('IDADE').Check('IDADE >= 18', 'CK_USUARIOS_IDADE')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE [USUARIOS] ([ID] INT CONSTRAINT [PK_USUARIOS] PRIMARY KEY, [EMAIL] VARCHAR(255) CONSTRAINT [UK_USUARIOS_EMAIL] UNIQUE, [IDADE] INT CONSTRAINT [CK_USUARIOS_IDADE] CHECK (IDADE >= 18))', LSql);
+end;
+
+procedure TTestDDLConstraints.TestNamedCheckConstraint_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).CreateTable('PRODUTOS')
+    .ColumnInteger('ID')
+    .ColumnInteger('PRECO').Check('PRECO > 0', 'CK_PRECO_POSITIVO')
+    .AsString;
+  // SQLite supports: col TYPE CONSTRAINT name CHECK (...)
+  Assert.AreEqual('CREATE TABLE `PRODUTOS` (`ID` INTEGER, `PRECO` INTEGER CONSTRAINT `CK_PRECO_POSITIVO` CHECK (PRECO > 0))', LSql);
+end;
+
+procedure TTestDDLConstraints.TestTableLevelCheck_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  // Check literal table-level (without specific column)
+  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('SALDOS')
+    .ColumnInteger('DEBITO')
+    .ColumnInteger('CREDITO')
+    .Check('DEBITO <= CREDITO', 'CK_SALDO_VALIDO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE "SALDOS" ("DEBITO" INTEGER, "CREDITO" INTEGER, CONSTRAINT "CK_SALDO_VALIDO" CHECK (DEBITO <= CREDITO))', LSql);
+end;
+
+procedure TTestDDLConstraints.TestPrimaryKeyDuplicity_RaisesException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).CreateTable('T')
+        .ColumnInteger('ID').PrimaryKey
+        .PrimaryKey(['A', 'B']) // Should raise
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLConstraints.TestNamedConstraint_AlterTableAdd_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAdd('USUARIOS')
+    .ColumnVarChar('LOGIN', 50).Unique('UK_USUARIOS_LOGIN')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE [USUARIOS] ADD [LOGIN] VARCHAR(50) CONSTRAINT [UK_USUARIOS_LOGIN] UNIQUE', LSql);
+end;
+
+initialization
+  TDUnitX.RegisterTestFixture(TTestDDLConstraints);
 
 end.

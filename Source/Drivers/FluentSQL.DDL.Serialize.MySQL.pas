@@ -119,7 +119,7 @@ begin
   if ADef.GetColumnCount <= 0 then
     raise EArgumentException.Create('DDL: empty column list');
 
-  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + GetTableConstraintList(ADef) + ')';
   
   if ADef.Description <> '' then
     Result := Result + ' COMMENT = ' + QuotedStr(ADef.Description);

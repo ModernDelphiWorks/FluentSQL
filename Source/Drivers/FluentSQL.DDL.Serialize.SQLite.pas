@@ -81,6 +81,10 @@ begin
     Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue, ACol.LogicalType);
   if ACol.NotNull then
     Result := Result + ' NOT NULL';
+
+  if ACol.ConstraintName <> '' then
+    Result := Result + ' CONSTRAINT ' + Quote(ACol.ConstraintName);
+
   if ACol.IsPrimaryKey then
   begin
     Result := Result + ' PRIMARY KEY';
@@ -137,7 +141,7 @@ begin
   if ADef.GetColumnCount <= 0 then
     raise EArgumentException.Create('DDL: empty column list');
 
-  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + GetTableConstraintList(ADef) + ')';
 end;
 
 function TFluentDDLSerializerSQLite.DropTable(const ADef: IFluentDDLDropTableDef): string;
