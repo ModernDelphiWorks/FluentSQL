@@ -648,6 +648,11 @@ type
   IFluentDDLDropIndexDef = interface;
   IFluentDDLTruncateTableDef = interface;
 
+  IFluentDDLCreateViewDef = interface;
+  IFluentDDLDropViewDef = interface;
+  IFluentDDLCreateSequenceDef = interface;
+  IFluentDDLDropSequenceDef = interface;
+
   IFluentDDLBuilder = interface;
   IFluentDDLDropBuilder = interface;
   IFluentDDLAlterTableAddBuilder = interface;
@@ -660,9 +665,8 @@ type
   IFluentDDLTruncateTableBuilder = interface;
   IFluentDDLCreateViewBuilder = interface;
   IFluentDDLDropViewBuilder = interface;
-
-  IFluentDDLCreateViewDef = interface;
-  IFluentDDLDropViewDef = interface;
+  IFluentDDLCreateSequenceBuilder = interface;
+  IFluentDDLDropSequenceBuilder = interface;
 
   IFluentDDLSerialize = interface
     ['{84D6A23D-B5F1-4F2E-A9C1-D3E4F5A6B7C8}']
@@ -678,6 +682,8 @@ type
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
     function CreateView(const ADef: IFluentDDLCreateViewDef): string;
     function DropView(const ADef: IFluentDDLDropViewDef): string;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
   end;
 
   IFluentSchema = interface
@@ -694,6 +700,8 @@ type
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
     function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
+    function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
+    function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
   end;
 
   IFluentSQLFunctions = interface
@@ -1069,6 +1077,39 @@ type
   IFluentDDLDropViewBuilder = interface(IFluentDDLDropViewDef)
     ['{95DB1214-7E0F-5052-C3D3-5E6F708192A3}']
     function IfExists: IFluentDDLDropViewBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-054 / ADR-054: read-only view of CREATE SEQUENCE for serializers.</summary>
+  IFluentDDLCreateSequenceDef = interface
+    ['{205DF81F-A7D4-4B33-8222-535BD0ED81BE}']
+    function GetDialect: TFluentSQLDriver;
+    function GetSequenceName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property SequenceName: string read GetSequenceName;
+  end;
+
+  /// <summary>ESP-054: fluent builder for CREATE SEQUENCE SQL text.</summary>
+  IFluentDDLCreateSequenceBuilder = interface(IFluentDDLCreateSequenceDef)
+    ['{EB1F1E00-12BE-48D4-848C-3DB9C301E350}']
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-054 / ADR-054: read-only view of DROP SEQUENCE for serializers.</summary>
+  IFluentDDLDropSequenceDef = interface
+    ['{48C58A52-3033-40D5-8DAF-12353EAAF33C}']
+    function GetDialect: TFluentSQLDriver;
+    function GetSequenceName: string;
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property SequenceName: string read GetSequenceName;
+    property IfExists: Boolean read GetIfExists;
+  end;
+
+  /// <summary>ESP-054: fluent builder for DROP SEQUENCE SQL text.</summary>
+  IFluentDDLDropSequenceBuilder = interface(IFluentDDLDropSequenceDef)
+    ['{999645DB-C850-4445-BB18-5591CD5221D5}']
+    function IfExists: IFluentDDLDropSequenceBuilder;
     function AsString: string;
   end;
 
