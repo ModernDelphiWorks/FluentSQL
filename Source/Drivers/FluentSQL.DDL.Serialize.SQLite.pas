@@ -47,6 +47,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
   end;
 
 implementation
@@ -250,6 +252,16 @@ end;
 function TFluentDDLSerializerSQLite.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
 begin
   raise ENotSupportedException.Create('DDL SQLite: sequences are not supported (ADR-054).');
+end;
+
+function TFluentDDLSerializerSQLite.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  raise ENotSupportedException.Create('DDL SQLite: ALTER TABLE ADD CONSTRAINT is not supported (ESP-057).');
+end;
+
+function TFluentDDLSerializerSQLite.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  raise ENotSupportedException.Create('DDL SQLite: ALTER TABLE DROP CONSTRAINT is not supported (ESP-057).');
 end;
 
 end.

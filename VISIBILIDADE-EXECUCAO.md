@@ -48,8 +48,8 @@ Resumo derivado do **`ROADMAP.md`** (checkboxes `[x]` e texto **Estado actual**)
 | MongoDB ESP-014 | **CHANGELOG [1.0.8]** |
 | Batch INSERT ESP-015 | **CHANGELOG [1.0.9]** |
 | ESP-016 — extensão explícita por motor | Fecho formal referido no **ROADMAP** (issue **#27**). |
-| ESP-017 … ESP-049 (DDL e Core) | Suporte completo a DDL (CREATE, DROP, ALTER, INDEX, TRUNCATE, COMPUTED) em FB/PG/MySQL; refatoração de entrypoints e remoção de globais concluídas em **2026-04-15**. |
-| ESP-050 — Alter Column | Em aberto (re-tentativa na Rodada 41). |
+| ESP-017 … ESP-056 (DDL e Core) | Suporte completo a DDL (CREATE, DROP, ALTER, INDEX, TRUNCATE, COMPUTED, SEQUENCES, VIEWS, CONSTRAINTS) em 5 dialetos; refatoração de entrypoints concluída em **2026-04-15**. |
+| ESP-057 — Alter Table Constraints | Em aberto (Rodada 48). |
 | ESP-040 — Suporte DDL SQLite | Planeado para a próxima rodada operacional. |
 | Operações de conjunto no núcleo | `UNION`, `UNION ALL`, `INTERSECT` — conforme **ROADMAP** Fase 2. |
 

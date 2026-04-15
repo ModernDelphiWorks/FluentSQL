@@ -282,6 +282,27 @@ type
     [Test]
     procedure TestAlterTableAlterColumn_MSSQL_OnlyNullability_RaisesArgumentException;
   end;
+
+  [TestFixture]
+  TTestDDLAlterTableConstraints = class
+  public
+    [Test]
+    procedure TestAlterTableAddPrimaryKey_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddUnique_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddForeignKey_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddCheck_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableDropConstraint_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableDropConstraint_MySQL_PrimaryKey_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAddConstraint_SQLite_RaisesNotSupported;
+    [Test]
+    procedure TestAlterTableDropConstraint_SQLite_RaisesNotSupported;
+  end;
   
   [TestFixture]
   TTestDDLViews = class
@@ -1959,7 +1980,104 @@ begin
 end;
 
 initialization
+  TDUnitX.RegisterTestFixture(TTestDDLCreateTable);
   TDUnitX.RegisterTestFixture(TTestDDLConstraints);
+  TDUnitX.RegisterTestFixture(TTestDDLComputedColumns);
+  TDUnitX.RegisterTestFixture(TTestDDLDropTable);
+  TDUnitX.RegisterTestFixture(TTestDDLAlterTableAddColumn);
+  TDUnitX.RegisterTestFixture(TTestDDLAlterTableDropColumn);
+  TDUnitX.RegisterTestFixture(TTestDDLAlterTableRenameColumn);
+  TDUnitX.RegisterTestFixture(TTestDDLAlterTableRenameTable);
+  TDUnitX.RegisterTestFixture(TTestDDLCreateIndex);
+  TDUnitX.RegisterTestFixture(TTestDDLDropIndex);
+  TDUnitX.RegisterTestFixture(TTestDDLTruncateTable);
+  TDUnitX.RegisterTestFixture(TTestDDLAlterTableAlterColumn);
+  TDUnitX.RegisterTestFixture(TTestDDLAlterTableConstraints);
+  TDUnitX.RegisterTestFixture(TTestDDLViews);
+  TDUnitX.RegisterTestFixture(TTestDDLSQLite);
   TDUnitX.RegisterTestFixture(TTestDDLMySQL);
+  TDUnitX.RegisterTestFixture(TTestDDLMSSQL);
+
+{ TTestDDLAlterTableConstraints }
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableAddPrimaryKey_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAdd('TAB_A')
+    .AddPrimaryKey(['COL_1'], 'PK_TAB_A')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "TAB_A" ADD CONSTRAINT "PK_TAB_A" PRIMARY KEY ("COL_1")', LSql);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableAddUnique_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAdd('TAB_A')
+    .AddUnique(['COL_1', 'COL_2'], 'UK_TAB_A')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "TAB_A" ADD CONSTRAINT "UK_TAB_A" UNIQUE ("COL_1", "COL_2")', LSql);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableAddForeignKey_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAdd('TAB_SALARY')
+    .AddForeignKey('EMP_ID', 'EMPLOYEES', 'ID', 'FK_SAL_EMP')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE [TAB_SALARY] ADD CONSTRAINT [FK_SAL_EMP] FOREIGN KEY ([EMP_ID]) REFERENCES [EMPLOYEES]([ID])', LSql);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableAddCheck_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAdd('TAB_DATA')
+    .AddCheck('VAL > 0', 'CK_VAL_POSITIVE')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE `TAB_DATA` ADD CONSTRAINT `CK_VAL_POSITIVE` CHECK (VAL > 0)', LSql);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableDropConstraint_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableDrop('TAB_A')
+    .DropConstraint('UK_TAB_A')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "TAB_A" DROP CONSTRAINT "UK_TAB_A"', LSql);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableDropConstraint_MySQL_PrimaryKey_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).AlterTableDrop('TAB_A')
+    .DropConstraint('PRIMARY')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE `TAB_A` DROP PRIMARY KEY', LSql);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableAddConstraint_SQLite_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnSQLite).AlterTableAdd('TAB_A').AddCheck('V > 0').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableConstraints.TestAlterTableDropConstraint_SQLite_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnSQLite).AlterTableDrop('TAB_A').DropConstraint('ANY').AsString;
+    end,
+    ENotSupportedException);
+end;
 
 end.

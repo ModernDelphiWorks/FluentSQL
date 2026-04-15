@@ -50,6 +50,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
   end;
 
 implementation
@@ -305,6 +307,16 @@ begin
     Result := 'DROP SEQUENCE IF EXISTS ' + Quote(ADef.SequenceName)
   else
     Result := 'DROP SEQUENCE ' + Quote(ADef.SequenceName);
+end;
+
+function TFluentDDLSerializerMSSQL.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  Result := inherited AlterTableAddConstraint(ADef);
+end;
+
+function TFluentDDLSerializerMSSQL.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  Result := inherited AlterTableDropConstraint(ADef);
 end;
 
 end.

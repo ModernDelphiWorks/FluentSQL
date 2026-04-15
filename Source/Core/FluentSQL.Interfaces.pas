@@ -652,6 +652,8 @@ type
   IFluentDDLDropViewDef = interface;
   IFluentDDLCreateSequenceDef = interface;
   IFluentDDLDropSequenceDef = interface;
+  IFluentDDLAlterTableAddConstraintDef = interface;
+  IFluentDDLAlterTableDropConstraintDef = interface;
 
   IFluentDDLBuilder = interface;
   IFluentDDLDropBuilder = interface;
@@ -684,6 +686,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
   end;
 
   IFluentSchema = interface
@@ -758,17 +762,20 @@ type
   TDDLConstraintType = (
     dctPrimaryKey,
     dctUnique,
-    dctCheck
+    dctCheck,
+    dctForeignKey
   );
 
   /// <summary>ESP-055: represents a composite or named constraint at the table level.</summary>
   IFluentDDLTableConstraint = interface
-    ['{6E7F8A91-0B1C-2D3E-4F5A-6B7C8D9E0F1A}']
+    ['{6E7F8A91-0B1C-2D3E-4F5AB61C8D9E0F1A}']
     function GetName: string;
     function GetConstraintType: TDDLConstraintType;
     function GetColumnCount: Integer;
     function GetColumnName(AIndex: Integer): string;
     function GetCheckCondition: string;
+    function GetReferenceTable: string;
+    function GetReferenceColumn: string;
     property Name: string read GetName;
     property ConstraintType: TDDLConstraintType read GetConstraintType;
   end;
@@ -902,7 +909,22 @@ type
     function Identity: IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
+    function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+    function AddUnique(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+    function AddForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+    function AddCheck(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
+  end;
+
+  /// <summary>ESP-057: read-only view of ALTER TABLE ADD CONSTRAINT for serializers.</summary>
+  IFluentDDLAlterTableAddConstraintDef = interface
+    ['{D7E81F92-A0C1-B2D3-E4F5-6A7B8C9D0E1F}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetConstraint: IFluentDDLTableConstraint;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property Constraint: IFluentDDLTableConstraint read GetConstraint;
   end;
 
   /// <summary>ESP-020 / ADR-020: read-only view of ALTER TABLE DROP COLUMN (one column) for serializers.</summary>
@@ -921,7 +943,19 @@ type
   IFluentDDLAlterTableDropBuilder = interface(IFluentDDLAlterTableDropColumnDef)
     ['{F2B35D6E-C470-5B8C-9F9A-0B1C2D3E4F5A}']
     function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function DropConstraint(const AName: string): IFluentDDLAlterTableDropBuilder;
     function AsString: string;
+  end;
+
+  /// <summary>ESP-057: read-only view of ALTER TABLE DROP CONSTRAINT for serializers.</summary>
+  IFluentDDLAlterTableDropConstraintDef = interface
+    ['{E8F92A03-B1D2-C3E4-F56A-7B8C9D0E1F2A}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetConstraintName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property ConstraintName: string read GetConstraintName;
   end;
 
   /// <summary>ESP-030 / ADR-030: read-only view of ALTER TABLE RENAME COLUMN for serializers.</summary>

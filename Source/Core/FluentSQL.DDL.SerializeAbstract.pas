@@ -61,6 +61,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string; virtual;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; virtual;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; virtual;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; virtual;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; virtual;
   end;
 
 implementation
@@ -245,6 +247,12 @@ begin
     begin
       Result := Result + 'CHECK (' + AConstraint.GetCheckCondition + ')';
     end;
+    dctForeignKey:
+    begin
+      Result := Result + 'FOREIGN KEY (' + Quote(AConstraint.GetColumnName(0)) + ') REFERENCES ' + Quote(AConstraint.GetReferenceTable);
+      if AConstraint.GetReferenceColumn <> '' then
+        Result := Result + '(' + Quote(AConstraint.GetReferenceColumn) + ')';
+    end;
   end;
 end;
 
@@ -329,6 +337,20 @@ end;
 function TFluentDDLSerializeAbstract.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropSequence', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  if not Assigned(ADef) or not Assigned(ADef.Constraint) then
+    Exit('');
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ADD ' + GetTableConstraintDefinition(ADef.Constraint);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  if not Assigned(ADef) or (ADef.ConstraintName = '') then
+    Exit('');
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
 end;
 
 end.

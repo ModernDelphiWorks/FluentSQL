@@ -49,6 +49,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
   end;
 
 implementation
@@ -275,6 +277,16 @@ begin
     raise ENotSupportedException.Create('DDL Firebird: DROP SEQUENCE IF EXISTS is not supported (ADR-054).');
 
   Result := 'DROP SEQUENCE ' + Quote(ADef.SequenceName);
+end;
+
+function TFluentDDLSerializerFirebird.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  Result := inherited AlterTableAddConstraint(ADef);
+end;
+
+function TFluentDDLSerializerFirebird.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  Result := inherited AlterTableDropConstraint(ADef);
 end;
 
 end.
