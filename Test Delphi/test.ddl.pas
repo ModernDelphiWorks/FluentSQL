@@ -258,6 +258,10 @@ type
     procedure TestAlterTableAlterColumn_EmptyTableName_RaisesArgumentException;
     [Test]
     procedure TestAlterTableAlterColumn_NoChanges_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableAlterColumn_MySQL_OnlyNullability_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableAlterColumn_MSSQL_OnlyNullability_RaisesArgumentException;
   end;
 
   [TestFixture]
@@ -502,6 +506,26 @@ begin
     procedure
     begin
       FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('T', 'C').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_OnlyNullability_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMySQL).AlterTableAlter('T', 'C').NotNull.AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MSSQL_OnlyNullability_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMSSQL).AlterTableAlter('T', 'C').Nullable.AsString;
     end,
     EArgumentException);
 end;

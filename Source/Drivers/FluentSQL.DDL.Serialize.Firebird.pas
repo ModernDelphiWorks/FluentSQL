@@ -160,10 +160,13 @@ begin
   if not Assigned(ADef) then
     Exit('');
 
+  if ADef.NullabilityChanged then
+     raise ENotSupportedException.Create('DDL Firebird: nullability change is not supported for ALTER COLUMN (ADR-050).');
+
   if ADef.TypeChanged then
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg)
   else
-    raise ENotSupportedException.Create('DDL ALTER TABLE ALTER COLUMN: Firebird only supports TYPE change in this Vertical.');
+    raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change is required.');
 end;
 
 function TFluentDDLSerializerFirebird.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;

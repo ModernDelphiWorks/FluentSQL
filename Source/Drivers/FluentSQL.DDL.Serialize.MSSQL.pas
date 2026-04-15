@@ -170,15 +170,16 @@ begin
   if not Assigned(ADef) then
     Exit('');
 
+  if not ADef.TypeChanged then
+    raise EArgumentException.Create('DDL MSSQL: column type must be restated during ALTER COLUMN.');
+
   LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
-  if ADef.NullabilityChanged then
-  begin
-    if ADef.NotNull then
-      Result := Result + ' NOT NULL'
-    else
-      Result := Result + ' NULL';
-  end;
+
+  if ADef.NotNull then
+    Result := Result + ' NOT NULL'
+  else
+    Result := Result + ' NULL';
 end;
 
 function TFluentDDLSerializerMSSQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
