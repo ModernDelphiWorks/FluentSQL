@@ -31,6 +31,7 @@ type
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -52,6 +53,13 @@ begin
   Result := '';
   if ACol.ComputedExpression <> '' then
     Result := ' AS (' + ACol.ComputedExpression + ') VIRTUAL';
+end;
+
+function TFluentDDLSerializerMySQL.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.IsIdentity then
+    Result := ' AUTO_INCREMENT';
 end;
 
 function TFluentDDLSerializerMySQL.Quote(const AName: string): string;

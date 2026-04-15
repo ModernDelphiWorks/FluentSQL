@@ -94,7 +94,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entrega versionada via **`/release`**.
 - [x] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (Concluído).
 - [x] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (Concluído; implementado como **ESP-047**).
-- [ ] **ESP-050** — DDL alargado (12ª vertical): **`ALTER TABLE … ALTER COLUMN`** (Tipo e Nulidade; **ESP-050**).
+- [x] **ESP-050** — DDL alargado (12ª vertical): **`ALTER TABLE … ALTER COLUMN`** (Tipo e Nulidade; **ESP-050**).
+- [ ] **ESP-051** — DDL alargado (14ª vertical): **Identity / Auto-Increment** (Fase 3).
 - [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (Concluído).
 - [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (Concluído).
 - [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído).
@@ -152,6 +153,8 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-15 | Planeada **ESP-051** — Identity / Auto-Increment Support; **ADR-051** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-050** — Advanced DDL: Alter Column (Re-work); validado na rodada 41. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Planeada **ESP-050** — Advanced DDL: Alter Column (Re-work); **ADR-050** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-15 | Entregue **ESP-049** — Advanced DDL: Computed Columns Support (FB/PG/MySQL/MSSQL). | `.claude/pipeline/implement-report.md` |
 | 2026-04-15 | Planeada **ESP-049** — Advanced DDL: Computed Columns; **ADR-049** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |

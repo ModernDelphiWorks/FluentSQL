@@ -749,6 +749,7 @@ type
     function GetCheckCondition: string;
     function GetDefaultValue: string;
     function GetComputedExpression: string;
+    function GetIsIdentity: Boolean;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     property Name: string read GetName;
@@ -760,6 +761,7 @@ type
     property CheckCondition: string read GetCheckCondition;
     property DefaultValue: string read GetDefaultValue;
     property ComputedExpression: string read GetComputedExpression;
+    property IsIdentity: Boolean read GetIsIdentity;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
   end;
@@ -791,6 +793,7 @@ type
     function Check(const ACondition: string): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
+    function Identity: IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
   end;
@@ -844,6 +847,7 @@ type
     function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
+    function Identity: IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;

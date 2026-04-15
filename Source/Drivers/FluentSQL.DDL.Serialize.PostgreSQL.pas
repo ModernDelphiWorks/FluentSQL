@@ -31,6 +31,7 @@ type
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -64,6 +65,13 @@ begin
   Result := '';
   if ACol.ComputedExpression <> '' then
     Result := ' GENERATED ALWAYS AS (' + ACol.ComputedExpression + ') STORED';
+end;
+
+function TFluentDDLSerializerPostgreSQL.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.IsIdentity then
+    Result := ' GENERATED ALWAYS AS IDENTITY';
 end;
 
 function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;

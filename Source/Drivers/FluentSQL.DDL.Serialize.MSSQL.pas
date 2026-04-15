@@ -31,6 +31,7 @@ type
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
@@ -54,6 +55,13 @@ begin
   Result := '';
   if ACol.ComputedExpression <> '' then
     Result := ' AS (' + ACol.ComputedExpression + ')';
+end;
+
+function TFluentDDLSerializerMSSQL.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.IsIdentity then
+    Result := ' IDENTITY(1,1)';
 end;
 
 function TFluentDDLSerializerMSSQL.Quote(const AName: string): string;

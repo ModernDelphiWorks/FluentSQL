@@ -38,6 +38,7 @@ type
     function Quote(const AName: string): string; virtual;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; virtual;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; virtual;
     function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
     function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
     function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
@@ -152,9 +153,15 @@ begin
   Result := '';
 end;
 
+function TFluentDDLSerializeAbstract.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+end;
+
 function TFluentDDLSerializeAbstract.GetColumnDefinition(const ACol: IFluentDDLColumn): string;
 begin
-  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + GetComputedDefinition(ACol) + MapConstraints(ACol);
+  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + GetComputedDefinition(ACol) +
+    GetIdentityDefinition(ACol) + MapConstraints(ACol);
 end;
 
 function TFluentDDLSerializeAbstract.GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;

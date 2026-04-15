@@ -31,6 +31,8 @@ type
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
+    function MapConstraints(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -59,6 +61,38 @@ begin
   if ACol.ComputedExpression <> '' then
     raise ENotSupportedException.Create('DDL: Computed columns are not supported in SQLite.');
   Result := '';
+end;
+
+function TFluentDDLSerializerSQLite.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  // SQLite's AUTOINCREMENT must be part of the PRIMARY KEY clause.
+  // We handle it in MapConstraints to ensure correct ordering.
+  Result := '';
+end;
+
+function TFluentDDLSerializerSQLite.MapConstraints(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.DefaultValue <> '' then
+    Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue, ACol.LogicalType);
+  if ACol.NotNull then
+    Result := Result + ' NOT NULL';
+  if ACol.IsPrimaryKey then
+  begin
+    Result := Result + ' PRIMARY KEY';
+    if ACol.IsIdentity then
+      Result := Result + ' AUTOINCREMENT';
+  end;
+  if ACol.IsUnique then
+    Result := Result + ' UNIQUE';
+  if ACol.CheckCondition <> '' then
+    Result := Result + ' CHECK (' + ACol.CheckCondition + ')';
+  if ACol.ReferenceTable <> '' then
+  begin
+    Result := Result + ' REFERENCES ' + Quote(ACol.ReferenceTable);
+    if ACol.ReferenceColumn <> '' then
+      Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
+  end;
 end;
 
 function TFluentDDLSerializerSQLite.GetDialect: TFluentSQLDriver;
