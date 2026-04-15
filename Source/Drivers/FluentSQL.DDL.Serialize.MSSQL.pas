@@ -220,16 +220,26 @@ begin
   if not Assigned(ADef) then
     Exit('');
 
-  if not ADef.TypeChanged then
-    raise EArgumentException.Create('DDL MSSQL: column type must be restated during ALTER COLUMN.');
-
-  LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
-  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
-
-  if ADef.NotNull then
-    Result := Result + ' NOT NULL'
+  if ADef.DefaultDropped then
+    raise ENotSupportedException.Create('DDL MSSQL: DROP DEFAULT requires a constraint name (use DropConstraint).')
+  else if ADef.DefaultSet then
+  begin
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ADD DEFAULT ' +
+      GetLiteralValue(ADef.DefaultValue, ADef.LogicalType) + ' FOR ' + Quote(ADef.ColumnName);
+  end
   else
-    Result := Result + ' NULL';
+  begin
+    if not ADef.TypeChanged then
+      raise EArgumentException.Create('DDL MSSQL: column type must be restated during ALTER COLUMN.');
+
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
+
+    if ADef.NotNull then
+      Result := Result + ' NOT NULL'
+    else
+      Result := Result + ' NULL';
+  end;
 end;
 
 function TFluentDDLSerializerMSSQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;

@@ -281,6 +281,22 @@ type
     procedure TestAlterTableAlterColumn_MySQL_OnlyNullability_RaisesArgumentException;
     [Test]
     procedure TestAlterTableAlterColumn_MSSQL_OnlyNullability_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableAlterColumn_PostgreSQL_SetDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_PostgreSQL_DropDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_Firebird_SetDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_Firebird_DropDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_MySQL_SetDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_MySQL_DropDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_MSSQL_SetDefault_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_MSSQL_DropDefault_RaisesNotSupported;
   end;
 
   [TestFixture]
@@ -606,6 +622,86 @@ begin
       FluentSQL.Schema(dbnMSSQL).AlterTableAlter('T', 'C').Nullable.AsString;
     end,
     EArgumentException);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_SetDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('VALORES', 'TOTAL')
+    .SetDefault('0')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "VALORES" ALTER COLUMN "TOTAL" SET DEFAULT 0', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_DropDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('VALORES', 'TOTAL')
+    .DropDefault
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "VALORES" ALTER COLUMN "TOTAL" DROP DEFAULT', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_SetDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('VALORES', 'TOTAL')
+    .SetDefault('0')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "VALORES" ALTER "TOTAL" SET DEFAULT 0', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_DropDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('VALORES', 'TOTAL')
+    .DropDefault
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "VALORES" ALTER "TOTAL" DROP DEFAULT', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_SetDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAlter('VALORES', 'TOTAL')
+    .SetDefault('0')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE `VALORES` ALTER COLUMN `TOTAL` SET DEFAULT 0', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_DropDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAlter('VALORES', 'TOTAL')
+    .DropDefault
+    .AsString;
+  Assert.AreEqual('ALTER TABLE `VALORES` ALTER COLUMN `TOTAL` DROP DEFAULT', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MSSQL_SetDefault_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAlter('VALORES', 'TOTAL')
+    .SetDefault('0')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE [VALORES] ADD DEFAULT 0 FOR [TOTAL]', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MSSQL_DropDefault_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMSSQL).AlterTableAlter('T', 'C').DropDefault.AsString;
+    end,
+    ENotSupportedException);
 end;
 
 procedure TTestDDLCreateTable.TestCreateTable_Firebird_GeneratesExpected;

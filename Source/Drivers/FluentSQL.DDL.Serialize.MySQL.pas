@@ -173,20 +173,34 @@ end;
 function TFluentDDLSerializerMySQL.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
 var
   LType: string;
+  LBase: string;
 begin
   if not Assigned(ADef) then
     Exit('');
 
-  if not ADef.TypeChanged then
-    raise EArgumentException.Create('DDL MySQL: column type must be restated during ALTER COLUMN (MODIFY COLUMN).');
+  LBase := 'ALTER TABLE ' + Quote(ADef.TableName);
 
-  LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
-  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' MODIFY COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
-
-  if ADef.NotNull then
-    Result := Result + ' NOT NULL'
+  if ADef.DefaultSet or ADef.DefaultDropped then
+  begin
+    Result := LBase + ' ALTER COLUMN ' + Quote(ADef.ColumnName);
+    if ADef.DefaultDropped then
+      Result := Result + ' DROP DEFAULT'
+    else
+      Result := Result + ' SET DEFAULT ' + GetLiteralValue(ADef.DefaultValue, ADef.LogicalType);
+  end
   else
-    Result := Result + ' NULL';
+  begin
+    if not ADef.TypeChanged then
+      raise EArgumentException.Create('DDL MySQL: column type must be restated during ALTER COLUMN (MODIFY COLUMN).');
+
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    Result := LBase + ' MODIFY COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
+
+    if ADef.NotNull then
+      Result := Result + ' NOT NULL'
+    else
+      Result := Result + ' NULL';
+  end;
 end;
 
 
