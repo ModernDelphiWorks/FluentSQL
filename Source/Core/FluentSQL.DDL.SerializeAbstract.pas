@@ -57,6 +57,8 @@ type
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; virtual;
     function CreateView(const ADef: IFluentDDLCreateViewDef): string; virtual;
     function DropView(const ADef: IFluentDDLDropViewDef): string; virtual;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; virtual;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; virtual;
   end;
 
 implementation
@@ -264,6 +266,16 @@ end;
 function TFluentDDLSerializeAbstract.DropView(const ADef: IFluentDDLDropViewDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropView', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateSequence', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropSequence', Self.ClassName]);
 end;
 
 end.

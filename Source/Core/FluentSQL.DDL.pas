@@ -348,6 +348,35 @@ type
     function IfExists: IFluentDDLDropViewBuilder;
     function AsString: string;
   end;
+  
+  TFluentDDLCreateSequenceBuilder = class(TInterfacedObject, IFluentDDLCreateSequenceBuilder, IFluentDDLCreateSequenceDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FSequenceName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ASequenceName: string);
+    { IFluentDDLCreateSequenceDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetSequenceName: string;
+    { IFluentDDLCreateSequenceBuilder }
+    function AsString: string;
+  end;
+
+  TFluentDDLDropSequenceBuilder = class(TInterfacedObject, IFluentDDLDropSequenceBuilder, IFluentDDLDropSequenceDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FSequenceName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ASequenceName: string);
+    { IFluentDDLDropSequenceDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetSequenceName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropSequenceBuilder }
+    function IfExists: IFluentDDLDropSequenceBuilder;
+    function AsString: string;
+  end;
 
   TFluentSchema = class(TInterfacedObject, IFluentSchema)
   strict private
@@ -366,6 +395,8 @@ type
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
     function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
+    function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
+    function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
   end;
 
 
@@ -1529,6 +1560,86 @@ begin
   end;
 end;
 
+{ TFluentDDLCreateSequenceBuilder }
+
+constructor TFluentDDLCreateSequenceBuilder.Create(const ADialect: TFluentSQLDriver; const ASequenceName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FSequenceName := ASequenceName;
+end;
+
+function TFluentDDLCreateSequenceBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLCreateSequenceBuilder.GetSequenceName: string;
+begin
+  Result := FSequenceName;
+end;
+
+function TFluentDDLCreateSequenceBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FSequenceName) = '' then
+    raise EArgumentException.Create('DDL: sequence name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateSequence(Self as IFluentDDLCreateSequenceDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropSequenceBuilder }
+
+constructor TFluentDDLDropSequenceBuilder.Create(const ADialect: TFluentSQLDriver; const ASequenceName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FSequenceName := ASequenceName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropSequenceBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropSequenceBuilder.GetSequenceName: string;
+begin
+  Result := FSequenceName;
+end;
+
+function TFluentDDLDropSequenceBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropSequenceBuilder.IfExists: IFluentDDLDropSequenceBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropSequenceBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FSequenceName) = '' then
+    raise EArgumentException.Create('DDL: sequence name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropSequence(Self as IFluentDDLDropSequenceDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
 { TFluentSchema }
 
 constructor TFluentSchema.Create(const ADialect: TFluentSQLDriver);
@@ -1594,6 +1705,16 @@ end;
 function TFluentSchema.DropView(const AName: string): IFluentDDLDropViewBuilder;
 begin
   Result := TFluentDDLDropViewBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
+begin
+  Result := TFluentDDLCreateSequenceBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
+begin
+  Result := TFluentDDLDropSequenceBuilder.Create(FDialect, AName);
 end;
 
 end.

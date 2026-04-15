@@ -46,6 +46,8 @@ type
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
     function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
   end;
 
 implementation
@@ -272,6 +274,23 @@ begin
     Result := 'DROP VIEW IF EXISTS ' + Quote(ADef.ViewName)
   else
     Result := 'DROP VIEW ' + Quote(ADef.ViewName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'CREATE SEQUENCE ' + Quote(ADef.SequenceName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if ADef.IfExists then
+    Result := 'DROP SEQUENCE IF EXISTS ' + Quote(ADef.SequenceName)
+  else
+    Result := 'DROP SEQUENCE ' + Quote(ADef.SequenceName);
 end;
 
 end.

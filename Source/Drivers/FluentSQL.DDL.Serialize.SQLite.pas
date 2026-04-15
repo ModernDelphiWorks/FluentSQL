@@ -45,6 +45,8 @@ type
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
     function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
   end;
 
 implementation
@@ -234,6 +236,16 @@ begin
     Result := 'DROP VIEW IF EXISTS ' + Quote(ADef.ViewName)
   else
     Result := 'DROP VIEW ' + Quote(ADef.ViewName);
+end;
+
+function TFluentDDLSerializerSQLite.CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+begin
+  raise ENotSupportedException.Create('DDL SQLite: sequences are not supported (use INTEGER PRIMARY KEY AUTOINCREMENT instead; ADR-054).');
+end;
+
+function TFluentDDLSerializerSQLite.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+begin
+  raise ENotSupportedException.Create('DDL SQLite: sequences are not supported (ADR-054).');
 end;
 
 end.
