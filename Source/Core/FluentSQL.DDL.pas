@@ -38,6 +38,7 @@ type
     FCheckCondition: string;
     FDefaultValue: string;
     FComputedExpression: string;
+    FIdentity: Boolean;
     FReferenceTable: string;
     FReferenceColumn: string;
   protected
@@ -55,6 +56,7 @@ type
     function GetCheckCondition: string;
     function GetDefaultValue: string;
     function GetComputedExpression: string;
+    function GetIsIdentity: Boolean;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     procedure SetNotNull(AValue: Boolean);
@@ -63,6 +65,7 @@ type
     procedure SetCheck(const ACondition: string);
     procedure SetDefaultValue(const AValue: string);
     procedure SetComputedBy(const AExpr: string);
+    procedure SetIdentity(AValue: Boolean);
     procedure SetReferences(const ATableName, AColumnName: string);
   end;
 
@@ -96,6 +99,7 @@ type
     function Check(const ACondition: string): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
+    function Identity: IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
   end;
@@ -146,6 +150,7 @@ type
     function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
+    function Identity: IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
@@ -355,6 +360,11 @@ begin
   Result := FComputedExpression;
 end;
 
+function TFluentDDLColumn.GetIsIdentity: Boolean;
+begin
+  Result := FIdentity;
+end;
+
 function TFluentDDLColumn._AddRef: Integer;
 begin
   Result := -1;
@@ -447,6 +457,13 @@ begin
   if (AExpr <> '') and (FDefaultValue <> '') then
     raise EArgumentException.Create('DDL: A column cannot have both DefaultValue and ComputedBy.');
   FComputedExpression := AExpr;
+end;
+
+procedure TFluentDDLColumn.SetIdentity(AValue: Boolean);
+begin
+  if AValue and not (FLogicalType in [dltInteger, dltBigInt]) then
+    raise EArgumentException.Create('DDL: .Identity can only be used on Integer or BigInt columns.');
+  FIdentity := AValue;
 end;
 
 procedure TFluentDDLColumn.SetReferences(const ATableName, AColumnName: string);
@@ -583,6 +600,13 @@ function TFluentDDLBuilder.ComputedBy(const AExpr: string): IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
     FColumns.Last.SetComputedBy(AExpr);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.Identity: IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetIdentity(True);
   Result := Self;
 end;
 
@@ -787,6 +811,13 @@ function TFluentDDLAlterTableAddBuilder.ComputedBy(const AExpr: string): IFluent
 begin
   if FHasColumn then
     FColumn.SetComputedBy(AExpr);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.Identity: IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetIdentity(True);
   Result := Self;
 end;
 
