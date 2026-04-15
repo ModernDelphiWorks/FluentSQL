@@ -47,6 +47,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
   end;
 
 implementation
@@ -257,6 +259,22 @@ end;
 function TFluentDDLSerializerMySQL.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
 begin
   raise ENotSupportedException.Create('DDL MySQL: sequences are not supported (ADR-054).');
+end;
+
+function TFluentDDLSerializerMySQL.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  Result := inherited AlterTableAddConstraint(ADef);
+end;
+
+function TFluentDDLSerializerMySQL.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  if not Assigned(ADef) or (ADef.ConstraintName = '') then
+    Exit('');
+  // ESP-057: special handling for PK drop in MySQL
+  if SameText(ADef.ConstraintName, 'PRIMARY') then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP PRIMARY KEY'
+  else
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
 end;
 
 end.

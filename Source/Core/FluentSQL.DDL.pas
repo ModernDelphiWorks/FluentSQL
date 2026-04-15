@@ -81,6 +81,8 @@ type
     FConstraintType: TDDLConstraintType;
     FColumns: TArray<string>;
     FCheckCondition: string;
+    FReferenceTable: string;
+    FReferenceColumn: string;
   public
     constructor Create(const AName: string; AType: TDDLConstraintType; const AColumns: array of string); overload;
     constructor Create(const AName: string; const ACheckCondition: string); overload;
@@ -89,6 +91,12 @@ type
     function GetColumnCount: Integer;
     function GetColumnName(AIndex: Integer): string;
     function GetCheckCondition: string;
+    function GetReferenceTable: string;
+    function GetReferenceColumn: string;
+  public
+    constructor Create(const AName: string; AType: TDDLConstraintType; const AColumns: array of string); overload;
+    constructor Create(const AName: string; const ACheckCondition: string); overload;
+    constructor Create(const AName: string; AType: TDDLConstraintType; const AColumn, ARefTable, ARefColumn: string); overload;
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
@@ -153,12 +161,15 @@ type
     function AsString: string;
   end;
 
-  TFluentDDLAlterTableAddBuilder = class(TInterfacedObject, IFluentDDLAlterTableAddBuilder, IFluentDDLAlterTableAddColumnDef)
+  TFluentDDLAlterTableAddBuilder = class(TInterfacedObject, IFluentDDLAlterTableAddBuilder,
+    IFluentDDLAlterTableAddColumnDef, IFluentDDLAlterTableAddConstraintDef)
   strict private
     FDialect: TFluentSQLDriver;
     FTableName: string;
     FColumn: TFluentDDLColumn;
+    FConstraint: TFluentDDLTableConstraint;
     FHasColumn: Boolean;
+    FHasConstraint: Boolean;
     function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -189,22 +200,32 @@ type
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
+    function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+    function AddUnique(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+    function AddForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+    function AddCheck(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
   end;
 
-  TFluentDDLAlterTableDropBuilder = class(TInterfacedObject, IFluentDDLAlterTableDropBuilder, IFluentDDLAlterTableDropColumnDef)
+  TFluentDDLAlterTableDropBuilder = class(TInterfacedObject, IFluentDDLAlterTableDropBuilder,
+    IFluentDDLAlterTableDropColumnDef, IFluentDDLAlterTableDropConstraintDef)
   strict private
     FDialect: TFluentSQLDriver;
     FTableName: string;
     FColumnName: string;
-    FHasDrop: Boolean;
+    FConstraintName: string;
+    FHasDropColumn: Boolean;
+    FHasDropConstraint: Boolean;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
     { IFluentDDLAlterTableDropColumnDef }
     function GetDialect: TFluentSQLDriver;
     function GetTableName: string;
     function GetColumnName: string;
+    { IFluentDDLAlterTableDropConstraintDef }
+    function GetConstraintName: string;
     { IFluentDDLAlterTableDropBuilder }
     function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function DropConstraint(const AName: string): IFluentDDLAlterTableDropBuilder;
     function AsString: string;
   end;
 
@@ -602,9 +623,31 @@ begin
   FCheckCondition := ACheckCondition;
 end;
 
+constructor TFluentDDLTableConstraint.Create(const AName, AType: TDDLConstraintType; const AColumn, ARefTable,
+  ARefColumn: string);
+begin
+  inherited Create;
+  FName := AName;
+  FConstraintType := AType;
+  SetLength(FColumns, 1);
+  FColumns[0] := AColumn;
+  FReferenceTable := ARefTable;
+  FReferenceColumn := ARefColumn;
+end;
+
 function TFluentDDLTableConstraint.GetCheckCondition: string;
 begin
   Result := FCheckCondition;
+end;
+
+function TFluentDDLTableConstraint.GetReferenceTable: string;
+begin
+  Result := FReferenceTable;
+end;
+
+function TFluentDDLTableConstraint.GetReferenceColumn: string;
+begin
+  Result := FReferenceColumn;
 end;
 
 function TFluentDDLTableConstraint.GetColumnCount: Integer;
@@ -933,12 +976,15 @@ begin
   FDialect := ADialect;
   FTableName := ATableName;
   FColumn := nil;
+  FConstraint := nil;
   FHasColumn := False;
+  FHasConstraint := False;
 end;
 
 destructor TFluentDDLAlterTableAddBuilder.Destroy;
 begin
   FColumn.Free;
+  FConstraint.Free;
   inherited;
 end;
 
@@ -960,11 +1006,19 @@ begin
     Result := nil;
 end;
 
+function TFluentDDLAlterTableAddBuilder.GetConstraint: IFluentDDLTableConstraint;
+begin
+  if FHasConstraint then
+    Result := FConstraint
+  else
+    Result := nil;
+end;
+
 function TFluentDDLAlterTableAddBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
 begin
-  if FHasColumn then
+  if FHasColumn or FHasConstraint then
     raise EArgumentException.Create(
-      'DDL ALTER TABLE ADD COLUMN: only one logical column per AsString in this build (ESP-019).');
+      'DDL ALTER TABLE ADD: only one logical operation per AsString in this build (ESP-019/ESP-057).');
   if Trim(AName) = '' then
     raise EArgumentException.Create('DDL: column name is required');
   FColumn := TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg);
@@ -1096,17 +1150,56 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableAddBuilder.AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn or FHasConstraint then
+    raise EArgumentException.Create('DDL ALTER TABLE ADD: only one operation per AsString.');
+  FConstraint := TFluentDDLTableConstraint.Create(AName, dctPrimaryKey, AColumns);
+  FHasConstraint := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.AddUnique(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn or FHasConstraint then
+    raise EArgumentException.Create('DDL ALTER TABLE ADD: only one operation per AsString.');
+  FConstraint := TFluentDDLTableConstraint.Create(AName, dctUnique, AColumns);
+  FHasConstraint := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.AddForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn or FHasConstraint then
+    raise EArgumentException.Create('DDL ALTER TABLE ADD: only one operation per AsString.');
+  FConstraint := TFluentDDLTableConstraint.Create(AName, dctForeignKey, AColumn, ARefTable, ARefColumn);
+  FHasConstraint := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.AddCheck(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn or FHasConstraint then
+    raise EArgumentException.Create('DDL ALTER TABLE ADD: only one operation per AsString.');
+  FConstraint := TFluentDDLTableConstraint.Create(AName, ACondition);
+  FHasConstraint := True;
+  Result := Self;
+end;
+
 function TFluentDDLAlterTableAddBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
-  if not FHasColumn then
-    raise EArgumentException.Create('DDL ALTER TABLE: a column definition is required');
+  if not (FHasColumn or FHasConstraint) then
+    raise EArgumentException.Create('DDL ALTER TABLE: an operation (column or constraint) is required');
   LSerializer := TFluentDDLSerialize.Create;
   try
-    Result := LSerializer.AlterTableAddColumn(Self as IFluentDDLAlterTableAddColumnDef);
+    if FHasColumn then
+      Result := LSerializer.AlterTableAddColumn(Self as IFluentDDLAlterTableAddColumnDef)
+    else
+      Result := LSerializer.AlterTableAddConstraint(Self as IFluentDDLAlterTableAddConstraintDef);
   finally
     LSerializer.Free;
   end;
@@ -1120,7 +1213,9 @@ begin
   FDialect := ADialect;
   FTableName := ATableName;
   FColumnName := '';
-  FHasDrop := False;
+  FConstraintName := '';
+  FHasDropColumn := False;
+  FHasDropConstraint := False;
 end;
 
 function TFluentDDLAlterTableDropBuilder.GetDialect: TFluentSQLDriver;
@@ -1135,21 +1230,41 @@ end;
 
 function TFluentDDLAlterTableDropBuilder.GetColumnName: string;
 begin
-  if FHasDrop then
+  if FHasDropColumn then
     Result := FColumnName
+  else
+    Result := '';
+end;
+
+function TFluentDDLAlterTableDropBuilder.GetConstraintName: string;
+begin
+  if FHasDropConstraint then
+    Result := FConstraintName
   else
     Result := '';
 end;
 
 function TFluentDDLAlterTableDropBuilder.DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
 begin
-  if FHasDrop then
+  if FHasDropColumn or FHasDropConstraint then
     raise EArgumentException.Create(
-      'DDL ALTER TABLE DROP COLUMN: only one column target per AsString in this build (ESP-020).');
+      'DDL ALTER TABLE DROP: only one operation per AsString.');
   if Trim(AName) = '' then
     raise EArgumentException.Create('DDL: column name is required');
   FColumnName := AName;
-  FHasDrop := True;
+  FHasDropColumn := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableDropBuilder.DropConstraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  if FHasDropColumn or FHasDropConstraint then
+    raise EArgumentException.Create(
+      'DDL ALTER TABLE DROP: only one operation per AsString.');
+  if Trim(AName) = '' then
+    raise EArgumentException.Create('DDL: constraint name is required');
+  FConstraintName := AName;
+  FHasDropConstraint := True;
   Result := Self;
 end;
 
@@ -1159,11 +1274,14 @@ var
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
-  if not FHasDrop then
-    raise EArgumentException.Create('DDL ALTER TABLE DROP COLUMN: a column target is required');
+  if not (FHasDropColumn or FHasDropConstraint) then
+    raise EArgumentException.Create('DDL ALTER TABLE DROP: a target (column or constraint) is required');
   LSerializer := TFluentDDLSerialize.Create;
   try
-    Result := LSerializer.AlterTableDropColumn(Self as IFluentDDLAlterTableDropColumnDef);
+    if FHasDropColumn then
+      Result := LSerializer.AlterTableDropColumn(Self as IFluentDDLAlterTableDropColumnDef)
+    else
+      Result := LSerializer.AlterTableDropConstraint(Self as IFluentDDLAlterTableDropConstraintDef);
   finally
     LSerializer.Free;
   end;

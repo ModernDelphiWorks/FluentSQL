@@ -23,7 +23,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 
 - **Fase 0 (identidade / rebranding, âmbito consumidor):** encerrada no roadmap após auditoria **ESP-008** (evidências e matriz em `.claude/pipeline/implement-report.md`). Issue: [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17).
 - **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)). **Fase 3 — DDL (ESP-017 … ESP-019):** entregues em **v1.1.0** (**2026-04-09**, `CHANGELOG.md`): `CREATE TABLE` (**ESP-017**, [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)), `DROP TABLE` (**ESP-018**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)), `ALTER TABLE ADD COLUMN` (**ESP-019**, [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); guias em `docs-src`. **ESP-020** (`ALTER TABLE DROP COLUMN`, **ADR-020**, issue [#34](https://github.com/ModernDelphiWorks/FluentSQL/issues/34)):** implementação e documentação no repositório; `task.md` reconciliado com `review-report.md` / `test-report.md`; **próximo passo:** **`/develop`** e **`/release`** (entrada em `CHANGELOG`/versão — contrato do pipeline). **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
-- **ESP-055 — DDL Advanced Constraints (Composite Keys & Named Constraints):** entregue em **2026-04-15** (issue [#73](https://github.com/ModernDelphiWorks/FluentSQL/issues/73)). **Próximo passo:** **ESP-056 — DDL Index Management (CREATE/DROP INDEX)**.
+- **ESP-056 — DDL Index Management (CREATE/DROP INDEX):** entregue em **2026-04-15** (issue [#74](https://github.com/ModernDelphiWorks/FluentSQL/issues/74)). **Próximo passo:** **ESP-057 — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT)**.
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
 - **Visibilidade de execução (ESP-024):** especificação e ADR em `.claude/pipeline/esp.md` (**ESP-024**) e **ADR-024** em `adr.md`. Quadro executivo e pendências rastreáveis: [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) na raiz (versionado).
@@ -103,7 +103,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-053** — DDL View Support (CREATE/DROP VIEW) — delivered 2026-04-15.
 - [x] **ESP-054** — DDL Sequence Support (CREATE/DROP SEQUENCE) — delivered 2026-04-15.
 - [x] **ESP-055** — DDL Advanced Constraints (Composite Keys & Named Constraints) — delivered 2026-04-15.
-- [ ] **ESP-056** — DDL Index Management (CREATE/DROP INDEX, Unified).
+- [x] **ESP-056** — DDL Index Management (CREATE/DROP INDEX, Unified) — delivered 2026-04-15.
+- [ ] **ESP-057** — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT).
 - [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 L alargado (13ª vertical): **Computed Columns** (Concluído).
 - [x] **ESP-053** — DDL View Support (CREATE/DROP VIEW) — delivered 2026-04-15.
@@ -159,7 +160,8 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
-| 2026-04-15 | Planeada **ESP-056** — DDL Index Management (CREATE/DROP INDEX); **ADR-056** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Planeada **ESP-057** — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT); **ADR-057** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-056** — DDL Index Management (CREATE/DROP INDEX); validado na rodada 47. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Entregue **ESP-055** — DDL Advanced Constraints (Composite Keys & Named Constraints); validado na rodada 46. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Entregue **ESP-054** — DDL Sequence Support; validado na rodada 45. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Entregue **ESP-053** — DDL View Support (CREATE/DROP VIEW); validado na rodada 44. | `.claude/pipeline/implement-report.md`, `test-report.md` |
