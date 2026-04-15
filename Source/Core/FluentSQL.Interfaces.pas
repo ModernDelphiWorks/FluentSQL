@@ -752,6 +752,7 @@ type
     function GetIsIdentity: Boolean;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetDescription: string;
     property Name: string read GetName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
@@ -764,6 +765,7 @@ type
     property IsIdentity: Boolean read GetIsIdentity;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
+    property Description: string read GetDescription;
   end;
 
   IFluentDDLTableDef = interface
@@ -772,8 +774,10 @@ type
     function GetTableName: string;
     function GetColumnCount: Integer;
     function GetColumn(AIndex: Integer): IFluentDDLColumn;
+    function GetDescription: string;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
+    property Description: string read GetDescription;
   end;
 
   IFluentDDLBuilder = interface(IFluentDDLTableDef)
@@ -795,6 +799,7 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity: IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
   end;
 
@@ -849,6 +854,7 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity: IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+    function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
 

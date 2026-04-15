@@ -41,6 +41,7 @@ type
     FIdentity: Boolean;
     FReferenceTable: string;
     FReferenceColumn: string;
+    FDescription: string;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -59,6 +60,7 @@ type
     function GetIsIdentity: Boolean;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetDescription: string;
     procedure SetNotNull(AValue: Boolean);
     procedure SetPrimaryKey(AValue: Boolean);
     procedure SetUnique(AValue: Boolean);
@@ -67,12 +69,14 @@ type
     procedure SetComputedBy(const AExpr: string);
     procedure SetIdentity(AValue: Boolean);
     procedure SetReferences(const ATableName, AColumnName: string);
+    procedure SetDescription(const AText: string);
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
   strict private
     FDialect: TFluentSQLDriver;
     FTableName: string;
+    FDescription: string;
     FColumns: TObjectList<TFluentDDLColumn>;
     function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
   public
@@ -83,6 +87,7 @@ type
     function GetTableName: string;
     function GetColumnCount: Integer;
     function GetColumn(AIndex: Integer): IFluentDDLColumn;
+    function GetDescription: string;
     { IFluentDDLBuilder }
     function ColumnInteger(const AName: string): IFluentDDLBuilder;
     function ColumnBigInt(const AName: string): IFluentDDLBuilder;
@@ -101,6 +106,7 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity: IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
   end;
 
@@ -152,6 +158,7 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity: IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+    function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
 
@@ -425,6 +432,11 @@ begin
   Result := FReferenceColumn;
 end;
 
+function TFluentDDLColumn.GetDescription: string;
+begin
+  Result := FDescription;
+end;
+
 procedure TFluentDDLColumn.SetNotNull(AValue: Boolean);
 begin
   FNotNull := AValue;
@@ -472,6 +484,11 @@ begin
   FReferenceColumn := AColumnName;
 end;
 
+procedure TFluentDDLColumn.SetDescription(const AText: string);
+begin
+  FDescription := AText;
+end;
+
 { TFluentDDLBuilder }
 
 constructor TFluentDDLBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -506,6 +523,11 @@ end;
 function TFluentDDLBuilder.GetColumn(AIndex: Integer): IFluentDDLColumn;
 begin
   Result := FColumns[AIndex];
+end;
+
+function TFluentDDLBuilder.GetDescription: string;
+begin
+  Result := FDescription;
 end;
 
 function TFluentDDLBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
@@ -614,6 +636,15 @@ function TFluentDDLBuilder.References(const ATableName, AColumnName: string): IF
 begin
   if FColumns.Count > 0 then
     FColumns.Last.SetReferences(ATableName, AColumnName);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.Description(const AText: string): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetDescription(AText)
+  else
+    FDescription := AText;
   Result := Self;
 end;
 
@@ -825,6 +856,13 @@ function TFluentDDLAlterTableAddBuilder.References(const ATableName, AColumnName
 begin
   if FHasColumn then
     FColumn.SetReferences(ATableName, AColumnName);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.Description(const AText: string): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetDescription(AText);
   Result := Self;
 end;
 

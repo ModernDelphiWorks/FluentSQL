@@ -32,6 +32,8 @@ type
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
+    function GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string; override;
+    function GetTableComment(const ATable: IFluentDDLTableDef): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -74,6 +76,20 @@ begin
     Result := ' GENERATED ALWAYS AS IDENTITY';
 end;
 
+function TFluentDDLSerializerPostgreSQL.GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.Description <> '' then
+    Result := '; ' + 'COMMENT ON COLUMN ' + Quote(ATable) + '.' + Quote(ACol.Name) + ' IS ' + QuotedStr(ACol.Description);
+end;
+
+function TFluentDDLSerializerPostgreSQL.GetTableComment(const ATable: IFluentDDLTableDef): string;
+begin
+  Result := '';
+  if ATable.Description <> '' then
+    Result := '; ' + 'COMMENT ON TABLE ' + Quote(ATable.TableName) + ' IS ' + QuotedStr(ATable.Description);
+end;
+
 function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
   case AType of
@@ -101,6 +117,8 @@ begin
 end;
 
 function TFluentDDLSerializerPostgreSQL.CreateTable(const ADef: IFluentDDLTableDef): string;
+var
+  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
@@ -108,6 +126,10 @@ begin
     raise EArgumentException.Create('DDL: empty column list');
 
   Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  
+  Result := Result + GetTableComment(ADef);
+  for LI := 0 to ADef.GetColumnCount - 1 do
+    Result := Result + GetColumnComment(ADef.TableName, ADef.GetColumn(LI));
 end;
 
 function TFluentDDLSerializerPostgreSQL.DropTable(const ADef: IFluentDDLDropTableDef): string;
@@ -134,6 +156,7 @@ begin
     raise EArgumentException.Create('DDL ALTER TABLE: a column definition is required');
 
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ADD ' + GetColumnDefinition(LCol);
+  Result := Result + GetColumnComment(ADef.TableName, LCol);
 end;
 
 function TFluentDDLSerializerPostgreSQL.AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;

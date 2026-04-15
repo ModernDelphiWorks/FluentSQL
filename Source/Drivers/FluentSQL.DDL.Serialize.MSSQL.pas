@@ -33,6 +33,8 @@ type
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; override;
+    function GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string; override;
+    function GetTableComment(const ATable: IFluentDDLTableDef): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -82,6 +84,33 @@ begin
   Result := inherited GetLiteralValue(AValue, ALogicalType);
 end;
 
+function TFluentDDLSerializerMSSQL.GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.Description <> '' then
+  begin
+    Result := '; EXEC sp_addextendedproperty ' +
+      '@name = N''MS_Description'', ' +
+      '@value = N' + QuotedStr(ACol.Description) + ', ' +
+      '@level0type = N''SCHEMA'', @level0name = N''dbo'', ' +
+      '@level1type = N''TABLE'', @level1name = N' + QuotedStr(ATable) + ', ' +
+      '@level2type = N''COLUMN'', @level2name = N' + QuotedStr(ACol.Name);
+  end;
+end;
+
+function TFluentDDLSerializerMSSQL.GetTableComment(const ATable: IFluentDDLTableDef): string;
+begin
+  Result := '';
+  if ATable.Description <> '' then
+  begin
+    Result := '; EXEC sp_addextendedproperty ' +
+      '@name = N''MS_Description'', ' +
+      '@value = N' + QuotedStr(ATable.Description) + ', ' +
+      '@level0type = N''SCHEMA'', @level0name = N''dbo'', ' +
+      '@level1type = N''TABLE'', @level1name = N' + QuotedStr(ATable.TableName);
+  end;
+end;
+
 function TFluentDDLSerializerMSSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
   case AType of
@@ -109,6 +138,8 @@ begin
 end;
 
 function TFluentDDLSerializerMSSQL.CreateTable(const ADef: IFluentDDLTableDef): string;
+var
+  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
@@ -116,6 +147,10 @@ begin
     raise EArgumentException.Create('DDL MSSQL: empty column list');
 
   Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  
+  Result := Result + GetTableComment(ADef);
+  for LI := 0 to ADef.GetColumnCount - 1 do
+    Result := Result + GetColumnComment(ADef.TableName, ADef.GetColumn(LI));
 end;
 
 function TFluentDDLSerializerMSSQL.DropTable(const ADef: IFluentDDLDropTableDef): string;
@@ -142,6 +177,7 @@ begin
     raise EArgumentException.Create('DDL MSSQL ALTER TABLE: a column definition is required');
     
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ADD ' + GetColumnDefinition(LCol);
+  Result := Result + GetColumnComment(ADef.TableName, LCol);
 end;
 
 function TFluentDDLSerializerMSSQL.AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
