@@ -658,6 +658,11 @@ type
   IFluentDDLCreateIndexBuilder = interface;
   IFluentDDLDropIndexBuilder = interface;
   IFluentDDLTruncateTableBuilder = interface;
+  IFluentDDLCreateViewBuilder = interface;
+  IFluentDDLDropViewBuilder = interface;
+
+  IFluentDDLCreateViewDef = interface;
+  IFluentDDLDropViewDef = interface;
 
   IFluentDDLSerialize = interface
     ['{84D6A23D-B5F1-4F2E-A9C1-D3E4F5A6B7C8}']
@@ -671,6 +676,8 @@ type
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string;
+    function DropView(const ADef: IFluentDDLDropViewDef): string;
   end;
 
   IFluentSchema = interface
@@ -685,6 +692,8 @@ type
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
+    function DropView(const AName: string): IFluentDDLDropViewBuilder;
   end;
 
   IFluentSQLFunctions = interface
@@ -1021,6 +1030,45 @@ type
     ['{D7F9A2B3-4C5E-6F70-B8C9-0D1E2F3A4B51}']
     function RestartIdentity: IFluentDDLTruncateTableBuilder;
     function Cascade: IFluentDDLTruncateTableBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-053 / ADR-053: read-only view of CREATE VIEW for serializers.</summary>
+  IFluentDDLCreateViewDef = interface
+    ['{62A8D9E1-4B7C-4D2F-9E1A-2B3C4D5E6F70}']
+    function GetDialect: TFluentSQLDriver;
+    function GetViewName: string;
+    function GetQuery: IFluentSQL;
+    function GetOrReplace: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property ViewName: string read GetViewName;
+    property Query: IFluentSQL read GetQuery;
+    property OrReplace: Boolean read GetOrReplace;
+  end;
+
+  /// <summary>ESP-053: fluent builder for CREATE VIEW SQL text.</summary>
+  IFluentDDLCreateViewBuilder = interface(IFluentDDLCreateViewDef)
+    ['{73B9E0F2-5C8D-4E30-A1B1-3C4D5E6F7081}']
+    function OrReplace: IFluentDDLCreateViewBuilder;
+    function As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-053 / ADR-053: read-only view of DROP VIEW for serializers.</summary>
+  IFluentDDLDropViewDef = interface
+    ['{84CA0103-6D9E-4F41-B2C2-4D5E6F708192}']
+    function GetDialect: TFluentSQLDriver;
+    function GetViewName: string;
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property ViewName: string read GetViewName;
+    property IfExists: Boolean read GetIfExists;
+  end;
+
+  /// <summary>ESP-053: fluent builder for DROP VIEW SQL text.</summary>
+  IFluentDDLDropViewBuilder = interface(IFluentDDLDropViewDef)
+    ['{95DB1214-7E0F-5052-C3D3-5E6F708192A3}']
+    function IfExists: IFluentDDLDropViewBuilder;
     function AsString: string;
   end;
 

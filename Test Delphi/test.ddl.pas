@@ -263,6 +263,33 @@ type
     [Test]
     procedure TestAlterTableAlterColumn_MSSQL_OnlyNullability_RaisesArgumentException;
   end;
+  
+  [TestFixture]
+  TTestDDLViews = class
+  public
+    [Test]
+    procedure TestCreateView_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateView_OrReplace_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateView_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestCreateView_OrReplace_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestCreateView_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateView_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateView_SQLite_GeneratesExpected;
+    [Test]
+    procedure TestDropView_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropView_IfExists_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestDropView_EmptyName_RaisesArgumentException;
+    [Test]
+    procedure TestCreateView_NoQuery_RaisesArgumentException;
+  end;
 
   [TestFixture]
   TTestDDLSQLite = class
@@ -1667,6 +1694,118 @@ begin
     .ColumnGuid('G').DefaultValue('{00000000-0000-0000-0000-000000000000}')
     .AsString;
   Assert.AreEqual('CREATE TABLE [T] ([D] DATE DEFAULT ''2024-04-14'', [G] UNIQUEIDENTIFIER DEFAULT ''{00000000-0000-0000-0000-000000000000}'')', LSql);
+end;
+
+{ TTestDDLViews }
+
+procedure TTestDDLViews.TestCreateView_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateView('VW_CLIENTES')
+    .As(FluentSQL.Query(dbnPostgreSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
+end;
+
+procedure TTestDDLViews.TestCreateView_OrReplace_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateView('VW_CLIENTES')
+    .OrReplace
+    .As(FluentSQL.Query(dbnPostgreSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE OR REPLACE VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
+end;
+
+procedure TTestDDLViews.TestCreateView_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).CreateView('VW_CLIENTES')
+    .As(FluentSQL.Query(dbnFirebird).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
+end;
+
+procedure TTestDDLViews.TestCreateView_OrReplace_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).CreateView('VW_CLIENTES')
+    .OrReplace
+    .As(FluentSQL.Query(dbnFirebird).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE OR ALTER VIEW "VW_CLIENTES" AS SELECT "ID", "NOME" FROM "CLIENTES"', LSql);
+end;
+
+procedure TTestDDLViews.TestCreateView_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).CreateView('VW_CLIENTES')
+    .OrReplace
+    .As(FluentSQL.Query(dbnMySQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE OR REPLACE VIEW `VW_CLIENTES` AS SELECT `ID`, `NOME` FROM `CLIENTES`', LSql);
+end;
+
+procedure TTestDDLViews.TestCreateView_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateView('VW_CLIENTES')
+    .OrReplace
+    .As(FluentSQL.Query(dbnMSSQL).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE OR ALTER VIEW [VW_CLIENTES] AS SELECT [ID], [NOME] FROM [CLIENTES]', LSql);
+end;
+
+procedure TTestDDLViews.TestCreateView_SQLite_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).CreateView('VW_CLIENTES')
+    .As(FluentSQL.Query(dbnSQLite).Select.Column(['ID', 'NOME']).From('CLIENTES'))
+    .AsString;
+  Assert.AreEqual('CREATE VIEW `VW_CLIENTES` AS SELECT `ID`, `NOME` FROM `CLIENTES`', LSql);
+end;
+
+procedure TTestDDLViews.TestDropView_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).DropView('VW_CLIENTES').AsString;
+  Assert.AreEqual('DROP VIEW "VW_CLIENTES"', LSql);
+end;
+
+procedure TTestDDLViews.TestDropView_IfExists_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).DropView('VW_CLIENTES').IfExists.AsString;
+  Assert.AreEqual('DROP VIEW IF EXISTS "VW_CLIENTES"', LSql);
+end;
+
+procedure TTestDDLViews.TestDropView_EmptyName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).DropView('').AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLViews.TestCreateView_NoQuery_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).CreateView('V').AsString;
+    end,
+    EArgumentException);
 end;
 
 end.
