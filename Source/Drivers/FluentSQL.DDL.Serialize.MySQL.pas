@@ -32,6 +32,7 @@ type
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
+    function MapConstraints(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -60,6 +61,13 @@ begin
   Result := '';
   if ACol.IsIdentity then
     Result := ' AUTO_INCREMENT';
+end;
+
+function TFluentDDLSerializerMySQL.MapConstraints(const ACol: IFluentDDLColumn): string;
+begin
+  Result := inherited MapConstraints(ACol);
+  if ACol.Description <> '' then
+    Result := Result + ' COMMENT ' + QuotedStr(ACol.Description);
 end;
 
 function TFluentDDLSerializerMySQL.Quote(const AName: string): string;
@@ -108,6 +116,9 @@ begin
     raise EArgumentException.Create('DDL: empty column list');
 
   Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  
+  if ADef.Description <> '' then
+    Result := Result + ' COMMENT = ' + QuotedStr(ADef.Description);
 end;
 
 function TFluentDDLSerializerMySQL.DropTable(const ADef: IFluentDDLDropTableDef): string;

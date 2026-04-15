@@ -153,6 +153,8 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-15 | Planeada **ESP-052** — DDL Table and Column Comments Support; **ADR-052** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-051** — DDL Identity / Auto-Increment Support; validado na rodada 42. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Planeada **ESP-051** — Identity / Auto-Increment Support; **ADR-051** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-15 | Entregue **ESP-050** — Advanced DDL: Alter Column (Re-work); validado na rodada 41. | `.claude/pipeline/implement-report.md`, `test-report.md` |
 | 2026-04-15 | Planeada **ESP-050** — Advanced DDL: Alter Column (Re-work); **ADR-050** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |

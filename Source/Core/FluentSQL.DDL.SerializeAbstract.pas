@@ -42,6 +42,8 @@ type
     function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
     function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
     function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
+    function GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string; virtual;
+    function GetTableComment(const ATable: IFluentDDLTableDef): string; virtual;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -188,6 +190,16 @@ begin
       Result := Result + ', ';
     Result := Result + Quote(ADef.GetColumnName(LI));
   end;
+end;
+
+function TFluentDDLSerializeAbstract.GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+end;
+
+function TFluentDDLSerializeAbstract.GetTableComment(const ATable: IFluentDDLTableDef): string;
+begin
+  Result := '';
 end;
 
 function TFluentDDLSerializeAbstract.CreateTable(const ADef: IFluentDDLTableDef): string;
