@@ -27,9 +27,10 @@ uses
 type
   TFluentDDLSerializerFirebird = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
@@ -37,6 +38,7 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -53,20 +55,27 @@ begin
   Result := '"' + AName + '"';
 end;
 
+function TFluentDDLSerializerFirebird.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.ComputedExpression <> '' then
+    Result := ' COMPUTED BY (' + ACol.ComputedExpression + ')';
+end;
+
 function TFluentDDLSerializerFirebird.GetDialect: TFluentSQLDriver;
 begin
   Result := dbnFirebird;
 end;
 
-function TFluentDDLSerializerFirebird.MapLogicalType(const ACol: IFluentDDLColumn): string;
+function TFluentDDLSerializerFirebird.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
-  case ACol.LogicalType of
+  case AType of
     dltInteger:
       Result := 'INTEGER';
     dltBigInt:
       Result := 'BIGINT';
     dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
+      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
     dltBoolean:
       Result := 'BOOLEAN';
     dltDate:
@@ -144,6 +153,17 @@ begin
   if not Assigned(ADef) then
     Exit('');
   Result := 'ALTER TABLE ' + Quote(ADef.OldTableName) + ' TO ' + Quote(ADef.NewTableName);
+end;
+
+function TFluentDDLSerializerFirebird.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.TypeChanged then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg)
+  else
+    raise ENotSupportedException.Create('DDL ALTER TABLE ALTER COLUMN: Firebird only supports TYPE change in this Vertical.');
 end;
 
 function TFluentDDLSerializerFirebird.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;

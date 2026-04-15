@@ -37,6 +37,7 @@ type
     FUnique: Boolean;
     FCheckCondition: string;
     FDefaultValue: string;
+    FComputedExpression: string;
     FReferenceTable: string;
     FReferenceColumn: string;
   protected
@@ -53,6 +54,7 @@ type
     function GetIsUnique: Boolean;
     function GetCheckCondition: string;
     function GetDefaultValue: string;
+    function GetComputedExpression: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     procedure SetNotNull(AValue: Boolean);
@@ -60,6 +62,7 @@ type
     procedure SetUnique(AValue: Boolean);
     procedure SetCheck(const ACondition: string);
     procedure SetDefaultValue(const AValue: string);
+    procedure SetComputedBy(const AExpr: string);
     procedure SetReferences(const ATableName, AColumnName: string);
   end;
 
@@ -92,6 +95,7 @@ type
     function Unique: IFluentDDLBuilder;
     function Check(const ACondition: string): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
+    function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
   end;
@@ -141,6 +145,7 @@ type
     function Unique: IFluentDDLAlterTableAddBuilder;
     function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
+    function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
@@ -260,6 +265,43 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLAlterTableAlterColumnBuilder = class(TInterfacedObject, IFluentDDLAlterTableAlterColumnBuilder,
+    IFluentDDLAlterTableAlterColumnDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FColumnName: string;
+    FLogicalType: TDDLLogicalType;
+    FTypeArg: Integer;
+    FNotNull: Boolean;
+    FTypeChanged: Boolean;
+    FNullabilityChanged: Boolean;
+    function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName, AColumnName: string);
+    { IFluentDDLAlterTableAlterColumnDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetColumnName: string;
+    function GetLogicalType: TDDLLogicalType;
+    function GetTypeArg: Integer;
+    function GetNotNull: Boolean;
+    function GetTypeChanged: Boolean;
+    function GetNullabilityChanged: Boolean;
+    { IFluentDDLAlterTableAlterColumnBuilder }
+    function TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeVarchar(ALength: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeBoolean: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDate: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+    function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
+    function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
+    function AsString: string;
+  end;
+
   TFluentSchema = class(TInterfacedObject, IFluentSchema)
   strict private
     FDialect: TFluentSQLDriver;
@@ -271,6 +313,7 @@ type
     function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
     function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder; overload;
     function AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
+    function AlterTableAlter(const ATableName, AColumnName: string): IFluentDDLAlterTableAlterColumnBuilder;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
@@ -305,6 +348,11 @@ begin
   end
   else
     Result := E_NOINTERFACE;
+end;
+
+function TFluentDDLColumn.GetComputedExpression: string;
+begin
+  Result := FComputedExpression;
 end;
 
 function TFluentDDLColumn._AddRef: Integer;
@@ -389,7 +437,16 @@ end;
 
 procedure TFluentDDLColumn.SetDefaultValue(const AValue: string);
 begin
+  if (AValue <> '') and (FComputedExpression <> '') then
+    raise EArgumentException.Create('DDL: A column cannot have both DefaultValue and ComputedBy.');
   FDefaultValue := AValue;
+end;
+
+procedure TFluentDDLColumn.SetComputedBy(const AExpr: string);
+begin
+  if (AExpr <> '') and (FDefaultValue <> '') then
+    raise EArgumentException.Create('DDL: A column cannot have both DefaultValue and ComputedBy.');
+  FComputedExpression := AExpr;
 end;
 
 procedure TFluentDDLColumn.SetReferences(const ATableName, AColumnName: string);
@@ -519,6 +576,13 @@ function TFluentDDLBuilder.DefaultValue(const AValue: string): IFluentDDLBuilder
 begin
   if FColumns.Count > 0 then
     FColumns.Last.SetDefaultValue(AValue);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.ComputedBy(const AExpr: string): IFluentDDLBuilder;
+begin
+  if FColumns.Count > 0 then
+    FColumns.Last.SetComputedBy(AExpr);
   Result := Self;
 end;
 
@@ -719,6 +783,13 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableAddBuilder.ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasColumn then
+    FColumn.SetComputedBy(AExpr);
+  Result := Self;
+end;
+
 function TFluentDDLAlterTableAddBuilder.References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn then
@@ -892,6 +963,144 @@ begin
   LSerializer := TFluentDDLSerialize.Create;
   try
     Result := LSerializer.AlterTableRenameTable(Self as IFluentDDLAlterTableRenameTableDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLAlterTableAlterColumnBuilder }
+
+constructor TFluentDDLAlterTableAlterColumnBuilder.Create(const ADialect: TFluentSQLDriver;
+  const ATableName, AColumnName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := Trim(ATableName);
+  FColumnName := Trim(AColumnName);
+  FTypeChanged := False;
+  FNullabilityChanged := False;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetColumnName: string;
+begin
+  Result := FColumnName;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetLogicalType: TDDLLogicalType;
+begin
+  Result := FLogicalType;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetTypeArg: Integer;
+begin
+  Result := FTypeArg;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetNotNull: Boolean;
+begin
+  Result := FNotNull;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetTypeChanged: Boolean;
+begin
+  Result := FTypeChanged;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetNullabilityChanged: Boolean;
+begin
+  Result := FNullabilityChanged;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  FLogicalType := ALogicalType;
+  FTypeArg := ATypeArg;
+  FTypeChanged := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltInteger, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  // SmallInt is mapped to Integer in TDDLLogicalType for now, or we define dltSmallInt?
+  // Checking TDDLLogicalType in Interfaces... it doesn't have SmallInt.
+  // ESP said to support TypeSmallInt. I'll map to dltInteger for now or check if I should add to enum.
+  // Actually, let's stick to what's in TDDLLogicalType.
+  Result := _SetType(dltInteger, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeVarchar(ALength: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltVarChar, ALength);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeBoolean: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltBoolean, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeDate: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltDate, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltDateTime, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltBigInt, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltGuid, 0);
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.NotNull: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  FNotNull := True;
+  FNullabilityChanged := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.Nullable: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  FNotNull := False;
+  FNullabilityChanged := True;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: table name is required');
+  if Trim(FColumnName) = '' then
+    raise EArgumentException.Create('DDL: column name is required');
+  if not (FTypeChanged or FNullabilityChanged) then
+    raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change (type or nullability) is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.AlterTableAlterColumn(Self as IFluentDDLAlterTableAlterColumnDef);
   finally
     LSerializer.Free;
   end;
@@ -1143,6 +1352,11 @@ end;
 function TFluentSchema.AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder;
 begin
   Result := TFluentDDLAlterTableRenameTableBuilder.Create(FDialect, AOldTableName, ANewTableName);
+end;
+
+function TFluentSchema.AlterTableAlter(const ATableName, AColumnName: string): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := TFluentDDLAlterTableAlterColumnBuilder.Create(FDialect, ATableName, AColumnName);
 end;
 
 function TFluentSchema.CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;

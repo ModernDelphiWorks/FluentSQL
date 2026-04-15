@@ -27,15 +27,17 @@ uses
 type
   TFluentDDLSerializerMySQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -44,6 +46,13 @@ type
 implementation
 
 { TFluentDDLSerializerMySQL }
+
+function TFluentDDLSerializerMySQL.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.ComputedExpression <> '' then
+    Result := ' AS (' + ACol.ComputedExpression + ') VIRTUAL';
+end;
 
 function TFluentDDLSerializerMySQL.Quote(const AName: string): string;
 begin
@@ -57,15 +66,15 @@ begin
   Result := dbnMySQL;
 end;
 
-function TFluentDDLSerializerMySQL.MapLogicalType(const ACol: IFluentDDLColumn): string;
+function TFluentDDLSerializerMySQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
-  case ACol.LogicalType of
+  case AType of
     dltInteger:
       Result := 'INT';
     dltBigInt:
       Result := 'BIGINT';
     dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
+      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
     dltBoolean:
       Result := 'BOOLEAN';
     dltDate:
@@ -134,6 +143,24 @@ begin
   if not Assigned(ADef) then
     Exit('');
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' RENAME COLUMN ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
+end;
+
+function TFluentDDLSerializerMySQL.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+var
+  LType: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' MODIFY COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
+  if ADef.NullabilityChanged then
+  begin
+    if ADef.NotNull then
+      Result := Result + ' NOT NULL'
+    else
+      Result := Result + ' NULL';
+  end;
 end;
 
 

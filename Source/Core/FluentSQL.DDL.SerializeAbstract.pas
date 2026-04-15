@@ -32,10 +32,12 @@ type
   TFluentDDLSerializeAbstract = class(TInterfacedObject, IFluentDDLSerialize)
   protected
     function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; virtual; abstract;
+    function MapLogicalType(const ACol: IFluentDDLColumn): string; overload; virtual;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; overload; virtual; abstract;
     function GetDialect: TFluentSQLDriver; virtual; abstract;
     function Quote(const AName: string): string; virtual;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; virtual;
     function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
     function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
     function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
@@ -46,6 +48,7 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; virtual;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; virtual;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; virtual;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; virtual;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; virtual;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; virtual;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; virtual;
@@ -78,6 +81,11 @@ begin
     if ACol.ReferenceColumn <> '' then
       Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
   end;
+end;
+
+function TFluentDDLSerializeAbstract.MapLogicalType(const ACol: IFluentDDLColumn): string;
+begin
+  Result := MapLogicalType(ACol.LogicalType, ACol.TypeArg);
 end;
 
 function TFluentDDLSerializeAbstract.Quote(const AName: string): string;
@@ -139,9 +147,14 @@ begin
   Result := AValue;
 end;
 
+function TFluentDDLSerializeAbstract.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+end;
+
 function TFluentDDLSerializeAbstract.GetColumnDefinition(const ACol: IFluentDDLColumn): string;
 begin
-  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + MapConstraints(ACol);
+  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + GetComputedDefinition(ACol) + MapConstraints(ACol);
 end;
 
 function TFluentDDLSerializeAbstract.GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
@@ -193,6 +206,11 @@ end;
 function TFluentDDLSerializeAbstract.AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
 begin
     raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableRenameColumn', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableAlterColumn', Self.ClassName]);
 end;
 
 function TFluentDDLSerializeAbstract.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;

@@ -27,15 +27,17 @@ uses
 type
   TFluentDDLSerializerPostgreSQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -45,6 +47,11 @@ implementation
 
 { TFluentDDLSerializerPostgreSQL }
 
+function TFluentDDLSerializerPostgreSQL.GetDialect: TFluentSQLDriver;
+begin
+  Result := dbnPostgreSQL;
+end;
+
 function TFluentDDLSerializerPostgreSQL.Quote(const AName: string): string;
 begin
   if (AName = '') or (AName.StartsWith('"')) then
@@ -52,20 +59,22 @@ begin
   Result := '"' + AName + '"';
 end;
 
-function TFluentDDLSerializerPostgreSQL.GetDialect: TFluentSQLDriver;
+function TFluentDDLSerializerPostgreSQL.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
 begin
-  Result := dbnPostgreSQL;
+  Result := '';
+  if ACol.ComputedExpression <> '' then
+    Result := ' GENERATED ALWAYS AS (' + ACol.ComputedExpression + ') STORED';
 end;
 
-function TFluentDDLSerializerPostgreSQL.MapLogicalType(const ACol: IFluentDDLColumn): string;
+function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
-  case ACol.LogicalType of
+  case AType of
     dltInteger:
       Result := 'INTEGER';
     dltBigInt:
       Result := 'BIGINT';
     dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
+      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
     dltBoolean:
       Result := 'BOOLEAN';
     dltDate:
@@ -134,6 +143,39 @@ begin
   if not Assigned(ADef) then
     Exit('');
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' RENAME COLUMN ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+var
+  LBase: string;
+  LTypePart: string;
+  LNullPart: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LBase := 'ALTER TABLE ' + Quote(ADef.TableName);
+  LTypePart := '';
+  LNullPart := '';
+
+  if ADef.TypeChanged then
+    LTypePart := ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+
+  if ADef.NullabilityChanged then
+  begin
+    LNullPart := ' ALTER COLUMN ' + Quote(ADef.ColumnName);
+    if ADef.NotNull then
+      LNullPart := LNullPart + ' SET NOT NULL'
+    else
+      LNullPart := LNullPart + ' DROP NOT NULL';
+  end;
+
+  if ADef.TypeChanged and ADef.NullabilityChanged then
+    Result := LBase + LTypePart + ',' + LNullPart
+  else if ADef.TypeChanged then
+    Result := LBase + LTypePart
+  else
+    Result := LBase + LNullPart;
 end;
 
 

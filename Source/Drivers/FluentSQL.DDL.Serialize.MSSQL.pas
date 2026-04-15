@@ -27,9 +27,10 @@ uses
 type
   TFluentDDLSerializerMSSQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
@@ -38,6 +39,7 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -46,6 +48,13 @@ type
 implementation
 
 { TFluentDDLSerializerMSSQL }
+
+function TFluentDDLSerializerMSSQL.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.ComputedExpression <> '' then
+    Result := ' AS (' + ACol.ComputedExpression + ')';
+end;
 
 function TFluentDDLSerializerMSSQL.Quote(const AName: string): string;
 begin
@@ -65,15 +74,15 @@ begin
   Result := inherited GetLiteralValue(AValue, ALogicalType);
 end;
 
-function TFluentDDLSerializerMSSQL.MapLogicalType(const ACol: IFluentDDLColumn): string;
+function TFluentDDLSerializerMSSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
-  case ACol.LogicalType of
+  case AType of
     dltInteger:
       Result := 'INT';
     dltBigInt:
       Result := 'BIGINT';
     dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
+      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
     dltBoolean:
       Result := 'BIT';
     dltDate:
@@ -152,6 +161,24 @@ begin
   if not Assigned(ADef) then
     Exit('');
   Result := 'EXEC sp_rename ''' + ADef.OldTableName + ''', ''' + ADef.NewTableName + '''';
+end;
+
+function TFluentDDLSerializerMSSQL.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+var
+  LType: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
+  if ADef.NullabilityChanged then
+  begin
+    if ADef.NotNull then
+      Result := Result + ' NOT NULL'
+    else
+      Result := Result + ' NULL';
+  end;
 end;
 
 function TFluentDDLSerializerMSSQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;

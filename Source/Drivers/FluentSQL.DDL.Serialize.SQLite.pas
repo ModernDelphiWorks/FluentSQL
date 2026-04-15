@@ -27,15 +27,17 @@ uses
 type
   TFluentDDLSerializerSQLite = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
@@ -52,14 +54,21 @@ begin
   Result := '`' + AName + '`';
 end;
 
+function TFluentDDLSerializerSQLite.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  if ACol.ComputedExpression <> '' then
+    raise ENotSupportedException.Create('DDL: Computed columns are not supported in SQLite.');
+  Result := '';
+end;
+
 function TFluentDDLSerializerSQLite.GetDialect: TFluentSQLDriver;
 begin
   Result := dbnSQLite;
 end;
 
-function TFluentDDLSerializerSQLite.MapLogicalType(const ACol: IFluentDDLColumn): string;
+function TFluentDDLSerializerSQLite.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
-  case ACol.LogicalType of
+  case AType of
     dltInteger:
       Result := 'INTEGER';
     dltBigInt:
@@ -134,6 +143,11 @@ begin
   if not Assigned(ADef) then
     Exit('');
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' RENAME COLUMN ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
+end;
+
+function TFluentDDLSerializerSQLite.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+begin
+  raise ENotSupportedException.Create('DDL ALTER TABLE ALTER COLUMN: is not supported by SQLite (requires table recreation).');
 end;
 
 
