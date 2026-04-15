@@ -338,6 +338,9 @@ type
     FNotNull: Boolean;
     FTypeChanged: Boolean;
     FNullabilityChanged: Boolean;
+    FDefaultValue: string;
+    FDefaultSet: Boolean;
+    FDefaultDropped: Boolean;
     function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName, AColumnName: string);
@@ -350,6 +353,9 @@ type
     function GetNotNull: Boolean;
     function GetTypeChanged: Boolean;
     function GetNullabilityChanged: Boolean;
+    function GetDefaultValue: string;
+    function GetDefaultSet: Boolean;
+    function GetDefaultDropped: Boolean;
     { IFluentDDLAlterTableAlterColumnBuilder }
     function TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
@@ -361,6 +367,8 @@ type
     function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
     function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
+    function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
+    function DropDefault: IFluentDDLAlterTableAlterColumnBuilder;
     function AsString: string;
   end;
 
@@ -1396,6 +1404,8 @@ begin
   FColumnName := Trim(AColumnName);
   FTypeChanged := False;
   FNullabilityChanged := False;
+  FDefaultSet := False;
+  FDefaultDropped := False;
 end;
 
 function TFluentDDLAlterTableAlterColumnBuilder.GetDialect: TFluentSQLDriver;
@@ -1436,6 +1446,21 @@ end;
 function TFluentDDLAlterTableAlterColumnBuilder.GetNullabilityChanged: Boolean;
 begin
   Result := FNullabilityChanged;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetDefaultValue: string;
+begin
+  Result := FDefaultValue;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetDefaultSet: Boolean;
+begin
+  Result := FDefaultSet;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetDefaultDropped: Boolean;
+begin
+  Result := FDefaultDropped;
 end;
 
 function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
@@ -1504,6 +1529,22 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableAlterColumnBuilder.SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  FDefaultValue := AValue;
+  FDefaultSet := True;
+  FDefaultDropped := False;
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.DropDefault: IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  FDefaultValue := '';
+  FDefaultSet := False;
+  FDefaultDropped := True;
+  Result := Self;
+end;
+
 function TFluentDDLAlterTableAlterColumnBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
@@ -1512,8 +1553,8 @@ begin
     raise EArgumentException.Create('DDL: table name is required');
   if Trim(FColumnName) = '' then
     raise EArgumentException.Create('DDL: column name is required');
-  if not (FTypeChanged or FNullabilityChanged) then
-    raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change (type or nullability) is required');
+  if not (FTypeChanged or FNullabilityChanged or FDefaultSet or FDefaultDropped) then
+    raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change (type, nullability or default) is required');
 
   LSerializer := TFluentDDLSerialize.Create;
   try

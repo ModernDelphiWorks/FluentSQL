@@ -185,34 +185,39 @@ end;
 function TFluentDDLSerializerPostgreSQL.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
 var
   LBase: string;
-  LTypePart: string;
-  LNullPart: string;
+  LParts: TStringList;
 begin
   if not Assigned(ADef) then
     Exit('');
 
   LBase := 'ALTER TABLE ' + Quote(ADef.TableName);
-  LTypePart := '';
-  LNullPart := '';
+  LParts := TStringList.Create;
+  try
+    if ADef.TypeChanged then
+      LParts.Add(' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg));
 
-  if ADef.TypeChanged then
-    LTypePart := ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    if ADef.NullabilityChanged then
+    begin
+      if ADef.NotNull then
+        LParts.Add(' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' SET NOT NULL')
+      else
+        LParts.Add(' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' DROP NOT NULL');
+    end;
 
-  if ADef.NullabilityChanged then
-  begin
-    LNullPart := ' ALTER COLUMN ' + Quote(ADef.ColumnName);
-    if ADef.NotNull then
-      LNullPart := LNullPart + ' SET NOT NULL'
-    else
-      LNullPart := LNullPart + ' DROP NOT NULL';
+    if ADef.DefaultDropped then
+      LParts.Add(' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' DROP DEFAULT')
+    else if ADef.DefaultSet then
+      LParts.Add(' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' SET DEFAULT ' + GetLiteralValue(ADef.DefaultValue, ADef.LogicalType));
+
+    if LParts.Count = 0 then
+      raise EArgumentException.Create('DDL PostgreSQL: at least one change (type, nullability or default) is required for ALTER COLUMN.');
+
+    LParts.Delimiter := ',';
+    LParts.StrictDelimiter := True;
+    Result := LBase + LParts.DelimitedText;
+  finally
+    LParts.Free;
   end;
-
-  if ADef.TypeChanged and ADef.NullabilityChanged then
-    Result := LBase + LTypePart + ',' + LNullPart
-  else if ADef.TypeChanged then
-    Result := LBase + LTypePart
-  else
-    Result := LBase + LNullPart;
 end;
 
 

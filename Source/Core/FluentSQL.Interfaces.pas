@@ -1005,6 +1005,9 @@ type
     function GetNotNull: Boolean;
     function GetTypeChanged: Boolean;
     function GetNullabilityChanged: Boolean;
+    function GetDefaultValue: string;
+    function GetDefaultSet: Boolean;
+    function GetDefaultDropped: Boolean;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
     property ColumnName: string read GetColumnName;
@@ -1013,6 +1016,9 @@ type
     property NotNull: Boolean read GetNotNull;
     property TypeChanged: Boolean read GetTypeChanged;
     property NullabilityChanged: Boolean read GetNullabilityChanged;
+    property DefaultValue: string read GetDefaultValue;
+    property DefaultSet: Boolean read GetDefaultSet;
+    property DefaultDropped: Boolean read GetDefaultDropped;
   end;
 
   /// <summary>ESP-048: fluent builder for ALTER TABLE ALTER COLUMN SQL text.</summary>
@@ -1028,6 +1034,8 @@ type
     function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
     function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
+    function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
+    function DropDefault: IFluentDDLAlterTableAlterColumnBuilder;
     function AsString: string;
   end;
 

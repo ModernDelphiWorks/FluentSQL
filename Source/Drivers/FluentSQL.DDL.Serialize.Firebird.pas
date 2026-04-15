@@ -202,6 +202,10 @@ begin
 
   if ADef.TypeChanged then
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg)
+  else if ADef.DefaultDropped then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' DROP DEFAULT'
+  else if ADef.DefaultSet then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' SET DEFAULT ' + GetLiteralValue(ADef.DefaultValue, ADef.LogicalType)
   else
     raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change is required.');
 end;
