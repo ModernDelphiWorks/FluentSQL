@@ -129,8 +129,6 @@ Projetos **DUnitX** em `Test Delphi/`:
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Exemplo mínimo. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
-Comandos usados em automação: secção **Comandos** em [`.claude/SKILL.md`](.claude/SKILL.md) (ecossistema de agentes).
-
 **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Extensão por dialeto (fechamento ESP-016):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
 ---

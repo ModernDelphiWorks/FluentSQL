@@ -129,8 +129,6 @@ The static site under `docs/` is built and committed in CI when `docs-src/` chan
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Minimal sample. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
-Automation commands are listed under **Comandos** in [`.claude/SKILL.md`](.claude/SKILL.md) (agent ecosystem).
-
 **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Dialect extension (ESP-016 closure):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guide [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
 ---
