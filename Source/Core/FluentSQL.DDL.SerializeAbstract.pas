@@ -55,6 +55,8 @@ type
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; virtual;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; virtual;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; virtual;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; virtual;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; virtual;
   end;
 
 implementation
@@ -252,6 +254,16 @@ end;
 function TFluentDDLSerializeAbstract.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['TruncateTable', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateView', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropView(const ADef: IFluentDDLDropViewDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropView', Self.ClassName]);
 end;
 
 end.

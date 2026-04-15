@@ -43,6 +43,8 @@ type
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; override;
   end;
 
 implementation
@@ -213,6 +215,25 @@ begin
     Exit('');
   // SQLite mappings: DELETE FROM is the standard way to clear a table.
   Result := 'DELETE FROM ' + Quote(ADef.TableName);
+end;
+
+function TFluentDDLSerializerSQLite.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  // SQLite does not support OR REPLACE/ALTER. 
+  // We emit simple CREATE VIEW as per ADR-053.
+  Result := 'CREATE VIEW ' + Quote(ADef.ViewName) + ' AS ' + ADef.Query.AsString;
+end;
+
+function TFluentDDLSerializerSQLite.DropView(const ADef: IFluentDDLDropViewDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if ADef.IfExists then
+    Result := 'DROP VIEW IF EXISTS ' + Quote(ADef.ViewName)
+  else
+    Result := 'DROP VIEW ' + Quote(ADef.ViewName);
 end;
 
 end.

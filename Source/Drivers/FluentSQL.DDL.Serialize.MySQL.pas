@@ -43,6 +43,8 @@ type
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; override;
   end;
 
 implementation
@@ -223,6 +225,26 @@ begin
     raise ENotSupportedException.Create(
       'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
   Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if ADef.OrReplace then
+    Result := 'CREATE OR REPLACE VIEW ' + Quote(ADef.ViewName) + ' AS ' + ADef.Query.AsString
+  else
+    Result := 'CREATE VIEW ' + Quote(ADef.ViewName) + ' AS ' + ADef.Query.AsString;
+end;
+
+function TFluentDDLSerializerMySQL.DropView(const ADef: IFluentDDLDropViewDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if ADef.IfExists then
+    Result := 'DROP VIEW IF EXISTS ' + Quote(ADef.ViewName)
+  else
+    Result := 'DROP VIEW ' + Quote(ADef.ViewName);
 end;
 
 end.

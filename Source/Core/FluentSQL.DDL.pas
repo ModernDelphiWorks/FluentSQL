@@ -314,6 +314,41 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLCreateViewBuilder = class(TInterfacedObject, IFluentDDLCreateViewBuilder, IFluentDDLCreateViewDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FViewName: string;
+    FQuery: IFluentSQL;
+    FOrReplace: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AViewName: string);
+    { IFluentDDLCreateViewDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetViewName: string;
+    function GetQuery: IFluentSQL;
+    function GetOrReplace: Boolean;
+    { IFluentDDLCreateViewBuilder }
+    function OrReplace: IFluentDDLCreateViewBuilder;
+    function As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLDropViewBuilder = class(TInterfacedObject, IFluentDDLDropViewBuilder, IFluentDDLDropViewDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FViewName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AViewName: string);
+    { IFluentDDLDropViewDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetViewName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropViewBuilder }
+    function IfExists: IFluentDDLDropViewBuilder;
+    function AsString: string;
+  end;
+
   TFluentSchema = class(TInterfacedObject, IFluentSchema)
   strict private
     FDialect: TFluentSQLDriver;
@@ -329,6 +364,8 @@ type
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
+    function DropView(const AName: string): IFluentDDLDropViewBuilder;
   end;
 
 
@@ -1386,6 +1423,112 @@ begin
   end;
 end;
 
+{ TFluentDDLCreateViewBuilder }
+
+constructor TFluentDDLCreateViewBuilder.Create(const ADialect: TFluentSQLDriver; const AViewName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FViewName := AViewName;
+  FQuery := nil;
+  FOrReplace := False;
+end;
+
+function TFluentDDLCreateViewBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLCreateViewBuilder.GetViewName: string;
+begin
+  Result := FViewName;
+end;
+
+function TFluentDDLCreateViewBuilder.GetQuery: IFluentSQL;
+begin
+  Result := FQuery;
+end;
+
+function TFluentDDLCreateViewBuilder.GetOrReplace: Boolean;
+begin
+  Result := FOrReplace;
+end;
+
+function TFluentDDLCreateViewBuilder.OrReplace: IFluentDDLCreateViewBuilder;
+begin
+  FOrReplace := True;
+  Result := Self;
+end;
+
+function TFluentDDLCreateViewBuilder.As(const AQuery: IFluentSQL): IFluentDDLCreateViewBuilder;
+begin
+  FQuery := AQuery;
+  Result := Self;
+end;
+
+function TFluentDDLCreateViewBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FViewName) = '' then
+    raise EArgumentException.Create('DDL: view name is required');
+  if FQuery = nil then
+    raise EArgumentException.Create('DDL: view query is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateView(Self as IFluentDDLCreateViewDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropViewBuilder }
+
+constructor TFluentDDLDropViewBuilder.Create(const ADialect: TFluentSQLDriver; const AViewName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FViewName := AViewName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropViewBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropViewBuilder.GetViewName: string;
+begin
+  Result := FViewName;
+end;
+
+function TFluentDDLDropViewBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropViewBuilder.IfExists: IFluentDDLDropViewBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropViewBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FViewName) = '' then
+    raise EArgumentException.Create('DDL: view name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropView(Self as IFluentDDLDropViewDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
 { TFluentSchema }
 
 constructor TFluentSchema.Create(const ADialect: TFluentSQLDriver);
@@ -1441,6 +1584,16 @@ end;
 function TFluentSchema.TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
 begin
   Result := TFluentDDLTruncateTableBuilder.Create(FDialect, ATableName);
+end;
+
+function TFluentSchema.CreateView(const AName: string): IFluentDDLCreateViewBuilder;
+begin
+  Result := TFluentDDLCreateViewBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropView(const AName: string): IFluentDDLDropViewBuilder;
+begin
+  Result := TFluentDDLDropViewBuilder.Create(FDialect, AName);
 end;
 
 end.

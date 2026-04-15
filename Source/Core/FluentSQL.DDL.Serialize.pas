@@ -39,6 +39,8 @@ type
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; override;
     function GetDialect: TFluentSQLDriver; override;
   end;
 
@@ -164,6 +166,30 @@ begin
   LReg := TFluentSQLRegister.Create;
   try
     Result := LReg.DDLSerialize(ADef.Dialect).TruncateTable(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateView(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.DropView(const ADef: IFluentDDLDropViewDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropView(ADef);
   finally
     LReg.Free;
   end;
