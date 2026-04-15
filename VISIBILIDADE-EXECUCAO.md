@@ -1,6 +1,6 @@
 # Visibilidade de execução — FluentSQL
 
-**Última atualização:** 2026-04-10  
+**Última atualização:** 2026-04-15  
 **ESP:** ESP-024 (governança / transparência — ver `.claude/pipeline/esp.md`)
 
 Este ficheiro **complementa** o [`ROADMAP.md`](ROADMAP.md). Não substitui o roadmap nem os artefactos finos em `.claude/pipeline/`.  
@@ -48,7 +48,8 @@ Resumo derivado do **`ROADMAP.md`** (checkboxes `[x]` e texto **Estado actual**)
 | MongoDB ESP-014 | **CHANGELOG [1.0.8]** |
 | Batch INSERT ESP-015 | **CHANGELOG [1.0.9]** |
 | ESP-016 — extensão explícita por motor | Fecho formal referido no **ROADMAP** (issue **#27**). |
-| ESP-017 … ESP-039 (DDL e Core) | Suporte completo a DDL (CREATE, DROP, ALTER, INDEX, TRUNCATE) em FB/PG/MySQL; refatoração de entrypoints e remoção de globais concluídas em **2026-04-13**. |
+| ESP-017 … ESP-049 (DDL e Core) | Suporte completo a DDL (CREATE, DROP, ALTER, INDEX, TRUNCATE, COMPUTED) em FB/PG/MySQL; refatoração de entrypoints e remoção de globais concluídas em **2026-04-15**. |
+| ESP-050 — Alter Column | Em aberto (re-tentativa na Rodada 41). |
 | ESP-040 — Suporte DDL SQLite | Planeado para a próxima rodada operacional. |
 | Operações de conjunto no núcleo | `UNION`, `UNION ALL`, `INTERSECT` — conforme **ROADMAP** Fase 2. |
 
