@@ -53,7 +53,7 @@ O manifesto Boss na raiz **não** impõe dependências transitórias obrigatóri
 
 ---
 
-## Início rápido
+## Início rápido (DML)
 
 ```delphi
 uses FluentSQL;
@@ -61,7 +61,7 @@ uses FluentSQL;
 var
   SQL: string;
 begin
-  SQL := CreateFluentSQL(dbnFirebird)
+  SQL := Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('NOME')
@@ -71,7 +71,26 @@ begin
 end;
 ```
 
-O atalho `TCQ(dbnFirebird)` na unit `FluentSQL` é equivalente a `CreateFluentSQL`. Em código reutilizável, prefere `IFluentSQL` / `FluentSQL.Interfaces`.
+O método `Query(dbnDialect)` é o ponto de entrada principal para operações **DML** (Select, Insert, Update, Delete). O atalho `TCQ(dbnDialect)` também está disponível por retrocompatibilidade.
+
+## Início rápido (DDL)
+
+```delphi
+uses FluentSQL;
+
+var
+  SQL: string;
+begin
+  SQL := Schema(dbnPostgreSQL)
+    .CreateTable('PRODUTOS')
+      .Column('ID', dltInteger).NotNull.PrimaryKey
+      .Column('NOME', dltString, 100).NotNull
+      .Column('PRECO', dltNumeric, 12, 2).Default(0)
+    .AsString;
+end;
+```
+
+O método `Schema(dbnDialect)` é o ponto de entrada para operações **DDL** (Create, Alter, Drop, Truncate).
 
 ---
 
