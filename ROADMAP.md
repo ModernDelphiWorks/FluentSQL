@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-13
+**Última atualização:** 2026-04-15
 
 ## Como este roadmap evolui
 
@@ -92,15 +92,17 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-027** — DDL alargado (7ª vertical): **`DROP INDEX CONCURRENTLY`** (PostgreSQL, **ADR-027**); testes em `test.ddl.pas` e guia em `docs-src`; issue [#42](https://github.com/ModernDelphiWorks/FluentSQL/issues/42); *ver `.claude/pipeline/esp.md` / `plan.md`.*
 - [ ] **ESP-028** — DDL alargado (8ª vertical): **`DROP INDEX … ON …` (MySQL / MariaDB)** (**ADR-028**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação + QA **[#43](https://github.com/ModernDelphiWorks/FluentSQL/issues/43)**; entrega versionada via **`/release`**.
 - [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entrega versionada via **`/release`**.
-- [ ] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-030**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação no repositório; issue [#45](https://github.com/ModernDelphiWorks/FluentSQL/issues/45); entrega versionada via **`/release`**.
-- [ ] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (renomear **tabela**; API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-031**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
-- [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (API fluente + serialização Firebird e PostgreSQL, **ADR-034**); integração no builder base e testes em `test.ddl.pas`.
-- [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (API fluente + serialização Firebird e PostgreSQL, **ADR-035**); suporte a chaves estrangeiras no builder de DDL e testes em `test.ddl.pas`.
-- [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído; arquitetura desacoplada e API Hub `FluentSQL.Schema` implementada).
-- [x] **ESP-036** — Advanced DDL: **Unique & Check Constraints** (Concluído; suporte universal FB/PG/MySQL).
-- [x] **ESP-040** — DDL Support: **SQLite** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE — entregue 2026-04-13).
-- [x] **ESP-041** — DDL Support: **MS SQL Server** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE via `sp_rename` — entregue 2026-04-13).
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; **Unique/Check** — **ESP-036**; **Refactor Drivers** — **ESP-037**; esta linha cobre o restante alargamento.*
+- [x] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (Concluído).
+- [x] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (Concluído; implementado como **ESP-047**).
+- [ ] **ESP-048** — DDL alargado (12ª vertical): **`ALTER TABLE … ALTER COLUMN`** (Tipo e Nulidade; **ESP-048**).
+- [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (Concluído).
+- [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (Concluído).
+- [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído).
+- [x] **ESP-036** — Advanced DDL: **Unique & Check Constraints** (Concluído).
+- [x] **ESP-040** — DDL Support: **SQLite** (Concluído).
+- [x] **ESP-041** — DDL Support: **MS SQL Server** (Concluído).
+- [x] **ESP-049** — DDL alargado (13ª vertical): **Computed Columns** (Concluído).
+- [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 
 ---
 
@@ -150,6 +152,10 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-15 | Entregue **ESP-049** — Advanced DDL: Computed Columns Support (FB/PG/MySQL/MSSQL). | `.claude/pipeline/implement-report.md` |
+| 2026-04-15 | Planeada **ESP-049** — Advanced DDL: Computed Columns; **ADR-049** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-14 | Planeada **ESP-048** — Advanced DDL: Alter Column; **ADR-048** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-14 | Entregue **ESP-047** — Advanced DDL: Rename Table Support (incl. MSSQL/SQLite). | `CHANGELOG.md` [1.3.0] |
 | 2026-04-14 | Planeada **ESP-045** — Estabilização de Literais DDL (Date, GUID); **ADR-045** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Planeada **ESP-040** — DDL Support for SQLite; **ADR-040** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Entregue **ESP-039** — Refatoração de Entrypoints (Query/Func); **ESP-038** — Cleanup Global Functions DDL. | `.claude/pipeline/implement-report.md` |

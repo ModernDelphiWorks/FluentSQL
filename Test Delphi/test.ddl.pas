@@ -26,6 +26,25 @@ type
   end;
 
   [TestFixture]
+  TTestDDLComputedColumns = class
+  public
+    [Test]
+    procedure TestComputedColumn_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestComputedColumn_PostgreSQL_GeneratesExpected;
+    [Test]
+    procedure TestComputedColumn_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestComputedColumn_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestComputedColumn_SQLite_RaisesNotSupported;
+    [Test]
+    procedure TestComputedBy_AlterTableAdd_GeneratesExpected;
+    [Test]
+    procedure TestComputedAndDefault_AreMutuallyExclusive_RaisesException;
+  end;
+
+  [TestFixture]
   TTestDDLDropTable = class
   public
     [Test]
@@ -211,12 +230,34 @@ type
     procedure TestTruncateTable_MySQL_RestartIdentity_RaisesNotSupported;
     [Test]
     procedure TestTruncateTable_MySQL_Cascade_RaisesNotSupported;
-    [Test]
     procedure TestTruncateTable_Firebird_Modifier_MessageReferencesESP029;
     [Test]
     procedure TestTruncateTable_UnsupportedDialect_RaisesNotSupported;
     [Test]
     procedure TestTruncateTable_EmptyTableName_RaisesArgumentException;
+  end;
+
+  [TestFixture]
+  TTestDDLAlterTableAlterColumn = class
+  public
+    [Test]
+    procedure TestAlterTableAlterColumn_PostgreSQL_Type_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_PostgreSQL_Nullability_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_Firebird_Type_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_Firebird_Nullability_RaisesNotSupported;
+    [Test]
+    procedure TestAlterTableAlterColumn_MySQL_TypeAndNullability_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_MSSQL_TypeAndNullability_GeneratesExpected;
+    [Test]
+    procedure TestAlterTableAlterColumn_SQLite_RaisesNotSupported;
+    [Test]
+    procedure TestAlterTableAlterColumn_EmptyTableName_RaisesArgumentException;
+    [Test]
+    procedure TestAlterTableAlterColumn_NoChanges_RaisesArgumentException;
   end;
 
   [TestFixture]
@@ -284,6 +325,186 @@ uses
   System.SysUtils,
   FluentSQL,
   FluentSQL.Interfaces;
+
+{ TTestDDLComputedColumns }
+
+procedure TTestDDLComputedColumns.TestComputedColumn_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('VENDAS')
+    .ColumnInteger('ID')
+    .ColumnInteger('QTD')
+    .ColumnInteger('PRECO')
+    .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE "VENDAS" ("ID" INTEGER, "QTD" INTEGER, "PRECO" INTEGER, "TOTAL" INTEGER COMPUTED BY (QTD * PRECO))', LSql);
+end;
+
+procedure TTestDDLComputedColumns.TestComputedColumn_PostgreSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('VENDAS')
+    .ColumnInteger('ID')
+    .ColumnInteger('QTD')
+    .ColumnInteger('PRECO')
+    .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE "VENDAS" ("ID" INTEGER, "QTD" INTEGER, "PRECO" INTEGER, "TOTAL" INTEGER GENERATED ALWAYS AS (QTD * PRECO) STORED)', LSql);
+end;
+
+procedure TTestDDLComputedColumns.TestComputedColumn_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).CreateTable('VENDAS')
+    .ColumnInteger('ID')
+    .ColumnInteger('QTD')
+    .ColumnInteger('PRECO')
+    .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE `VENDAS` (`ID` INT, `QTD` INT, `PRECO` INT, `TOTAL` INT AS (QTD * PRECO) VIRTUAL)', LSql);
+end;
+
+procedure TTestDDLComputedColumns.TestComputedColumn_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('VENDAS')
+    .ColumnInteger('ID')
+    .ColumnInteger('QTD')
+    .ColumnInteger('PRECO')
+    .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
+    .AsString;
+  Assert.AreEqual('CREATE TABLE [VENDAS] ([ID] INT, [QTD] INT, [PRECO] INT, [TOTAL] INT AS (QTD * PRECO))', LSql);
+end;
+
+procedure TTestDDLComputedColumns.TestComputedColumn_SQLite_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnSQLite).CreateTable('T').ColumnInteger('A').ComputedBy('1').AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLComputedColumns.TestComputedBy_AlterTableAdd_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAdd('VENDAS')
+    .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "VENDAS" ADD "TOTAL" INTEGER GENERATED ALWAYS AS (QTD * PRECO) STORED', LSql);
+end;
+
+procedure TTestDDLComputedColumns.TestComputedAndDefault_AreMutuallyExclusive_RaisesException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).CreateTable('T')
+        .ColumnInteger('A').DefaultValue('0').ComputedBy('1')
+        .AsString;
+    end,
+    EArgumentException);
+end;
+
+{ TTestDDLAlterTableAlterColumn }
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_Type_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('CLIENTES', 'IDADE')
+    .TypeInteger
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER COLUMN "IDADE" TYPE INTEGER', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_Nullability_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('CLIENTES', 'NOME')
+    .NotNull
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER COLUMN "NOME" SET NOT NULL', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_Type_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('CLIENTES', 'IDADE')
+    .TypeInteger
+    .AsString;
+  Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER "IDADE" TYPE INTEGER', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_Nullability_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnFirebird).AlterTableAlter('CLIENTES', 'NOME').NotNull.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_TypeAndNullability_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAlter('clientes', 'nome')
+    .TypeVarchar(100)
+    .NotNull
+    .AsString;
+  Assert.AreEqual('ALTER TABLE `clientes` MODIFY COLUMN `nome` VARCHAR(100) NOT NULL', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MSSQL_TypeAndNullability_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAlter('CLIENTES', 'NOME')
+    .TypeVarchar(100)
+    .Nullable
+    .AsString;
+  Assert.AreEqual('ALTER TABLE [CLIENTES] ALTER COLUMN [NOME] VARCHAR(100) NULL', LSql);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_SQLite_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnSQLite).AlterTableAlter('T', 'C').TypeInteger.AsString;
+    end,
+    ENotSupportedException);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_EmptyTableName_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('', 'C').TypeInteger.AsString;
+    end,
+    EArgumentException);
+end;
+
+procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_NoChanges_RaisesArgumentException;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('T', 'C').AsString;
+    end,
+    EArgumentException);
+end;
 
 procedure TTestDDLCreateTable.TestCreateTable_Firebird_GeneratesExpected;
 var

@@ -35,9 +35,11 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+    function GetDialect: TFluentSQLDriver; override;
   end;
 
 implementation
@@ -119,6 +121,18 @@ begin
   end;
 end;
 
+function TFluentDDLSerialize.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableAlterColumn(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
 function TFluentDDLSerialize.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
 var
   LReg: TFluentSQLRegister;
@@ -153,6 +167,11 @@ begin
   finally
     LReg.Free;
   end;
+end;
+
+function TFluentDDLSerialize.GetDialect: TFluentSQLDriver;
+begin
+  raise EAbstractError.Create('TFluentDDLSerialize is a proxy; it has no specific dialect. Use a concrete driver.');
 end;
 
 end.

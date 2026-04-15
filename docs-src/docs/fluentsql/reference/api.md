@@ -9,19 +9,17 @@ Documentation aligned with release **v1.2.0** (2026-04-13): **ESP-034** (Advance
 
 | Item | Descrição |
 |------|-----------|
-| Factory / ponto de entrada | **`CreateFluentSQL(dbnFirebird)`** (unit `FluentSQL`); o atalho `TCQ(dbn…)` permanece equivalente. |
-| DDL (`CREATE TABLE`, ESP-017) | **`CreateFluentDDLTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLBuilder`**; suporte a constraints (**ESP-034**) e chaves estrangeiras (**ESP-035**). Ver [DDL — CREATE TABLE](../guides/ddl-create-table.md). |
-| DDL (`DROP TABLE`, ESP-018) | **`CreateFluentDDLDropTable(dbnFirebird, 'TABELA')`** devolve **`IFluentDDLDropBuilder`**; encadear **`.IfExists`** antes de **`AsString`** quando aplicável. Ver [DDL — DROP TABLE](../guides/ddl-drop-table.md). |
-| DDL (`ALTER TABLE ADD COLUMN`, ESP-019) | **`CreateFluentDDLAlterTableAddColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableAddBuilder`**; suporte a constraints e chaves estrangeiras. Ver [DDL — ALTER TABLE ADD COLUMN](../guides/ddl-alter-table-add-column.md). |
-| DDL (`ALTER TABLE DROP COLUMN`, ESP-020) | **`CreateFluentDDLAlterTableDropColumn(ADialect, 'TABELA')`** devolve **`IFluentDDLAlterTableDropBuilder`**; exatamente uma **`DropColumn`** antes de **`AsString`**. Ver [DDL — ALTER TABLE DROP COLUMN](../guides/ddl-alter-table-drop-column.md). |
-| DDL (`ALTER TABLE RENAME COLUMN`, ESP-030) | **`CreateFluentDDLAlterTableRenameColumn(ADialect, 'TABELA', 'COLUNA_ANTIGA', 'COLUNA_NOVA')`** devolve **`IFluentDDLAlterTableRenameColumnBuilder`**. Ver [DDL — ALTER TABLE RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
-| Performance (Cache, ESP-032) | **`.WithCache(provider)`** e **`.WithTTL(seconds)`**: injecta cache provider (ex: Redis). Ver [Cache Distribuído](../guides/cache-distribuido.md). |
-| DDL (`CREATE INDEX`, ESP-022) | **`CreateFluentDDLCreateIndex(ADialect, 'INDICE', 'TABELA')`** devolve **`IFluentDDLCreateIndexBuilder`**. |
-| DDL (`DROP INDEX`, ESP-025 … ESP-028) | **`CreateFluentDDLDropIndex(ADialect, 'INDICE')`** devolve **`IFluentDDLDropIndexBuilder`**. |
-| DDL (`TRUNCATE TABLE`, ESP-029) | **`CreateFluentDDLTruncateTable(ADialect, 'TABELA')`** devolve **`IFluentDDLTruncateTableBuilder`**. |
-| **Constraints (ESP-034)** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`** disponíveis após a definição de coluna no builder de DDL. |
-| **Foreign Keys (ESP-035)** | **`.References('TABELA', 'COLUNA')`** disponível no builder de DDL; gera a cláusula REFERENCES. |
-| Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** (v1.0.9) fecha a linha corrente e inicia a próxima para **INSERT em lote** (ver regras abaixo). |
+| **Query Factory (DML)** | **`Query(dbnFirebird)`** (unit `FluentSQL`) é o ponto de entrada principal para consultas. As fábricas legadas `CreateFluentSQL` e `TCQ` encontram-se obsoletas. |
+| **Schema Factory (DDL)** | **`Schema(dbnPostgreSQL)`** (unit `FluentSQL`) devolve **`IFluentSchema`**, ponto de entrada centralizado para todas as operações DDL. |
+| DDL (`CREATE TABLE`) | **`Schema(dbnFirebird).CreateTable('TABELA')`** devolve **`IFluentDDLBuilder`**; suporte a constraints e chaves estrangeiras. Ver [DDL — CREATE TABLE](../guides/ddl-create-table.md). |
+| DDL (`DROP TABLE`) | **`Schema(dbnFirebird).DropTable('TABELA')`** devolve **`IFluentDDLDropBuilder`**; encadear **`.IfExists`** antes de **`AsString`**. Ver [DDL — DROP TABLE](../guides/ddl-drop-table.md). |
+| DDL (`ALTER TABLE ADD`) | **`Schema(ADialect).AlterTableAdd('TABELA')`** devolve **`IFluentDDLAlterTableAddBuilder`**. Ver [DDL — ALTER TABLE ADD COLUMN](../guides/ddl-alter-table-add-column.md). |
+| DDL (`ALTER TABLE DROP`) | **`Schema(ADialect).AlterTableDrop('TABELA')`** devolve **`IFluentDDLAlterTableDropBuilder`**. Ver [DDL — ALTER TABLE DROP COLUMN](../guides/ddl-alter-table-drop-column.md). |
+| DDL (`RENAME COLUMN`) | **`Schema(ADialect).AlterTableRename('TABELA', 'ANTIGA', 'NOVA')`** (3 args) devolve **`IFluentDDLAlterTableRenameColumnBuilder`**. Ver [RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
+| DDL (`RENAME TABLE`) | **`Schema(ADialect).AlterTableRename('ANTIGA', 'NOVA')`** (2 args) devolve **`IFluentDDLAlterTableRenameTableBuilder`**. Ver [RENAME TABLE](../guides/ddl-alter-table-rename-table.md). |
+| **Constraints** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`**, **`.ComputedBy(AExpr)`** disponíveis após a definição de coluna no builder de DDL. |
+| **Foreign Keys** | **`.References('TABELA', 'COLUNA')`** disponível no builder de DDL; gera a cláusula REFERENCES. |
+| Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** fecha a linha corrente e inicia a próxima para **INSERT em lote**. |
 | Subquery em conjunto | `Union`, `UnionAll` e `Intersect` recebem `IFluentSQL` da ramificação secundária; a AST armazena `UnionType` e `UnionQuery`. |
 
 ## Main outputs

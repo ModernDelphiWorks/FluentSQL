@@ -643,6 +643,7 @@ type
   IFluentDDLAlterTableDropColumnDef = interface;
   IFluentDDLAlterTableRenameColumnDef = interface;
   IFluentDDLAlterTableRenameTableDef = interface;
+  IFluentDDLAlterTableAlterColumnDef = interface;
   IFluentDDLCreateIndexDef = interface;
   IFluentDDLDropIndexDef = interface;
   IFluentDDLTruncateTableDef = interface;
@@ -653,6 +654,7 @@ type
   IFluentDDLAlterTableDropBuilder = interface;
   IFluentDDLAlterTableRenameColumnBuilder = interface;
   IFluentDDLAlterTableRenameTableBuilder = interface;
+  IFluentDDLAlterTableAlterColumnBuilder = interface;
   IFluentDDLCreateIndexBuilder = interface;
   IFluentDDLDropIndexBuilder = interface;
   IFluentDDLTruncateTableBuilder = interface;
@@ -665,6 +667,7 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
@@ -678,6 +681,7 @@ type
     function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
     function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder; overload;
     function AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
+    function AlterTableAlter(const ATableName, AColumnName: string): IFluentDDLAlterTableAlterColumnBuilder;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
@@ -734,7 +738,7 @@ type
   );
 
   IFluentDDLColumn = interface
-    ['{6E8A1F2C-9B4D-4E7A-8F31-2D5C6E7F8091}']
+    ['{9E0DA634-9BA2-4CFC-8E3B-168651C8B02B}']
     function GetName: string;
     function GetLogicalType: TDDLLogicalType;
     /// <summary>For <c>dltVarChar</c>: max length; otherwise 0.</summary>
@@ -744,6 +748,7 @@ type
     function GetIsUnique: Boolean;
     function GetCheckCondition: string;
     function GetDefaultValue: string;
+    function GetComputedExpression: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     property Name: string read GetName;
@@ -754,6 +759,7 @@ type
     property IsUnique: Boolean read GetIsUnique;
     property CheckCondition: string read GetCheckCondition;
     property DefaultValue: string read GetDefaultValue;
+    property ComputedExpression: string read GetComputedExpression;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
   end;
@@ -769,7 +775,7 @@ type
   end;
 
   IFluentDDLBuilder = interface(IFluentDDLTableDef)
-    ['{80AC3F4E-BD6F-409C-A853-4F7E8F9A0213}']
+    ['{2F51EC02-5CBF-4270-BE72-F40DC48E4E74}']
     function ColumnInteger(const AName: string): IFluentDDLBuilder;
     function ColumnBigInt(const AName: string): IFluentDDLBuilder;
     function ColumnVarChar(const AName: string; ALength: Integer): IFluentDDLBuilder;
@@ -784,6 +790,7 @@ type
     function Unique: IFluentDDLBuilder;
     function Check(const ACondition: string): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
+    function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function AsString: string;
   end;
@@ -821,7 +828,7 @@ type
 
   /// <summary>ESP-019: fluent builder for ALTER TABLE ADD COLUMN SQL text (one logical column per AsString).</summary>
   IFluentDDLAlterTableAddBuilder = interface(IFluentDDLAlterTableAddColumnDef)
-    ['{D9F52E3B-A04C-4F2D-B8E6-7C9F0A1B2C3D}']
+    ['{38F3D045-596E-4867-B6F5-40B64A87DA2F}']
     function ColumnInteger(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBigInt(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnVarChar(const AName: string; ALength: Integer): IFluentDDLAlterTableAddBuilder;
@@ -836,6 +843,7 @@ type
     function Unique: IFluentDDLAlterTableAddBuilder;
     function Check(const ACondition: string): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
+    function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
   end;
@@ -892,6 +900,43 @@ type
   /// <summary>ESP-047: fluent builder for ALTER TABLE RENAME TABLE SQL text.</summary>
   IFluentDDLAlterTableRenameTableBuilder = interface(IFluentDDLAlterTableRenameTableDef)
     ['{D6F2E3B4-C5D6-E7F8-0123-4567890ABCDE}']
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-048 / ADR-048: read-only view of ALTER TABLE ALTER COLUMN (type/null) for serializers.</summary>
+  IFluentDDLAlterTableAlterColumnDef = interface
+    ['{9A1B2C3D-4E5F-6A7B-8C9D-0E1F2A3B4C5D}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetColumnName: string;
+    function GetLogicalType: TDDLLogicalType;
+    function GetTypeArg: Integer;
+    function GetNotNull: Boolean;
+    function GetTypeChanged: Boolean;
+    function GetNullabilityChanged: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TableName: string read GetTableName;
+    property ColumnName: string read GetColumnName;
+    property LogicalType: TDDLLogicalType read GetLogicalType;
+    property TypeArg: Integer read GetTypeArg;
+    property NotNull: Boolean read GetNotNull;
+    property TypeChanged: Boolean read GetTypeChanged;
+    property NullabilityChanged: Boolean read GetNullabilityChanged;
+  end;
+
+  /// <summary>ESP-048: fluent builder for ALTER TABLE ALTER COLUMN SQL text.</summary>
+  IFluentDDLAlterTableAlterColumnBuilder = interface(IFluentDDLAlterTableAlterColumnDef)
+    ['{0D1E2F3A-4B5C-6D7E-8F9A-0B1C2D3E4F5A}']
+    function TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeVarchar(ALength: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeBoolean: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDate: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+    function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
+    function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function AsString: string;
   end;
 
