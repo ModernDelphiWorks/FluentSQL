@@ -333,6 +333,17 @@ type
     procedure TestAlterTableRenameTable_SQLite_GeneratesExpected;
     [Test]
     procedure TestTruncateTable_SQLite_GeneratesDeleteFrom;
+    [Test]
+    procedure TestCreateIndex_SQLite_MultiColumn_GeneratesExpected;
+  end;
+
+  [TestFixture]
+  TTestDDLMySQL = class
+  public
+    [Test]
+    procedure TestCreateIndex_MySQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_MySQL_Unique_GeneratesExpected;
   end;
 
   [TestFixture]
@@ -1913,7 +1924,42 @@ begin
   Assert.AreEqual('ALTER TABLE [USUARIOS] ADD [LOGIN] VARCHAR(50) CONSTRAINT [UK_USUARIOS_LOGIN] UNIQUE', LSql);
 end;
 
+procedure TTestDDLSQLite.TestCreateIndex_SQLite_MultiColumn_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnSQLite).CreateIndex('IX_CLI_MULTI', 'CLIENTES')
+    .Column('NOME')
+    .Column('DATA_NASCIMENTO')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX `IX_CLI_MULTI` ON `CLIENTES` (`NOME`, `DATA_NASCIMENTO`)', LSql);
+end;
+
+{ TTestDDLMySQL }
+
+procedure TTestDDLMySQL.TestCreateIndex_MySQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).CreateIndex('IX_CLI_NOME', 'CLIENTES')
+    .Column('NOME')
+    .AsString;
+  Assert.AreEqual('CREATE INDEX `IX_CLI_NOME` ON `CLIENTES` (`NOME`)', LSql);
+end;
+
+procedure TTestDDLMySQL.TestCreateIndex_MySQL_Unique_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMySQL).CreateIndex('UK_CLI_EMAIL', 'CLIENTES')
+    .Unique
+    .Column('EMAIL')
+    .AsString;
+  Assert.AreEqual('CREATE UNIQUE INDEX `UK_CLI_EMAIL` ON `CLIENTES` (`EMAIL`)', LSql);
+end;
+
 initialization
   TDUnitX.RegisterTestFixture(TTestDDLConstraints);
+  TDUnitX.RegisterTestFixture(TTestDDLMySQL);
 
 end.
