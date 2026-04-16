@@ -39,6 +39,7 @@ type
     FDefaultValue: string;
     FComputedExpression: string;
     FIdentity: Boolean;
+    FIdentityScope: TDDLIdentityScope;
     FReferenceTable: string;
     FReferenceColumn: string;
     FDescription: string;
@@ -59,6 +60,7 @@ type
     function GetDefaultValue: string;
     function GetComputedExpression: string;
     function GetIsIdentity: Boolean;
+    function GetIdentityScope: TDDLIdentityScope;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     function GetDescription: string;
@@ -69,13 +71,13 @@ type
     procedure SetCheck(const ACondition: string; const AName: string = '');
     procedure SetDefaultValue(const AValue: string);
     procedure SetComputedBy(const AExpr: string);
-    procedure SetIdentity(AValue: Boolean);
+    procedure SetIdentity(AValue: Boolean; AScope: TDDLIdentityScope = disAlways);
     procedure SetReferences(const ATableName, AColumnName: string);
     procedure SetDescription(const AText: string);
   end;
 
   /// <summary>ESP-055: concrete implementation of table-level constraints.</summary>
-  TFluentDDLTableConstraint = class(TInterfacedObject, IFluentDDLTableConstraint)
+  TFluentDDLTableConstraint = class(TObject, IFluentDDLTableConstraint)
   strict private
     FName: string;
     FConstraintType: TDDLConstraintType;
@@ -83,9 +85,14 @@ type
     FCheckCondition: string;
     FReferenceTable: string;
     FReferenceColumn: string;
+  protected
+    function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
+    function _AddRef: Integer; stdcall;
+    function _Release: Integer; stdcall;
   public
     constructor Create(const AName: string; AType: TDDLConstraintType; const AColumns: array of string); overload;
-    constructor Create(const AName: string; const ACheckCondition: string); overload;
+    constructor Create(const AName, ACheckCondition: string); overload;
+    constructor Create(const AName: string; AType: TDDLConstraintType; const AColumn, ARefTable, ARefColumn: string); overload;
     function GetName: string;
     function GetConstraintType: TDDLConstraintType;
     function GetColumnCount: Integer;
@@ -93,10 +100,6 @@ type
     function GetCheckCondition: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
-  public
-    constructor Create(const AName: string; AType: TDDLConstraintType; const AColumns: array of string); overload;
-    constructor Create(const AName: string; const ACheckCondition: string); overload;
-    constructor Create(const AName: string; AType: TDDLConstraintType; const AColumn, ARefTable, ARefColumn: string); overload;
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
@@ -139,7 +142,7 @@ type
     function Check(const ACondition: string; const AName: string = ''): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
-    function Identity: IFluentDDLBuilder;
+    function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
@@ -178,6 +181,7 @@ type
     function GetDialect: TFluentSQLDriver;
     function GetTableName: string;
     function GetColumn: IFluentDDLColumn;
+    function GetConstraint: IFluentDDLTableConstraint;
     { IFluentDDLAlterTableAddBuilder }
     function ColumnInteger(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBigInt(const AName: string): IFluentDDLAlterTableAddBuilder;
@@ -196,7 +200,7 @@ type
     function Check(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
-    function Identity: IFluentDDLAlterTableAddBuilder;
+    function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
@@ -341,6 +345,9 @@ type
     FDefaultValue: string;
     FDefaultSet: Boolean;
     FDefaultDropped: Boolean;
+    FIdentity: Boolean;
+    FIdentityScope: TDDLIdentityScope;
+    FIdentityChanged: Boolean;
     function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName, AColumnName: string);
@@ -356,6 +363,9 @@ type
     function GetDefaultValue: string;
     function GetDefaultSet: Boolean;
     function GetDefaultDropped: Boolean;
+    function GetIsIdentity: Boolean;
+    function GetIdentityScope: TDDLIdentityScope;
+    function GetIdentityChanged: Boolean;
     { IFluentDDLAlterTableAlterColumnBuilder }
     function TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
@@ -369,6 +379,7 @@ type
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
     function DropDefault: IFluentDDLAlterTableAlterColumnBuilder;
+    function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAlterColumnBuilder;
     function AsString: string;
   end;
 
@@ -475,6 +486,7 @@ begin
   FName := AName;
   FLogicalType := ALogicalType;
   FTypeArg := ATypeArg;
+  FIdentityScope := disAlways;
 end;
 
 function TFluentDDLColumn.QueryInterface(const IID: TGUID; out Obj): HResult;
@@ -496,6 +508,11 @@ end;
 function TFluentDDLColumn.GetIsIdentity: Boolean;
 begin
   Result := FIdentity;
+end;
+
+function TFluentDDLColumn.GetIdentityScope: TDDLIdentityScope;
+begin
+  Result := FIdentityScope;
 end;
 
 function TFluentDDLColumn._AddRef: Integer;
@@ -608,7 +625,26 @@ begin
   FComputedExpression := AExpr;
 end;
 
-{ TFluentDDLTableConstraint }
+function TFluentDDLTableConstraint.QueryInterface(const IID: TGUID; out Obj): HResult;
+begin
+  if IsEqualGUID(IID, IInterface) or IsEqualGUID(IID, IFluentDDLTableConstraint) then
+  begin
+    Pointer(Obj) := Self;
+    Result := S_OK;
+  end
+  else
+    Result := E_NOINTERFACE;
+end;
+
+function TFluentDDLTableConstraint._AddRef: Integer;
+begin
+  Result := -1;
+end;
+
+function TFluentDDLTableConstraint._Release: Integer;
+begin
+  Result := -1;
+end;
 
 constructor TFluentDDLTableConstraint.Create(const AName: string; AType: TDDLConstraintType;
   const AColumns: array of string);
@@ -631,7 +667,7 @@ begin
   FCheckCondition := ACheckCondition;
 end;
 
-constructor TFluentDDLTableConstraint.Create(const AName, AType: TDDLConstraintType; const AColumn, ARefTable,
+constructor TFluentDDLTableConstraint.Create(const AName: string; AType: TDDLConstraintType; const AColumn, ARefTable,
   ARefColumn: string);
 begin
   inherited Create;
@@ -678,11 +714,12 @@ begin
   Result := FName;
 end;
 
-procedure TFluentDDLColumn.SetIdentity(AValue: Boolean);
+procedure TFluentDDLColumn.SetIdentity(AValue: Boolean; AScope: TDDLIdentityScope = disAlways);
 begin
   if AValue and not (FLogicalType in [dltInteger, dltBigInt]) then
     raise EArgumentException.Create('DDL: .Identity can only be used on Integer or BigInt columns.');
   FIdentity := AValue;
+  FIdentityScope := AScope;
 end;
 
 procedure TFluentDDLColumn.SetReferences(const ATableName, AColumnName: string);
@@ -892,10 +929,10 @@ begin
   Result := Self;
 end;
 
-function TFluentDDLBuilder.Identity: IFluentDDLBuilder;
+function TFluentDDLBuilder.Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
-    FColumns.Last.SetIdentity(True);
+    FColumns.Last.SetIdentity(True, AScope);
   Result := Self;
 end;
 
@@ -1137,10 +1174,10 @@ begin
   Result := Self;
 end;
 
-function TFluentDDLAlterTableAddBuilder.Identity: IFluentDDLAlterTableAddBuilder;
+function TFluentDDLAlterTableAddBuilder.Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn then
-    FColumn.SetIdentity(True);
+    FColumn.SetIdentity(True, AScope);
   Result := Self;
 end;
 
@@ -1463,6 +1500,21 @@ begin
   Result := FDefaultDropped;
 end;
 
+function TFluentDDLAlterTableAlterColumnBuilder.GetIsIdentity: Boolean;
+begin
+  Result := FIdentity;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetIdentityScope: TDDLIdentityScope;
+begin
+  Result := FIdentityScope;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetIdentityChanged: Boolean;
+begin
+  Result := FIdentityChanged;
+end;
+
 function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
 begin
   FLogicalType := ALogicalType;
@@ -1545,6 +1597,14 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableAlterColumnBuilder.Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  FIdentity := True;
+  FIdentityScope := AScope;
+  FIdentityChanged := True;
+  Result := Self;
+end;
+
 function TFluentDDLAlterTableAlterColumnBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
@@ -1553,8 +1613,8 @@ begin
     raise EArgumentException.Create('DDL: table name is required');
   if Trim(FColumnName) = '' then
     raise EArgumentException.Create('DDL: column name is required');
-  if not (FTypeChanged or FNullabilityChanged or FDefaultSet or FDefaultDropped) then
-    raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change (type, nullability or default) is required');
+  if not (FTypeChanged or FNullabilityChanged or FDefaultSet or FDefaultDropped or FIdentityChanged) then
+    raise EArgumentException.Create('DDL ALTER TABLE ALTER COLUMN: at least one change (type, nullability, default or identity) is required');
 
   LSerializer := TFluentDDLSerialize.Create;
   try

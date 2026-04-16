@@ -745,6 +745,9 @@ type
     function Abs(const AValue: String): String;
   end;
 
+  /// <summary>ESP-061: scope of identity generation.</summary>
+  TDDLIdentityScope = (disAlways, disByDefault);
+
   /// <summary>ESP-017: logical column kinds for DDL; SQL text is produced per dialect.</summary>
   TDDLLogicalType = (
     dltInteger,
@@ -768,7 +771,7 @@ type
 
   /// <summary>ESP-055: represents a composite or named constraint at the table level.</summary>
   IFluentDDLTableConstraint = interface
-    ['{6E7F8A91-0B1C-2D3E-4F5AB61C8D9E0F1A}']
+    ['{6E7F8A91-0B1C-2D3E-4F5A-B61C8D9E0F1A}']
     function GetName: string;
     function GetConstraintType: TDDLConstraintType;
     function GetColumnCount: Integer;
@@ -793,6 +796,7 @@ type
     function GetDefaultValue: string;
     function GetComputedExpression: string;
     function GetIsIdentity: Boolean;
+    function GetIdentityScope: TDDLIdentityScope;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
     function GetDescription: string;
@@ -808,6 +812,7 @@ type
     property DefaultValue: string read GetDefaultValue;
     property ComputedExpression: string read GetComputedExpression;
     property IsIdentity: Boolean read GetIsIdentity;
+    property IdentityScope: TDDLIdentityScope read GetIdentityScope;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
     property Description: string read GetDescription;
@@ -849,7 +854,7 @@ type
     function Check(const ACondition: string; const AName: string = ''): IFluentDDLBuilder;
     function DefaultValue(const AValue: string): IFluentDDLBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
-    function Identity: IFluentDDLBuilder;
+    function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
@@ -906,7 +911,7 @@ type
     function Check(const ACondition: string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function DefaultValue(const AValue: string): IFluentDDLAlterTableAddBuilder;
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
-    function Identity: IFluentDDLAlterTableAddBuilder;
+    function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
@@ -1008,6 +1013,9 @@ type
     function GetDefaultValue: string;
     function GetDefaultSet: Boolean;
     function GetDefaultDropped: Boolean;
+    function GetIsIdentity: Boolean;
+    function GetIdentityScope: TDDLIdentityScope;
+    function GetIdentityChanged: Boolean;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
     property ColumnName: string read GetColumnName;
@@ -1019,6 +1027,9 @@ type
     property DefaultValue: string read GetDefaultValue;
     property DefaultSet: Boolean read GetDefaultSet;
     property DefaultDropped: Boolean read GetDefaultDropped;
+    property IsIdentity: Boolean read GetIsIdentity;
+    property IdentityScope: TDDLIdentityScope read GetIdentityScope;
+    property IdentityChanged: Boolean read GetIdentityChanged;
   end;
 
   /// <summary>ESP-048: fluent builder for ALTER TABLE ALTER COLUMN SQL text.</summary>
@@ -1036,6 +1047,7 @@ type
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
     function DropDefault: IFluentDDLAlterTableAlterColumnBuilder;
+    function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAlterColumnBuilder;
     function AsString: string;
   end;
 

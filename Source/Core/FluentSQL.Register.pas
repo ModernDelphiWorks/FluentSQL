@@ -75,7 +75,7 @@ uses
   {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.Select.SQLite, FluentSQL.FunctionsSQLite, FluentSQL.DDL.Serialize.SQLite,{$ENDIF}
   {$IFDEF INTERBASE}FluentSQL.SerializeInterbase, FluentSQL.SelectInterbase, FluentSQL.FunctionsInterbase,{$ENDIF}
   {$IFDEF DB2}FluentSQL.SerializeDB2, FluentSQL.SelectDB2, FluentSQL.FunctionsDB2,{$ENDIF}
-  {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.SelectOracle, FluentSQL.FunctionsOracle,{$ENDIF}
+  {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.SelectOracle, FluentSQL.FunctionsOracle, FluentSQL.DDL.Serialize.Oracle,{$ENDIF}
   {$IFDEF INFORMIX}FluentSQL.SerializeInformix, FluentSQL.SelectInformix, FluentSQL.FunctionsInformix,{$ENDIF}
   {$IFDEF POSTGRESQL}FluentSQL.SerializePostgreSQL, FluentSQL.SelectPostgreSQL, FluentSQL.FunctionsPostgreSQL, FluentSQL.DDL.Serialize.PostgreSQL,{$ENDIF}
   {$IFDEF ADS}FluentSQL.SerializeADS, FluentSQL.SelectADS, FluentSQL.FunctionsADS,{$ENDIF}
@@ -212,8 +212,9 @@ end;
 procedure TFluentSQLRegister._RegisterOracle;
 begin
   Self.RegisterSerialize(dbnOracle, TFluentSQLSerializeOracle.Create);
-  Self.RegisterSelect(dbnOracle, TIFluentSQLSelectOracle.Create);
+  Self.RegisterSelect(dbnOracle, TFluentSQLSelectOracle.Create);
   Self.RegisterFunctions(dbnOracle, TFluentSQLFunctionsOracle.Create);
+  Self.RegisterDDLSerialize(dbnOracle, TFluentDDLSerializerOracle.Create);
 end;
 {$ENDIF}
 
