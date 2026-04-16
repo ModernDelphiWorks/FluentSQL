@@ -230,6 +230,8 @@ type
     { IFluentDDLAlterTableDropBuilder }
     function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
     function DropConstraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function Column(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function Constraint(const AName: string): IFluentDDLAlterTableDropBuilder;
     function AsString: string;
   end;
 
@@ -447,18 +449,61 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLTableDrop = class(TInterfacedObject, IFluentDDLTableDrop, IFluentDDLDropBuilder, IFluentDDLDropTableDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+    FDropBuilder: IFluentDDLDropBuilder;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    function Column(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function Constraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function IfExists: IFluentDDLDropBuilder;
+    function AsString: string;
+    function GetDialect: TFluentSQLDriver;
+    function GetTableName: string;
+    function GetIfExists: Boolean;
+  end;
+
+  TFluentDDLTableRename = class(TInterfacedObject, IFluentDDLTableRename)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    function Column(const AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+  end;
+
+  TFluentDDLTableAlter = class(TInterfacedObject, IFluentDDLTableAlter)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    function Column(const AName: string): IFluentDDLAlterTableAlterColumnBuilder;
+  end;
+
+  TFluentDDLTable = class(TInterfacedObject, IFluentDDLTable)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FTableName: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    function CreateBuilder: IFluentDDLBuilder;
+    function IFluentDDLTable.Create = CreateBuilder;
+    function Drop: IFluentDDLTableDrop;
+    function Rename(const ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
+    function Rename: IFluentDDLTableRename; overload;
+    function Add: IFluentDDLAlterTableAddBuilder;
+    function Alter: IFluentDDLTableAlter;
+  end;
+
   TFluentSchema = class(TInterfacedObject, IFluentSchema)
   strict private
     FDialect: TFluentSQLDriver;
   public
     constructor Create(const ADialect: TFluentSQLDriver);
-    function CreateTable(const ATableName: string): IFluentDDLBuilder;
-    function DropTable(const ATableName: string): IFluentDDLDropBuilder;
-    function AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
-    function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
-    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder; overload;
-    function AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
-    function AlterTableAlter(const ATableName, AColumnName: string): IFluentDDLAlterTableAlterColumnBuilder;
+    function Table(const ATableName: string): IFluentDDLTable;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
     function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
@@ -1313,6 +1358,16 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLAlterTableDropBuilder.Column(const AName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := DropColumn(AName);
+end;
+
+function TFluentDDLAlterTableDropBuilder.Constraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := DropConstraint(AName);
+end;
+
 function TFluentDDLAlterTableDropBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
@@ -2021,6 +2076,119 @@ begin
   end;
 end;
 
+{ TFluentDDLTableDrop }
+
+constructor TFluentDDLTableDrop.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FDropBuilder := TFluentDDLDropBuilder.Create(ADialect, ATableName);
+end;
+
+function TFluentDDLTableDrop.Column(const AName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := TFluentDDLAlterTableDropBuilder.Create(FDialect, FTableName).DropColumn(AName);
+end;
+
+function TFluentDDLTableDrop.Constraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+begin
+  Result := TFluentDDLAlterTableDropBuilder.Create(FDialect, FTableName).DropConstraint(AName);
+end;
+
+function TFluentDDLTableDrop.IfExists: IFluentDDLDropBuilder;
+begin
+  FDropBuilder.IfExists;
+  Result := Self;
+end;
+
+function TFluentDDLTableDrop.AsString: string;
+begin
+  Result := FDropBuilder.AsString;
+end;
+
+function TFluentDDLTableDrop.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLTableDrop.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLTableDrop.GetIfExists: Boolean;
+begin
+  Result := (FDropBuilder as IFluentDDLDropTableDef).GetIfExists;
+end;
+
+{ TFluentDDLTableRename }
+
+constructor TFluentDDLTableRename.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+end;
+
+function TFluentDDLTableRename.Column(const AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+begin
+  Result := TFluentDDLAlterTableRenameColumnBuilder.Create(FDialect, FTableName, AOldColumnName, ANewColumnName);
+end;
+
+{ TFluentDDLTableAlter }
+
+constructor TFluentDDLTableAlter.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+end;
+
+function TFluentDDLTableAlter.Column(const AName: string): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := TFluentDDLAlterTableAlterColumnBuilder.Create(FDialect, FTableName, AName);
+end;
+
+{ TFluentDDLTable }
+
+constructor TFluentDDLTable.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+end;
+
+function TFluentDDLTable.CreateBuilder: IFluentDDLBuilder;
+begin
+  Result := TFluentDDLBuilder.Create(FDialect, FTableName);
+end;
+
+function TFluentDDLTable.Drop: IFluentDDLTableDrop;
+begin
+  Result := TFluentDDLTableDrop.Create(FDialect, FTableName);
+end;
+
+function TFluentDDLTable.Rename(const ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder;
+begin
+  Result := TFluentDDLAlterTableRenameTableBuilder.Create(FDialect, FTableName, ANewTableName);
+end;
+
+function TFluentDDLTable.Rename: IFluentDDLTableRename;
+begin
+  Result := TFluentDDLTableRename.Create(FDialect, FTableName);
+end;
+
+function TFluentDDLTable.Add: IFluentDDLAlterTableAddBuilder;
+begin
+  Result := TFluentDDLAlterTableAddBuilder.Create(FDialect, FTableName);
+end;
+
+function TFluentDDLTable.Alter: IFluentDDLTableAlter;
+begin
+  Result := TFluentDDLTableAlter.Create(FDialect, FTableName);
+end;
+
 { TFluentSchema }
 
 constructor TFluentSchema.Create(const ADialect: TFluentSQLDriver);
@@ -2028,39 +2196,9 @@ begin
   FDialect := ADialect;
 end;
 
-function TFluentSchema.CreateTable(const ATableName: string): IFluentDDLBuilder;
+function TFluentSchema.Table(const ATableName: string): IFluentDDLTable;
 begin
-  Result := TFluentDDLBuilder.Create(FDialect, ATableName);
-end;
-
-function TFluentSchema.DropTable(const ATableName: string): IFluentDDLDropBuilder;
-begin
-  Result := TFluentDDLDropBuilder.Create(FDialect, ATableName);
-end;
-
-function TFluentSchema.AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
-begin
-  Result := TFluentDDLAlterTableAddBuilder.Create(FDialect, ATableName);
-end;
-
-function TFluentSchema.AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
-begin
-  Result := TFluentDDLAlterTableDropBuilder.Create(FDialect, ATableName);
-end;
-
-function TFluentSchema.AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
-begin
-  Result := TFluentDDLAlterTableRenameColumnBuilder.Create(FDialect, ATableName, AOldColumnName, ANewColumnName);
-end;
-
-function TFluentSchema.AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder;
-begin
-  Result := TFluentDDLAlterTableRenameTableBuilder.Create(FDialect, AOldTableName, ANewTableName);
-end;
-
-function TFluentSchema.AlterTableAlter(const ATableName, AColumnName: string): IFluentDDLAlterTableAlterColumnBuilder;
-begin
-  Result := TFluentDDLAlterTableAlterColumnBuilder.Create(FDialect, ATableName, AColumnName);
+  Result := TFluentDDLTable.Create(FDialect, ATableName);
 end;
 
 function TFluentSchema.CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;

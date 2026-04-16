@@ -11,7 +11,7 @@
   ------------------------------------------------------------------------------
 }
 
-unit FluentSQL.SelectMSSQL;
+unit FluentSQL.Select.Oracle;
 
 {$ifdef fpc}
   {$mode delphi}{$H+}
@@ -21,11 +21,10 @@ interface
 
 uses
   SysUtils,
-  FluentSQL.Interfaces,
   FluentSQL.Select;
 
 type
-  TFluentSQLSelectMSSQL = class(TFluentSQLSelect)
+  TFluentSQLSelectOracle = class(TFluentSQLSelect)
   public
     constructor Create; override;
     function Serialize: String; override;
@@ -35,50 +34,31 @@ implementation
 
 uses
   FluentSQL.Utils,
+  FluentSQL.Interfaces,
   FluentSQL.Register,
-  FluentSQL.QualifierMSSQL;
+  FluentSQL.QualifierOracle;
 
-{ TFluentSQLSelectMSSQL }
+{ TFluentSQLSelectOracle }
 
-constructor TFluentSQLSelectMSSQL.Create;
+constructor TFluentSQLSelectOracle.Create;
 begin
-  inherited Create;
-  FQualifiers := TFluentSQLSelectQualifiersMSSQL.Create;
+  inherited;
+  FQualifiers := TFluentSQLSelectQualifiersOracle.Create;
 end;
 
-function TFluentSQLSelectMSSQL.Serialize: String;
-var
-  LFor: Integer;
-
-  function DoSerialize: String;
-  begin
+function TFluentSQLSelectOracle.Serialize: String;
+begin
+  if IsEmpty then
+    Result := ''
+  else
     Result := TUtils.Concat(['SELECT',
                              FColumns.Serialize,
                              FQualifiers.SerializeDistinct,
                              'FROM',
                              FTableNames.Serialize]);
-  end;
-
-const
-  cSELECT = 'SELECT * FROM (%s) AS %s';
-
-begin
-  if IsEmpty then
-    Result := ''
-  else
-  begin
-    if FQualifiers.ExecutingPagination then
-    begin
-      FColumns.Add.Name := 'ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER';
-      Result := Format(cSELECT, [DoSerialize, FTableNames[0].Name]);
-    end
-    else
-      Result := DoSerialize;
-  end;
 end;
 
 end.
-
 
 
 

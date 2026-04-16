@@ -69,15 +69,15 @@ type
 implementation
 
 uses
-  {$IFDEF FIREBIRD}FluentSQL.SerializeFirebird, FluentSQL.SelectFirebird, FluentSQL.FunctionsFirebird, FluentSQL.DDL.Serialize.Firebird,{$ENDIF}
-  {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.SelectMSSQL, FluentSQL.FunctionsMSSQL, FluentSQL.DDL.Serialize.MSSQL,{$ENDIF}
-  {$IFDEF MYSQL}FluentSQL.SerializeMySQL, FluentSQL.SelectMySQL, FluentSQL.FunctionsMySQL, FluentSQL.DDL.Serialize.MySQL,{$ENDIF}
+  {$IFDEF FIREBIRD}FluentSQL.SerializeFirebird, FluentSQL.Select.Firebird, FluentSQL.FunctionsFirebird, FluentSQL.DDL.Serialize.Firebird,{$ENDIF}
+  {$IFDEF MSSQL}FluentSQL.SerializeMSSQL, FluentSQL.Select.MSSQL, FluentSQL.FunctionsMSSQL, FluentSQL.DDL.Serialize.MSSQL,{$ENDIF}
+  {$IFDEF MYSQL}FluentSQL.SerializeMySQL, FluentSQL.Select.MySQL, FluentSQL.FunctionsMySQL, FluentSQL.DDL.Serialize.MySQL,{$ENDIF}
   {$IFDEF SQLITE}FluentSQL.SerializeSQLite, FluentSQL.Select.SQLite, FluentSQL.FunctionsSQLite, FluentSQL.DDL.Serialize.SQLite,{$ENDIF}
   {$IFDEF INTERBASE}FluentSQL.SerializeInterbase, FluentSQL.SelectInterbase, FluentSQL.FunctionsInterbase,{$ENDIF}
   {$IFDEF DB2}FluentSQL.SerializeDB2, FluentSQL.SelectDB2, FluentSQL.FunctionsDB2,{$ENDIF}
-  {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.SelectOracle, FluentSQL.FunctionsOracle, FluentSQL.DDL.Serialize.Oracle,{$ENDIF}
+  {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.Select.Oracle, FluentSQL.FunctionsOracle, FluentSQL.DDL.Serialize.Oracle,{$ENDIF}
   {$IFDEF INFORMIX}FluentSQL.SerializeInformix, FluentSQL.SelectInformix, FluentSQL.FunctionsInformix,{$ENDIF}
-  {$IFDEF POSTGRESQL}FluentSQL.SerializePostgreSQL, FluentSQL.SelectPostgreSQL, FluentSQL.FunctionsPostgreSQL, FluentSQL.DDL.Serialize.PostgreSQL,{$ENDIF}
+  {$IFDEF POSTGRESQL}FluentSQL.SerializePostgreSQL, FluentSQL.Select.PostgreSQL, FluentSQL.FunctionsPostgreSQL, FluentSQL.DDL.Serialize.PostgreSQL,{$ENDIF}
   {$IFDEF ADS}FluentSQL.SerializeADS, FluentSQL.SelectADS, FluentSQL.FunctionsADS,{$ENDIF}
   {$IFDEF ASA}FluentSQL.SerializeASA, FluentSQL.SelectASA, FluentSQL.FunctionsASA,{$ENDIF}
   {$IFDEF ABSOLUTEDB}FluentSQL.SerializeAbsoluteDB, FluentSQL.SelectAbsoluteDB, FluentSQL.FunctionsAbsoluteDB,{$ENDIF}

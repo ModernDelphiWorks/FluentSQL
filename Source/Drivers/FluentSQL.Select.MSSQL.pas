@@ -11,7 +11,7 @@
   ------------------------------------------------------------------------------
 }
 
-unit FluentSQL.SelectPostgreSQL;
+unit FluentSQL.Select.MSSQL;
 
 {$ifdef fpc}
   {$mode delphi}{$H+}
@@ -21,10 +21,11 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.Select;
 
 type
-  TFluentSQLSelectPostgreSQL = class(TFluentSQLSelect)
+  TFluentSQLSelectMSSQL = class(TFluentSQLSelect)
   public
     constructor Create; override;
     function Serialize: String; override;
@@ -35,30 +36,49 @@ implementation
 uses
   FluentSQL.Utils,
   FluentSQL.Register,
-  FluentSQL.Interfaces,
-  FluentSQL.QualifierPostgresql;
+  FluentSQL.QualifierMSSQL;
 
-{ TFluentSQLSelectPostgreSQL }
+{ TFluentSQLSelectMSSQL }
 
-constructor TFluentSQLSelectPostgreSQL.Create;
+constructor TFluentSQLSelectMSSQL.Create;
 begin
-  inherited;
-  FQualifiers := TFluentSQLSelectQualifiersPostgreSQL.Create;
+  inherited Create;
+  FQualifiers := TFluentSQLSelectQualifiersMSSQL.Create;
 end;
 
-function TFluentSQLSelectPostgreSQL.Serialize: String;
+function TFluentSQLSelectMSSQL.Serialize: String;
+var
+  LFor: Integer;
+
+  function DoSerialize: String;
+  begin
+    Result := TUtils.Concat(['SELECT',
+                             FColumns.Serialize,
+                             FQualifiers.SerializeDistinct,
+                             'FROM',
+                             FTableNames.Serialize]);
+  end;
+
+const
+  cSELECT = 'SELECT * FROM (%s) AS %s';
+
 begin
   if IsEmpty then
     Result := ''
   else
-    Result := TUtils.Concat(['SELECT',
-                             FQualifiers.SerializeDistinct,
-                             FColumns.Serialize,
-                             'FROM',
-                             FTableNames.Serialize]);
+  begin
+    if FQualifiers.ExecutingPagination then
+    begin
+      FColumns.Add.Name := 'ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER';
+      Result := Format(cSELECT, [DoSerialize, FTableNames[0].Name]);
+    end
+    else
+      Result := DoSerialize;
+  end;
 end;
 
 end.
+
 
 
 
