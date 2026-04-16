@@ -11,7 +11,7 @@
   ------------------------------------------------------------------------------
 }
 
-unit FluentSQL.SelectMySQL;
+unit FluentSQL.Select.MySQL;
 
 {$ifdef fpc}
   {$mode delphi}{$H+}

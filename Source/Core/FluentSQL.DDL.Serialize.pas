@@ -43,6 +43,8 @@ type
     function DropView(const ADef: IFluentDDLDropViewDef): string; override;
     function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
     function GetDialect: TFluentSQLDriver; override;
   end;
 
@@ -216,6 +218,30 @@ begin
   LReg := TFluentSQLRegister.Create;
   try
     Result := LReg.DDLSerialize(ADef.Dialect).DropSequence(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableAddConstraint(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableDropConstraint(ADef);
   finally
     LReg.Free;
   end;

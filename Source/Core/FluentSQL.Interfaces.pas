@@ -690,23 +690,6 @@ type
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
   end;
 
-  IFluentSchema = interface
-    ['{B1A2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}']
-    function CreateTable(const ATableName: string): IFluentDDLBuilder;
-    function DropTable(const ATableName: string): IFluentDDLDropBuilder;
-    function AlterTableAdd(const ATableName: string): IFluentDDLAlterTableAddBuilder;
-    function AlterTableDrop(const ATableName: string): IFluentDDLAlterTableDropBuilder;
-    function AlterTableRename(const ATableName, AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder; overload;
-    function AlterTableRename(const AOldTableName, ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
-    function AlterTableAlter(const ATableName, AColumnName: string): IFluentDDLAlterTableAlterColumnBuilder;
-    function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
-    function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
-    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
-    function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
-    function DropView(const AName: string): IFluentDDLDropViewBuilder;
-    function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
-    function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
-  end;
 
   IFluentSQLFunctions = interface
     ['{5035E399-D3F0-48C6-BACB-9CA6D94B2BE7}']
@@ -949,6 +932,8 @@ type
     ['{F2B35D6E-C470-5B8C-9F9A-0B1C2D3E4F5A}']
     function DropColumn(const AName: string): IFluentDDLAlterTableDropBuilder;
     function DropConstraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function Column(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function Constraint(const AName: string): IFluentDDLAlterTableDropBuilder;
     function AsString: string;
   end;
 
@@ -1195,6 +1180,45 @@ type
     ['{999645DB-C850-4445-BB18-5591CD5221D5}']
     function IfExists: IFluentDDLDropSequenceBuilder;
     function AsString: string;
+  end;
+
+
+  IFluentDDLTableDrop = interface(IFluentDDLDropBuilder)
+    ['{BA76472F-1AD2-4CBA-A528-98AA510E59A8}']
+    function Column(const AName: string): IFluentDDLAlterTableDropBuilder;
+    function Constraint(const AName: string): IFluentDDLAlterTableDropBuilder;
+  end;
+
+  IFluentDDLTableRename = interface
+    ['{AFB45CD3-3D0F-44F4-A0B8-A685D2C2EB6B}']
+    function Column(const AOldColumnName, ANewColumnName: string): IFluentDDLAlterTableRenameColumnBuilder;
+  end;
+
+  IFluentDDLTableAlter = interface
+    ['{EAEBC46D-9BE1-4C54-8B8D-75D01A1869ED}']
+    function Column(const AName: string): IFluentDDLAlterTableAlterColumnBuilder;
+  end;
+
+  IFluentDDLTable = interface
+    ['{DF30283A-4D78-43C5-B9F2-C5EAD72B4B27}']
+    function Create: IFluentDDLBuilder;
+    function Drop: IFluentDDLTableDrop;
+    function Rename(const ANewTableName: string): IFluentDDLAlterTableRenameTableBuilder; overload;
+    function Rename: IFluentDDLTableRename; overload;
+    function Add: IFluentDDLAlterTableAddBuilder;
+    function Alter: IFluentDDLTableAlter;
+  end;
+
+  IFluentSchema = interface
+    ['{B1A2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D}']
+    function Table(const ATableName: string): IFluentDDLTable;
+    function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
+    function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
+    function DropView(const AName: string): IFluentDDLDropViewBuilder;
+    function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
+    function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
   end;
 
 implementation

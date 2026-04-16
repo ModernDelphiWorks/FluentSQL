@@ -11,7 +11,7 @@
   ------------------------------------------------------------------------------
 }
 
-unit FluentSQL.SelectFirebird;
+unit FluentSQL.Select.Firebird;
 
 {$ifdef fpc}
   {$mode delphi}{$H+}

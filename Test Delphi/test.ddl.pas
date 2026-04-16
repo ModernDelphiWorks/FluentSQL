@@ -457,7 +457,7 @@ procedure TTestDDLComputedColumns.TestComputedColumn_Firebird_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('VENDAS')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('VENDAS').Create
     .ColumnInteger('ID')
     .ColumnInteger('QTD')
     .ColumnInteger('PRECO')
@@ -470,7 +470,7 @@ procedure TTestDDLComputedColumns.TestComputedColumn_PostgreSQL_GeneratesExpecte
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('VENDAS')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('VENDAS').Create
     .ColumnInteger('ID')
     .ColumnInteger('QTD')
     .ColumnInteger('PRECO')
@@ -483,7 +483,7 @@ procedure TTestDDLComputedColumns.TestComputedColumn_MySQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).CreateTable('VENDAS')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('VENDAS').Create
     .ColumnInteger('ID')
     .ColumnInteger('QTD')
     .ColumnInteger('PRECO')
@@ -496,7 +496,7 @@ procedure TTestDDLComputedColumns.TestComputedColumn_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('VENDAS')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('VENDAS').Create
     .ColumnInteger('ID')
     .ColumnInteger('QTD')
     .ColumnInteger('PRECO')
@@ -510,7 +510,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnSQLite).CreateTable('T').ColumnInteger('A').ComputedBy('1').AsString;
+      FluentSQL.Schema(dbnSQLite).Table('T').Create.ColumnInteger('A').ComputedBy('1').AsString;
     end,
     ENotSupportedException);
 end;
@@ -519,7 +519,7 @@ procedure TTestDDLComputedColumns.TestComputedBy_AlterTableAdd_GeneratesExpected
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAdd('VENDAS')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('VENDAS').Add
     .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
     .AsString;
   Assert.AreEqual('ALTER TABLE "VENDAS" ADD "TOTAL" INTEGER GENERATED ALWAYS AS (QTD * PRECO) STORED', LSql);
@@ -530,7 +530,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).CreateTable('T')
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Create
         .ColumnInteger('A').DefaultValue('0').ComputedBy('1')
         .AsString;
     end,
@@ -543,7 +543,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_Typ
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('CLIENTES', 'IDADE')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Alter.Column('IDADE')
     .TypeInteger
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER COLUMN "IDADE" TYPE INTEGER', LSql);
@@ -553,7 +553,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_Nul
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('CLIENTES', 'NOME')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Alter.Column('NOME')
     .NotNull
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER COLUMN "NOME" SET NOT NULL', LSql);
@@ -563,7 +563,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_Type_
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('CLIENTES', 'IDADE')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Alter.Column('IDADE')
     .TypeInteger
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER "IDADE" TYPE INTEGER', LSql);
@@ -574,7 +574,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnFirebird).AlterTableAlter('CLIENTES', 'NOME').NotNull.AsString;
+      FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Alter.Column('NOME').NotNull.AsString;
     end,
     ENotSupportedException);
 end;
@@ -583,7 +583,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_TypeAndN
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAlter('clientes', 'nome')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('clientes').Alter.Column('nome')
     .TypeVarchar(100)
     .NotNull
     .AsString;
@@ -594,7 +594,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MSSQL_TypeAndN
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAlter('CLIENTES', 'NOME')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Alter.Column('NOME')
     .TypeVarchar(100)
     .Nullable
     .AsString;
@@ -606,7 +606,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnSQLite).AlterTableAlter('T', 'C').TypeInteger.AsString;
+      FluentSQL.Schema(dbnSQLite).Table('T').Alter.Column('C').TypeInteger.AsString;
     end,
     ENotSupportedException);
 end;
@@ -616,7 +616,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('', 'C').TypeInteger.AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('').Alter.Column('C').TypeInteger.AsString;
     end,
     EArgumentException);
 end;
@@ -626,7 +626,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('T', 'C').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Alter.Column('C').AsString;
     end,
     EArgumentException);
 end;
@@ -636,7 +636,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMySQL).AlterTableAlter('T', 'C').NotNull.AsString;
+      FluentSQL.Schema(dbnMySQL).Table('T').Alter.Column('C').NotNull.AsString;
     end,
     EArgumentException);
 end;
@@ -646,7 +646,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMSSQL).AlterTableAlter('T', 'C').Nullable.AsString;
+      FluentSQL.Schema(dbnMSSQL).Table('T').Alter.Column('C').Nullable.AsString;
     end,
     EArgumentException);
 end;
@@ -655,7 +655,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_Set
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('VALORES').Alter.Column('TOTAL')
     .SetDefault('0')
     .AsString;
   Assert.AreEqual('ALTER TABLE "VALORES" ALTER COLUMN "TOTAL" SET DEFAULT 0', LSql);
@@ -665,7 +665,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_PostgreSQL_Dro
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('VALORES').Alter.Column('TOTAL')
     .DropDefault
     .AsString;
   Assert.AreEqual('ALTER TABLE "VALORES" ALTER COLUMN "TOTAL" DROP DEFAULT', LSql);
@@ -675,7 +675,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_SetDe
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('VALORES').Alter.Column('TOTAL')
     .SetDefault('0')
     .AsString;
   Assert.AreEqual('ALTER TABLE "VALORES" ALTER "TOTAL" SET DEFAULT 0', LSql);
@@ -685,7 +685,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_Firebird_DropD
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('VALORES').Alter.Column('TOTAL')
     .DropDefault
     .AsString;
   Assert.AreEqual('ALTER TABLE "VALORES" ALTER "TOTAL" DROP DEFAULT', LSql);
@@ -695,7 +695,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_SetDefau
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('VALORES').Alter.Column('TOTAL')
     .SetDefault('0')
     .AsString;
   Assert.AreEqual('ALTER TABLE `VALORES` ALTER COLUMN `TOTAL` SET DEFAULT 0', LSql);
@@ -705,7 +705,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MySQL_DropDefa
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('VALORES').Alter.Column('TOTAL')
     .DropDefault
     .AsString;
   Assert.AreEqual('ALTER TABLE `VALORES` ALTER COLUMN `TOTAL` DROP DEFAULT', LSql);
@@ -715,7 +715,7 @@ procedure TTestDDLAlterTableAlterColumn.TestAlterTableAlterColumn_MSSQL_SetDefau
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAlter('VALORES', 'TOTAL')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('VALORES').Alter.Column('TOTAL')
     .SetDefault('0')
     .AsString;
   Assert.AreEqual('ALTER TABLE [VALORES] ADD DEFAULT 0 FOR [TOTAL]', LSql);
@@ -726,7 +726,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnMSSQL).AlterTableAlter('T', 'C').DropDefault.AsString;
+      FluentSQL.Schema(dbnMSSQL).Table('T').Alter.Column('C').DropDefault.AsString;
     end,
     ENotSupportedException);
 end;
@@ -735,7 +735,7 @@ procedure TTestDDLCreateTable.TestCreateTable_Firebird_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('CLIENTES')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Create
     .ColumnInteger('ID')
     .ColumnVarChar('NOME', 100)
     .ColumnBoolean('ATIVO')
@@ -749,7 +749,7 @@ procedure TTestDDLCreateTable.TestCreateTable_PostgreSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('CLIENTES')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Create
     .ColumnInteger('ID')
     .ColumnVarChar('NOME', 100)
     .ColumnBoolean('ATIVO')
@@ -763,7 +763,7 @@ procedure TTestDDLCreateTable.TestCreateTable_MySQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).CreateTable('CLIENTES')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('CLIENTES').Create
     .ColumnInteger('ID')
     .ColumnVarChar('NOME', 100)
     .ColumnBoolean('ATIVO')
@@ -777,7 +777,7 @@ procedure TTestDDLCreateTable.TestCreateTable_WithConstraints_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('USUARIOS')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('USUARIOS').Create
     .ColumnInteger('ID').PrimaryKey
     .ColumnVarChar('NOME', 100).NotNull
     .ColumnVarChar('EMAIL', 255).Unique
@@ -794,11 +794,11 @@ procedure TTestDDLCreateTable.TestLongTextAndBlob_DivergeBetweenFirebirdAndPostg
 var
   LFirebirdSql, LPostgreSql: string;
 begin
-  LFirebirdSql := FluentSQL.Schema(dbnFirebird).CreateTable('DOC')
+  LFirebirdSql := FluentSQL.Schema(dbnFirebird).Table('DOC').Create
     .ColumnLongText('BODY')
     .ColumnBlob('RAW')
     .AsString;
-  LPostgreSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('DOC')
+  LPostgreSql := FluentSQL.Schema(dbnPostgreSQL).Table('DOC').Create
     .ColumnLongText('BODY')
     .ColumnBlob('RAW')
     .AsString;
@@ -814,7 +814,7 @@ procedure TTestDDLDropTable.TestDropTable_Firebird_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).DropTable('CLIENTES').AsString;
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Drop.AsString;
   Assert.AreEqual('DROP TABLE "CLIENTES"', LSql);
 end;
 
@@ -822,7 +822,7 @@ procedure TTestDDLDropTable.TestDropTable_PostgreSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).DropTable('CLIENTES').AsString;
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Drop.AsString;
   Assert.AreEqual('DROP TABLE "CLIENTES"', LSql);
 end;
 
@@ -830,7 +830,7 @@ procedure TTestDDLDropTable.TestDropTableIfExists_PostgreSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).DropTable('CLIENTES').IfExists.AsString;
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Drop.IfExists.AsString;
   Assert.AreEqual('DROP TABLE IF EXISTS "CLIENTES"', LSql);
 end;
 
@@ -839,7 +839,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnFirebird).DropTable('CLIENTES').IfExists.AsString;
+      FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Drop.IfExists.AsString;
     end,
     ENotSupportedException);
 end;
@@ -848,7 +848,7 @@ procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_Firebird_Integer_G
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAdd('CLIENTES')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Add
     .ColumnInteger('NOVO_ID')
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ADD "NOVO_ID" INTEGER', LSql);
@@ -858,7 +858,7 @@ procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_PostgreSQL_VarChar
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAdd('CLIENTES')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Add
     .ColumnVarChar('NOME', 80)
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ADD "NOME" VARCHAR(80)', LSql);
@@ -868,7 +868,7 @@ procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_Firebird_Boolean_G
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAdd('CLIENTES')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Add
     .ColumnBoolean('ATIVO')
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ADD "ATIVO" BOOLEAN', LSql);
@@ -878,7 +878,7 @@ procedure TTestDDLAlterTableAddColumn.TestAlterTableAddColumn_WithReferences_Gen
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAdd('PEDIDOS')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('PEDIDOS').Add
     .ColumnInteger('CLIENTE_ID').References('CLIENTES', 'ID')
     .AsString;
   Assert.AreEqual('ALTER TABLE "PEDIDOS" ADD "CLIENTE_ID" INTEGER REFERENCES "CLIENTES"("ID")', LSql);
@@ -889,7 +889,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableAdd('T')
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Add
         .ColumnInteger('A')
         .ColumnInteger('B')
         .AsString;
@@ -902,7 +902,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnDB2).AlterTableAdd('T')
+      FluentSQL.Schema(dbnDB2).Table('T').Add
         .ColumnInteger('C')
         .AsString;
     end,
@@ -913,8 +913,8 @@ procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_Firebird_Generat
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableDrop('CLIENTES')
-    .DropColumn('LEGADO')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Drop
+    .Column('LEGADO')
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" DROP "LEGADO"', LSql);
 end;
@@ -923,8 +923,8 @@ procedure TTestDDLAlterTableDropColumn.TestAlterTableDropColumn_PostgreSQL_Gener
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableDrop('CLIENTES')
-    .DropColumn('LEGADO')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Drop
+    .Column('LEGADO')
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" DROP COLUMN "LEGADO"', LSql);
 end;
@@ -934,9 +934,9 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableDrop('T')
-        .DropColumn('A')
-        .DropColumn('B')
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Drop
+        .Column('A')
+        .Column('B')
         .AsString;
     end,
     EArgumentException);
@@ -947,8 +947,8 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnDB2).AlterTableDrop('T')
-        .DropColumn('C')
+      FluentSQL.Schema(dbnDB2).Table('T').Drop
+        .Column('C')
         .AsString;
     end,
     ENotSupportedException);
@@ -960,7 +960,7 @@ procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_PostgreSQL_G
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('CLIENTES', 'LEGADO', 'NOVO_NOME')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('CLIENTES').Rename.Column('LEGADO', 'NOVO_NOME')
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" RENAME COLUMN "LEGADO" TO "NOVO_NOME"', LSql);
 end;
@@ -969,7 +969,7 @@ procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_MySQL_Genera
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableRename('pedidos', 'status_id', 'status_ref')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('pedidos').Rename.Column('status_id', 'status_ref')
     .AsString;
   Assert.AreEqual('ALTER TABLE `pedidos` RENAME COLUMN `status_id` TO `status_ref`', LSql);
 end;
@@ -978,7 +978,7 @@ procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_Firebird_Gen
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableRename('CLIENTES', 'LEGADO', 'NOVO_NOME')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CLIENTES').Rename.Column('LEGADO', 'NOVO_NOME')
     .AsString;
   Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER "LEGADO" TO "NOVO_NOME"', LSql);
 end;
@@ -987,7 +987,7 @@ procedure TTestDDLAlterTableRenameColumn.TestAlterTableRenameColumn_TrimsIdentif
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('  T  ', '  a  ', '  b  ')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('  T  ').Rename.Column('  a  ', '  b  ')
     .AsString;
   Assert.AreEqual('ALTER TABLE "T" RENAME COLUMN "a" TO "b"', LSql);
 end;
@@ -997,7 +997,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('', 'A', 'B').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('').Rename.Column('A', 'B').AsString;
     end,
     EArgumentException);
 end;
@@ -1007,7 +1007,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('T', '  ', 'B').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Rename.Column('  ', 'B').AsString;
     end,
     EArgumentException);
 end;
@@ -1017,7 +1017,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('T', 'A', '').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Rename.Column('A', '').AsString;
     end,
     EArgumentException);
 end;
@@ -1027,7 +1027,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('T', 'X', 'X').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Rename.Column('X', 'X').AsString;
     end,
     EArgumentException);
 end;
@@ -1037,7 +1037,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('T', 'X', '  X  ').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Rename.Column('X', '  X  ').AsString;
     end,
     EArgumentException);
 end;
@@ -1047,7 +1047,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnDB2).AlterTableRename('T', 'A', 'B').AsString;
+      FluentSQL.Schema(dbnDB2).Table('T').Rename.Column('A', 'B').AsString;
     end,
     ENotSupportedException);
 end;
@@ -1058,7 +1058,7 @@ procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_PostgreSQL_Gen
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('TAB_A').Rename('TAB_B').AsString;
   Assert.AreEqual('ALTER TABLE "TAB_A" RENAME TO "TAB_B"', LSql);
 end;
 
@@ -1066,7 +1066,7 @@ procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_Firebird_Gener
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  LSql := FluentSQL.Schema(dbnFirebird).Table('TAB_A').Rename('TAB_B').AsString;
   Assert.AreEqual('ALTER TABLE "TAB_A" TO "TAB_B"', LSql);
 end;
 
@@ -1074,7 +1074,7 @@ procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_MySQL_Generate
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  LSql := FluentSQL.Schema(dbnMySQL).Table('TAB_A').Rename('TAB_B').AsString;
   Assert.AreEqual('ALTER TABLE `TAB_A` RENAME TO `TAB_B`', LSql);
 end;
 
@@ -1082,7 +1082,7 @@ procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_SQLite_Generat
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  LSql := FluentSQL.Schema(dbnSQLite).Table('TAB_A').Rename('TAB_B').AsString;
   Assert.AreEqual('ALTER TABLE `TAB_A` RENAME TO `TAB_B`', LSql);
 end;
 
@@ -1090,7 +1090,7 @@ procedure TTestDDLAlterTableRenameTable.TestAlterTableRenameTable_MSSQL_Generate
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableRename('TAB_A', 'TAB_B').AsString;
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('TAB_A').Rename('TAB_B').AsString;
   Assert.AreEqual('EXEC sp_rename ''TAB_A'', ''TAB_B''', LSql);
 end;
 
@@ -1099,7 +1099,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('', 'B').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('').Rename('B').AsString;
     end,
     EArgumentException);
 end;
@@ -1109,7 +1109,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('A', '').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('A').Rename('').AsString;
     end,
     EArgumentException);
 end;
@@ -1119,7 +1119,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).AlterTableRename('A', 'A').AsString;
+      FluentSQL.Schema(dbnPostgreSQL).Table('A').Rename('A').AsString;
     end,
     EArgumentException);
 end;
@@ -1612,7 +1612,7 @@ procedure TTestDDLSQLite.TestCreateTable_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).CreateTable('CLIENTES')
+  LSql := FluentSQL.Schema(dbnSQLite).Table('CLIENTES').Create
     .ColumnInteger('ID').PrimaryKey
     .ColumnVarChar('NOME', 100).NotNull
     .ColumnBoolean('ATIVO')
@@ -1626,7 +1626,7 @@ procedure TTestDDLSQLite.TestDropTable_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).DropTable('CLIENTES').AsString;
+  LSql := FluentSQL.Schema(dbnSQLite).Table('CLIENTES').Drop.AsString;
   Assert.AreEqual('DROP TABLE `CLIENTES`', LSql);
 end;
 
@@ -1634,7 +1634,7 @@ procedure TTestDDLSQLite.TestDropTableIfExists_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).DropTable('CLIENTES').IfExists.AsString;
+  LSql := FluentSQL.Schema(dbnSQLite).Table('CLIENTES').Drop.IfExists.AsString;
   Assert.AreEqual('DROP TABLE IF EXISTS `CLIENTES`', LSql);
 end;
 
@@ -1642,7 +1642,7 @@ procedure TTestDDLSQLite.TestAlterTableAddColumn_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).AlterTableAdd('CLIENTES')
+  LSql := FluentSQL.Schema(dbnSQLite).Table('CLIENTES').Add
     .ColumnVarChar('EMAIL', 150)
     .AsString;
   Assert.AreEqual('ALTER TABLE `CLIENTES` ADD COLUMN `EMAIL` TEXT', LSql);
@@ -1652,7 +1652,7 @@ procedure TTestDDLSQLite.TestAlterTableRenameColumn_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).AlterTableRename('CLIENTES', 'NOME', 'RAZAO_SOCIAL')
+  LSql := FluentSQL.Schema(dbnSQLite).Table('CLIENTES').Rename.Column('NOME', 'RAZAO_SOCIAL')
     .AsString;
   Assert.AreEqual('ALTER TABLE `CLIENTES` RENAME COLUMN `NOME` TO `RAZAO_SOCIAL`', LSql);
 end;
@@ -1687,7 +1687,7 @@ procedure TTestDDLSQLite.TestAlterTableRenameTable_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).AlterTableRename('TAB_OLD', 'TAB_NEW').AsString;
+  LSql := FluentSQL.Schema(dbnSQLite).Table('TAB_OLD').Rename('TAB_NEW').AsString;
   Assert.AreEqual('ALTER TABLE `TAB_OLD` RENAME TO `TAB_NEW`', LSql);
 end;
 
@@ -1705,7 +1705,7 @@ procedure TTestDDLMSSQL.TestCreateTable_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('CLIENTES')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Create
     .ColumnInteger('ID')
     .ColumnVarChar('NOME', 100)
     .ColumnBoolean('ATIVO')
@@ -1722,7 +1722,7 @@ procedure TTestDDLMSSQL.TestDropTable_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).DropTable('CLIENTES').AsString;
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Drop.AsString;
   Assert.AreEqual('DROP TABLE [CLIENTES]', LSql);
 end;
 
@@ -1730,7 +1730,7 @@ procedure TTestDDLMSSQL.TestDropTableIfExists_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).DropTable('CLIENTES').IfExists.AsString;
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Drop.IfExists.AsString;
   Assert.AreEqual('DROP TABLE IF EXISTS [CLIENTES]', LSql);
 end;
 
@@ -1738,7 +1738,7 @@ procedure TTestDDLMSSQL.TestAlterTableAddColumn_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAdd('CLIENTES')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Add
     .ColumnVarChar('EMAIL', 150)
     .AsString;
   Assert.AreEqual('ALTER TABLE [CLIENTES] ADD [EMAIL] VARCHAR(150)', LSql);
@@ -1748,8 +1748,8 @@ procedure TTestDDLMSSQL.TestAlterTableDropColumn_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableDrop('CLIENTES')
-    .DropColumn('LEGADO')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Drop
+    .Column('LEGADO')
     .AsString;
   Assert.AreEqual('ALTER TABLE [CLIENTES] DROP COLUMN [LEGADO]', LSql);
 end;
@@ -1758,7 +1758,7 @@ procedure TTestDDLMSSQL.TestAlterTableRenameColumn_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableRename('CLIENTES', 'NOME', 'RAZAO_SOCIAL')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CLIENTES').Rename.Column('NOME', 'RAZAO_SOCIAL')
     .AsString;
   Assert.AreEqual('EXEC sp_rename ''[CLIENTES].[NOME]'', ''RAZAO_SOCIAL'', ''COLUMN''', LSql);
 end;
@@ -1793,7 +1793,7 @@ procedure TTestDDLMSSQL.TestReservedWords_MSSQL;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('User')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('User').Create
     .ColumnInteger('Order')
     .ColumnVarChar('Table', 10)
     .AsString;
@@ -1804,7 +1804,7 @@ procedure TTestDDLMSSQL.TestBooleanDefault_MSSQL;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('CONFIGS')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('CONFIGS').Create
     .ColumnBoolean('ENABLED').DefaultValue('True')
     .ColumnBoolean('ACTIVE').DefaultValue('False')
     .ColumnBoolean('LEGACY_T').DefaultValue('T')
@@ -1817,7 +1817,7 @@ procedure TTestDDLMSSQL.TestAlterTableRenameTable_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableRename('OLD_NAME', 'NEW_NAME').AsString;
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('OLD_NAME').Rename('NEW_NAME').AsString;
   Assert.AreEqual('EXEC sp_rename ''OLD_NAME'', ''NEW_NAME''', LSql);
 end;
 
@@ -1833,19 +1833,19 @@ end;
 procedure TTestDDLCreateTable.TestGuidType_GeneratesExpectedPerDialect;
 begin
   Assert.AreEqual('CREATE TABLE [T] ([G] UNIQUEIDENTIFIER)', 
-    FluentSQL.Schema(dbnMSSQL).CreateTable('T').ColumnGuid('G').AsString);
+    FluentSQL.Schema(dbnMSSQL).Table('T').Create.ColumnGuid('G').AsString);
     
   Assert.AreEqual('CREATE TABLE "T" ("G" CHAR(16) CHARACTER SET OCTETS)', 
-    FluentSQL.Schema(dbnFirebird).CreateTable('T').ColumnGuid('G').AsString);
+    FluentSQL.Schema(dbnFirebird).Table('T').Create.ColumnGuid('G').AsString);
     
   Assert.AreEqual('CREATE TABLE "T" ("G" UUID)', 
-    FluentSQL.Schema(dbnPostgreSQL).CreateTable('T').ColumnGuid('G').AsString);
+    FluentSQL.Schema(dbnPostgreSQL).Table('T').Create.ColumnGuid('G').AsString);
     
   Assert.AreEqual('CREATE TABLE `T` (`G` GUID)', 
-    FluentSQL.Schema(dbnSQLite).CreateTable('T').ColumnGuid('G').AsString);
+    FluentSQL.Schema(dbnSQLite).Table('T').Create.ColumnGuid('G').AsString);
     
   Assert.AreEqual('CREATE TABLE `T` (`G` CHAR(36))', 
-    FluentSQL.Schema(dbnMySQL).CreateTable('T').ColumnGuid('G').AsString);
+    FluentSQL.Schema(dbnMySQL).Table('T').Create.ColumnGuid('G').AsString);
 end;
 
 procedure TTestDDLCreateTable.TestDateDefault_Firebird_GeneratesExpected;
@@ -1853,7 +1853,7 @@ var
   LSql: string;
 begin
   // Firebird uses mm/dd/yyyy in this framework's Utils for historical reasons
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('T')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('T').Create
     .ColumnDate('D').DefaultValue('2024-04-14')
     .AsString;
   Assert.AreEqual('CREATE TABLE "T" ("D" DATE DEFAULT ''04/14/2024'')', LSql);
@@ -1863,7 +1863,7 @@ procedure TTestDDLMSSQL.TestDateAndGuidDefault_MSSQL;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('T')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('T').Create
     .ColumnDate('D').DefaultValue('2024-04-14')
     .ColumnGuid('G').DefaultValue('{00000000-0000-0000-0000-000000000000}')
     .AsString;
@@ -1988,7 +1988,7 @@ procedure TTestDDLConstraints.TestCompositePrimaryKey_PostgreSQL_GeneratesExpect
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('ITEM_PEDIDO')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('ITEM_PEDIDO').Create
     .ColumnInteger('PEDIDO_ID')
     .ColumnInteger('ITEM_ID')
     .PrimaryKey(['PEDIDO_ID', 'ITEM_ID'], 'PK_ITEM_PEDIDO')
@@ -2000,7 +2000,7 @@ procedure TTestDDLConstraints.TestCompositeUnique_Firebird_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('CONTATOS')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('CONTATOS').Create
     .ColumnInteger('CLIENTE_ID')
     .ColumnVarChar('TIPO', 20)
     .Unique(['CLIENTE_ID', 'TIPO'], 'UK_CONTATO_TIPO')
@@ -2012,7 +2012,7 @@ procedure TTestDDLConstraints.TestNamedInlineConstraints_MSSQL_GeneratesExpected
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('USUARIOS')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('USUARIOS').Create
     .ColumnInteger('ID').PrimaryKey('PK_USUARIOS')
     .ColumnVarChar('EMAIL', 255).Unique('UK_USUARIOS_EMAIL')
     .ColumnInteger('IDADE').Check('IDADE >= 18', 'CK_USUARIOS_IDADE')
@@ -2024,7 +2024,7 @@ procedure TTestDDLConstraints.TestNamedCheckConstraint_SQLite_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnSQLite).CreateTable('PRODUTOS')
+  LSql := FluentSQL.Schema(dbnSQLite).Table('PRODUTOS').Create
     .ColumnInteger('ID')
     .ColumnInteger('PRECO').Check('PRECO > 0', 'CK_PRECO_POSITIVO')
     .AsString;
@@ -2037,7 +2037,7 @@ var
   LSql: string;
 begin
   // Check literal table-level (without specific column)
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('SALDOS')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('SALDOS').Create
     .ColumnInteger('DEBITO')
     .ColumnInteger('CREDITO')
     .Check('DEBITO <= CREDITO', 'CK_SALDO_VALIDO')
@@ -2050,7 +2050,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnPostgreSQL).CreateTable('T')
+      FluentSQL.Schema(dbnPostgreSQL).Table('T').Create
         .ColumnInteger('ID').PrimaryKey
         .PrimaryKey(['A', 'B']) // Should raise
         .AsString;
@@ -2062,7 +2062,7 @@ procedure TTestDDLConstraints.TestNamedConstraint_AlterTableAdd_MSSQL_GeneratesE
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAdd('USUARIOS')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('USUARIOS').Add
     .ColumnVarChar('LOGIN', 50).Unique('UK_USUARIOS_LOGIN')
     .AsString;
   Assert.AreEqual('ALTER TABLE [USUARIOS] ADD [LOGIN] VARCHAR(50) CONSTRAINT [UK_USUARIOS_LOGIN] UNIQUE', LSql);
@@ -2110,7 +2110,7 @@ procedure TTestDDLAlterTableConstraints.TestAlterTableAddPrimaryKey_PostgreSQL_G
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAdd('TAB_A')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('TAB_A').Add
     .AddPrimaryKey(['COL_1'], 'PK_TAB_A')
     .AsString;
   Assert.AreEqual('ALTER TABLE "TAB_A" ADD CONSTRAINT "PK_TAB_A" PRIMARY KEY ("COL_1")', LSql);
@@ -2120,7 +2120,7 @@ procedure TTestDDLAlterTableConstraints.TestAlterTableAddUnique_Firebird_Generat
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAdd('TAB_A')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('TAB_A').Add
     .AddUnique(['COL_1', 'COL_2'], 'UK_TAB_A')
     .AsString;
   Assert.AreEqual('ALTER TABLE "TAB_A" ADD CONSTRAINT "UK_TAB_A" UNIQUE ("COL_1", "COL_2")', LSql);
@@ -2130,7 +2130,7 @@ procedure TTestDDLAlterTableConstraints.TestAlterTableAddForeignKey_MSSQL_Genera
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).AlterTableAdd('TAB_SALARY')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('TAB_SALARY').Add
     .AddForeignKey('EMP_ID', 'EMPLOYEES', 'ID', 'FK_SAL_EMP')
     .AsString;
   Assert.AreEqual('ALTER TABLE [TAB_SALARY] ADD CONSTRAINT [FK_SAL_EMP] FOREIGN KEY ([EMP_ID]) REFERENCES [EMPLOYEES]([ID])', LSql);
@@ -2140,7 +2140,7 @@ procedure TTestDDLAlterTableConstraints.TestAlterTableAddCheck_MySQL_GeneratesEx
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableAdd('TAB_DATA')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('TAB_DATA').Add
     .AddCheck('VAL > 0', 'CK_VAL_POSITIVE')
     .AsString;
   Assert.AreEqual('ALTER TABLE `TAB_DATA` ADD CONSTRAINT `CK_VAL_POSITIVE` CHECK (VAL > 0)', LSql);
@@ -2150,8 +2150,8 @@ procedure TTestDDLAlterTableConstraints.TestAlterTableDropConstraint_PostgreSQL_
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableDrop('TAB_A')
-    .DropConstraint('UK_TAB_A')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('TAB_A').Drop
+    .Constraint('UK_TAB_A')
     .AsString;
   Assert.AreEqual('ALTER TABLE "TAB_A" DROP CONSTRAINT "UK_TAB_A"', LSql);
 end;
@@ -2160,8 +2160,8 @@ procedure TTestDDLAlterTableConstraints.TestAlterTableDropConstraint_MySQL_Prima
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).AlterTableDrop('TAB_A')
-    .DropConstraint('PRIMARY')
+  LSql := FluentSQL.Schema(dbnMySQL).Table('TAB_A').Drop
+    .Constraint('PRIMARY')
     .AsString;
   Assert.AreEqual('ALTER TABLE `TAB_A` DROP PRIMARY KEY', LSql);
 end;
@@ -2171,7 +2171,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnSQLite).AlterTableAdd('TAB_A').AddCheck('V > 0').AsString;
+      FluentSQL.Schema(dbnSQLite).Table('TAB_A').Add.AddCheck('V > 0').AsString;
     end,
     ENotSupportedException);
 end;
@@ -2181,7 +2181,7 @@ begin
   Assert.WillRaise(
     procedure
     begin
-      FluentSQL.Schema(dbnSQLite).AlterTableDrop('TAB_A').DropConstraint('ANY').AsString;
+      FluentSQL.Schema(dbnSQLite).Table('TAB_A').Drop.Constraint('ANY').AsString;
     end,
     ENotSupportedException);
 end;
@@ -2192,7 +2192,7 @@ procedure TTestDDLIdentityScope.TestIdentity_PostgreSQL_Always_GeneratesExpected
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('LOGS')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disAlways)
     .AsString;
   Assert.AreEqual('CREATE TABLE "LOGS" ("ID" BIGINT GENERATED ALWAYS AS IDENTITY)', LSql);
@@ -2202,7 +2202,7 @@ procedure TTestDDLIdentityScope.TestIdentity_PostgreSQL_ByDefault_GeneratesExpec
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('LOGS')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disByDefault)
     .AsString;
   Assert.AreEqual('CREATE TABLE "LOGS" ("ID" BIGINT GENERATED BY DEFAULT AS IDENTITY)', LSql);
@@ -2212,7 +2212,7 @@ procedure TTestDDLIdentityScope.TestIdentity_Firebird_Always_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('LOGS')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disAlways)
     .AsString;
   Assert.AreEqual('CREATE TABLE "LOGS" ("ID" BIGINT GENERATED ALWAYS AS IDENTITY)', LSql);
@@ -2222,7 +2222,7 @@ procedure TTestDDLIdentityScope.TestIdentity_Firebird_ByDefault_GeneratesExpecte
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('LOGS')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disByDefault)
     .AsString;
   Assert.AreEqual('CREATE TABLE "LOGS" ("ID" BIGINT GENERATED BY DEFAULT AS IDENTITY)', LSql);
@@ -2232,10 +2232,10 @@ procedure TTestDDLIdentityScope.TestIdentity_MSSQL_MapsBothToNative;
 var
   LSqlAlways, LSqlByDefault: string;
 begin
-  LSqlAlways := FluentSQL.Schema(dbnMSSQL).CreateTable('LOGS')
+  LSqlAlways := FluentSQL.Schema(dbnMSSQL).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disAlways)
     .AsString;
-  LSqlByDefault := FluentSQL.Schema(dbnMSSQL).CreateTable('LOGS')
+  LSqlByDefault := FluentSQL.Schema(dbnMSSQL).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disByDefault)
     .AsString;
 
@@ -2247,10 +2247,10 @@ procedure TTestDDLIdentityScope.TestIdentity_SQLite_MapsBothToNative;
 var
   LSqlAlways, LSqlByDefault: string;
 begin
-  LSqlAlways := FluentSQL.Schema(dbnSQLite).CreateTable('LOGS')
+  LSqlAlways := FluentSQL.Schema(dbnSQLite).Table('LOGS').Create
     .ColumnInteger('ID').PrimaryKey.Identity(disAlways)
     .AsString;
-  LSqlByDefault := FluentSQL.Schema(dbnSQLite).CreateTable('LOGS')
+  LSqlByDefault := FluentSQL.Schema(dbnSQLite).Table('LOGS').Create
     .ColumnInteger('ID').PrimaryKey.Identity(disByDefault)
     .AsString;
 
@@ -2262,7 +2262,7 @@ procedure TTestDDLIdentityScope.TestIdentity_AlterTableAlter_PostgreSQL_Generate
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).AlterTableAlter('LOGS', 'ID')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('LOGS').Alter.Column('ID')
     .Identity(disByDefault)
     .AsString;
   Assert.AreEqual('ALTER TABLE "LOGS" ALTER COLUMN "ID" SET GENERATED BY DEFAULT', LSql);
@@ -2272,7 +2272,7 @@ procedure TTestDDLIdentityScope.TestIdentity_AlterTableAlter_Firebird_GeneratesE
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).AlterTableAlter('LOGS', 'ID')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('LOGS').Alter.Column('ID')
     .Identity(disAlways)
     .AsString;
   Assert.AreEqual('ALTER TABLE "LOGS" ALTER "ID" SET GENERATED ALWAYS', LSql);
@@ -2282,7 +2282,7 @@ procedure TTestDDLIdentityScope.TestIdentity_Oracle_Always_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnOracle).CreateTable('LOGS')
+  LSql := FluentSQL.Schema(dbnOracle).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disAlways)
     .AsString;
   Assert.AreEqual('CREATE TABLE "LOGS" ("ID" NUMBER(19) GENERATED ALWAYS AS IDENTITY)', LSql);
@@ -2292,7 +2292,7 @@ procedure TTestDDLIdentityScope.TestIdentity_Oracle_ByDefault_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnOracle).CreateTable('LOGS')
+  LSql := FluentSQL.Schema(dbnOracle).Table('LOGS').Create
     .ColumnBigInt('ID').Identity(disByDefault)
     .AsString;
   Assert.AreEqual('CREATE TABLE "LOGS" ("ID" NUMBER(19) GENERATED BY DEFAULT AS IDENTITY)', LSql);
@@ -2302,7 +2302,7 @@ procedure TTestDDLIdentityScope.TestIdentity_AlterTableAlter_Oracle_GeneratesExp
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnOracle).AlterTableAlter('LOGS', 'ID')
+  LSql := FluentSQL.Schema(dbnOracle).Table('LOGS').Alter.Column('ID')
     .Identity(disByDefault)
     .AsString;
   Assert.AreEqual('ALTER TABLE "LOGS" MODIFY ("ID" GENERATED BY DEFAULT AS IDENTITY)', LSql);
