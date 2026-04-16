@@ -81,7 +81,7 @@ uses
   {$IFDEF ADS}FluentSQL.SerializeADS, FluentSQL.SelectADS, FluentSQL.FunctionsADS,{$ENDIF}
   {$IFDEF ASA}FluentSQL.SerializeASA, FluentSQL.SelectASA, FluentSQL.FunctionsASA,{$ENDIF}
   {$IFDEF ABSOLUTEDB}FluentSQL.SerializeAbsoluteDB, FluentSQL.SelectAbsoluteDB, FluentSQL.FunctionsAbsoluteDB,{$ENDIF}
-  {$IFDEF MONGODB}FluentSQL.SerializeMongoDB, FluentSQL.SelectMongoDB, FluentSQL.FunctionsMongoDB,{$ENDIF}
+  {$IFDEF MONGODB}FluentSQL.SerializeMongoDB, FluentSQL.SelectMongoDB, FluentSQL.FunctionsMongoDB, FluentSQL.DDL.Serialize.MongoDB,{$ENDIF}
   {$IFDEF ELEVATEDB}FluentSQL.SerializeElevateDB, FluentSQL.SelectElevateDB, FluentSQL.FunctionsElevateDB,{$ENDIF}
   {$IFDEF NEXUSDB}FluentSQL.SerializeNexusDB, FluentSQL.SelectNexusDB, FluentSQL.FunctionsNexusDB,{$ENDIF}
   FluentSQL.Utils;
@@ -270,6 +270,7 @@ begin
   Self.RegisterSerialize(dbnMongoDB, TFluentSQLSerializerMongoDB.Create);
   Self.RegisterSelect(dbnMongoDB, TFluentSQLSelectMongoDB.Create);
   Self.RegisterFunctions(dbnMongoDB, TFluentSQLFunctionsMongoDB.Create);
+  Self.RegisterDDLSerialize(dbnMongoDB, TFluentDDLSerializerMongoDB.Create);
 end;
 {$ENDIF}
 

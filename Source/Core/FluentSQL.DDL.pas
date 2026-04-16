@@ -1003,7 +1003,7 @@ var
 begin
   if Trim(FTableName) = '' then
     raise EArgumentException.Create('DDL: table name is required');
-  if FColumns.Count = 0 then
+  if (FColumns.Count = 0) and (FDialect <> dbnMongoDB) then
     raise EArgumentException.Create('DDL: at least one column is required');
   LSerializer := TFluentDDLSerialize.Create;
   try

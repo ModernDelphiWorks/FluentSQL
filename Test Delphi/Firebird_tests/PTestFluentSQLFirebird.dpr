@@ -9,6 +9,8 @@ program PTestFluentSQLFirebird;
 {$DEFINE MONGODB}
 {$DEFINE SQLITE}
 {$DEFINE MSSQL}
+{$DEFINE FIREBIRD}
+{$DEFINE ORACLE}
 uses
   System.SysUtils,
   {$IFDEF TESTINSIGHT}
@@ -20,7 +22,7 @@ uses
   DUnitX.TestFramework,
   UTestFluentSQLFirebird in 'UTestFluentSQLFirebird.pas',
   test.core.params in '..\test.core.params.pas',
-  test.ddl in '..\test.ddl.pas',
+  test.ddl.firebird in 'test.ddl.firebird.pas',
   test.operators.isin.firebird in 'test.operators.isin.firebird.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
   FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',
@@ -92,7 +94,8 @@ uses
   FluentSQL.SerializePostgreSQL in '..\..\Source\Drivers\FluentSQL.SerializePostgreSQL.pas',
   FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas',
   FluentSQL.DDL.Serialize.SQLite in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas',
-  FluentSQL.DDL.Serialize.MSSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas';
+  FluentSQL.DDL.Serialize.MSSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas',
+  FluentSQL.DDL.Serialize.Oracle in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas';
 
 { keep comment here to protect the following conditional from being removed by the IDE when adding a unit }
 {$IFNDEF TESTINSIGHT}
