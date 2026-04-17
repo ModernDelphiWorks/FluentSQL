@@ -41,4 +41,5 @@ O arquivo [ROADMAP.md](https://github.com/ModernDelphiWorks/FluentSQL/blob/main/
 - **v1.1.0:** introdução da API DDL (CREATE TABLE, DROP TABLE, ALTER TABLE ADD COLUMN).
 - **v1.1.1:** suporte a ALTER TABLE DROP COLUMN e CREATE INDEX.
 - **v1.2.0:** Cache Distribuído (Redis), Constraints Avançadas e Chaves Estrangeiras.
-- **v1.3.0:** suporte a Renomear Tabela e refinamento do ponto de entrada `Schema`.-047** — Rename Table (Issue [#65](https://github.com/ModernDelphiWorks/FluentSQL/issues/65)). Refinement of the DDL Schema entry point. Ver `CHANGELOG.md` **[1.3.0]**.
+- **v1.3.0:** suporte a Renomear Tabela e refinamento do ponto de entrada `Schema`.
+- **v1.4.0:** MongoDB Aggregations & Joins, MongoDB DDL, Views, Sequences, Identity e Comments.
