@@ -9,7 +9,7 @@ A partir da entrega **ESP-020** / **ADR-020**, o FluentSQL gera **texto SQL** pa
 
 ## Ponto de entrada
 
-- **`CreateFluentDDLAlterTableDropColumn(ADialect, 'NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLAlterTableDropBuilder`** (`FluentSQL.Interfaces`).
+- **`Schema(ADialect).AlterTableDrop('NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLAlterTableDropBuilder`** (`FluentSQL.Interfaces`). Tambem suportado via `CreateFluentDDLAlterTableDropColumn`.
 
 Chame **um único** **`DropColumn('NOME_COLUNA')`** e finalize com **`AsString`**. Uma segunda chamada a **`DropColumn`** na mesma cadeia levanta **`EArgumentException`** com mensagem estável (regra **ESP-020**).
 

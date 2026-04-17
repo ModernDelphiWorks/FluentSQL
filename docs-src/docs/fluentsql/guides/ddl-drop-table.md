@@ -7,7 +7,7 @@ A partir da entrega **ESP-018** / **ADR-018**, o FluentSQL inclui geração de t
 
 ## Ponto de entrada
 
-- **`CreateFluentDDLDropTable(ADialect, 'NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLDropBuilder`** (`FluentSQL.Interfaces`).
+- **`Schema(ADialect).DropTable('NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLDropBuilder`** (`FluentSQL.Interfaces`). Tambem suportado via `CreateFluentDDLDropTable`.
 
 Opcionalmente encadeie **`.IfExists`** antes de **`AsString`** para pedir uma remoção idempotente onde o dialeto e esta build o suportam (detalhe normativo em **ADR-018**).
 

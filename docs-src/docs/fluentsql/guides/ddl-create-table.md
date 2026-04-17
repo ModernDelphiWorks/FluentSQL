@@ -7,7 +7,7 @@ A partir da entrega **ESP-017** / **ADR-017**, o FluentSQL expõe uma **superfí
 
 ## Ponto de entrada
 
-- **`CreateFluentDDLTable(ADialect, 'NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLBuilder`** (`FluentSQL.Interfaces`).
+- **`Schema(ADialect).CreateTable('NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLBuilder`** (`FluentSQL.Interfaces`). Tambem é suportado via o método legado `CreateFluentDDLTable`.
 
 Encadeie colunas com métodos `ColumnInteger`, `ColumnVarChar`, etc., e utilize as **Constraints Avançadas** (**ESP-034**) para definir a integridade:
 - **`.PrimaryKey`**: Define a chave primária da tabela.
@@ -22,7 +22,7 @@ Finalize com **`AsString`**.
 var
   LSql: string;
 begin
-  LSql := CreateFluentDDLTable(dbnPostgreSQL, 'USUARIOS')
+  LSql := Schema(dbnPostgreSQL).CreateTable('USUARIOS')
     .ColumnInteger('ID').PrimaryKey
     .ColumnVarChar('NOME', 100).NotNull
     .ColumnVarChar('EMAIL', 150).NotNull
@@ -36,7 +36,7 @@ end;
 Para definir chaves estrangeiras que referenciam outras tabelas, utilize o método **`.References`**. Este suporte permite a definição em linha (inline) tanto no `CREATE TABLE` quanto no `ALTER TABLE ADD COLUMN`.
 
 ```delphi
-  LSql := CreateFluentDDLTable(dbnPostgreSQL, 'PEDIDOS')
+  LSql := Schema(dbnPostgreSQL).CreateTable('PEDIDOS')
     .ColumnInteger('ID').PrimaryKey
     .ColumnInteger('CLIENTE_ID').References('CLIENTES', 'ID')
     .AsString;
