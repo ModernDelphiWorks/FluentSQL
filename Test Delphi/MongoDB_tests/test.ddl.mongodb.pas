@@ -21,6 +21,22 @@ type
     procedure TestCreateIndex_Unique_GeneratesExpected;
     [Test]
     procedure TestDropIndex_GeneratesExpected;
+    [Test]
+    procedure TestRenameCollection_GeneratesExpected;
+    [Test]
+    procedure TestTruncateCollection_GeneratesExpected;
+    [Test]
+    procedure TestCreateCollection_EmptyName_RaisesError;
+    [Test]
+    procedure TestDropCollection_EmptyName_RaisesError;
+    [Test]
+    procedure TestCreateIndex_EmptyNames_RaisesError;
+    [Test]
+    procedure TestDropIndex_EmptyNames_RaisesError;
+    [Test]
+    procedure TestRenameCollection_EmptyNames_RaisesError;
+    [Test]
+    procedure TestTruncateCollection_EmptyName_RaisesError;
   end;
 
 implementation
@@ -92,6 +108,88 @@ begin
     .OnTable('customers')
     .AsString;
   Assert.AreEqual('{"dropIndexes":"customers","index":"idx_email"}', LResult);
+end;
+
+procedure TTestDDLMongoDB.TestRenameCollection_GeneratesExpected;
+var
+  LResult: string;
+begin
+  LResult := FluentSQL.Schema(dbnMongoDB).Table('old_customers').Rename('new_customers').AsString;
+  Assert.AreEqual('{"renameCollection":"old_customers","to":"new_customers"}', LResult);
+end;
+
+procedure TTestDDLMongoDB.TestTruncateCollection_GeneratesExpected;
+var
+  LResult: string;
+begin
+  LResult := FluentSQL.Schema(dbnMongoDB).TruncateTable('customers').AsString;
+  Assert.AreEqual('{"delete":"customers","deletes":[{"q":{},"limit":0}]}', LResult);
+end;
+
+procedure TTestDDLMongoDB.TestCreateCollection_EmptyName_RaisesError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMongoDB).Table('').Create.AsString;
+    end,
+    EArgumentException
+  );
+end;
+
+procedure TTestDDLMongoDB.TestDropCollection_EmptyName_RaisesError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMongoDB).Table(' ').Drop.AsString;
+    end,
+    EArgumentException
+  );
+end;
+
+procedure TTestDDLMongoDB.TestCreateIndex_EmptyNames_RaisesError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMongoDB).CreateIndex('', 'customers').Column('col').AsString;
+    end,
+    EArgumentException
+  );
+end;
+
+procedure TTestDDLMongoDB.TestDropIndex_EmptyNames_RaisesError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMongoDB).DropIndex('idx').OnTable('').AsString;
+    end,
+    EArgumentException
+  );
+end;
+
+procedure TTestDDLMongoDB.TestRenameCollection_EmptyNames_RaisesError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMongoDB).Table('old').Rename('').AsString;
+    end,
+    EArgumentException
+  );
+end;
+
+procedure TTestDDLMongoDB.TestTruncateCollection_EmptyName_RaisesError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMongoDB).TruncateTable('').AsString;
+    end,
+    EArgumentException
+  );
 end;
 
 initialization

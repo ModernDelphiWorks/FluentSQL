@@ -34,6 +34,8 @@ type
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
+    function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
+    function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
   end;
 
 implementation
@@ -119,6 +121,31 @@ begin
     raise EArgumentException.Create('DDL MongoDB: index name is required for drop index');
 
   Result := '{"dropIndexes":"' + ADef.TableName + '","index":"' + ADef.IndexName + '"}';
+end;
+
+function TFluentDDLSerializerMongoDB.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if Trim(ADef.OldTableName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: old collection name is required');
+
+  if Trim(ADef.NewTableName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: new collection name is required');
+
+  Result := '{"renameCollection":"' + ADef.OldTableName + '","to":"' + ADef.NewTableName + '"}';
+end;
+
+function TFluentDDLSerializerMongoDB.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if Trim(ADef.TableName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: collection name is required');
+
+  Result := '{"delete":"' + ADef.TableName + '","deletes":[{"q":{},"limit":0}]}';
 end;
 
 initialization
