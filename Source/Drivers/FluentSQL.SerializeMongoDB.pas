@@ -152,11 +152,15 @@ begin
   end;
 end;
 
-function NormalizeFieldName(const AFieldName: String): String;
+function NormalizeFieldName(const AFieldName: String; AIncludeAlias: Boolean = False): String;
+var
+  LDotPos: Integer;
 begin
   Result := Trim(AFieldName);
-  if Pos('.', Result) > 0 then
-    Result := Copy(Result, LastDelimiter('.', Result) + 1, MaxInt);
+  LDotPos := LastDelimiter('.', Result);
+  if (Pos('.', Result) > 0) and (not AIncludeAlias) then
+    Result := Copy(Result, LDotPos + 1, MaxInt);
+  
   Result := StringReplace(Result, '`', '', [rfReplaceAll]);
   Result := StringReplace(Result, '"', '', [rfReplaceAll]);
   Result := StringReplace(Result, '[', '', [rfReplaceAll]);
@@ -386,6 +390,64 @@ begin
   Result := ParseConditionToMongo(AAST, LExpr);
 end;
 
+procedure ParseJoinCondition(const ACondition: String; const AJoinedAlias: String; const AMainTable, AMainAlias: String; out ALocalField, AForeignField: String);
+var
+  LExpr: String;
+  LPos: Integer;
+  LPart1, LPart2: String;
+  LIsMain: Boolean;
+begin
+  LExpr := Trim(ACondition);
+  LPos := Pos('=', LExpr);
+  if LPos = 0 then
+    raise EFluentSQLMongoDBSerialize.CreateFmt('MongoDB Join: condição inválida (esperado "="): %s', [ACondition]);
+
+  LPart1 := Trim(Copy(LExpr, 1, LPos - 1));
+  LPart2 := Trim(Copy(LExpr, LPos + 1, MaxInt));
+
+  // Determine which side belongs to the joined collection (foreignField)
+  if StartsText(AJoinedAlias + '.', LPart1) then
+  begin
+    AForeignField := NormalizeFieldName(LPart1);
+    ALocalField := LPart2;
+  end
+  else if StartsText(AJoinedAlias + '.', LPart2) then
+  begin
+    AForeignField := NormalizeFieldName(LPart2);
+    ALocalField := LPart1;
+  end
+  else
+  begin
+    // Fallback logic
+    if Pos('.', LPart2) > 0 then
+    begin
+      AForeignField := NormalizeFieldName(LPart2);
+      ALocalField := LPart1;
+    end
+    else
+    begin
+      AForeignField := NormalizeFieldName(LPart2);
+      ALocalField := LPart1;
+    end;
+  end;
+
+  // Process ALocalField: preserve alias only if NOT the main table identity (chained joins)
+  LIsMain := False;
+  if (AMainAlias <> '') and StartsText(AMainAlias + '.', ALocalField) then
+    LIsMain := True
+  else if (AMainTable <> '') and StartsText(AMainTable + '.', ALocalField) then
+    LIsMain := True;
+
+  if LIsMain then
+    ALocalField := NormalizeFieldName(ALocalField)
+  else if Pos('.', ALocalField) > 0 then
+    ALocalField := NormalizeFieldName(ALocalField, True)
+  else
+    ALocalField := NormalizeFieldName(ALocalField);
+
+  AForeignField := NormalizeFieldName(AForeignField);
+end;
+
 function BuildProjection(const AAST: IFluentSQLAST; AIsAggregation: Boolean = False): String;
 var
   LIdx: Integer;
@@ -395,10 +457,15 @@ var
   LSource: String;
   LProjected: TStringList;
   LStages: String;
+  LHasJoins: Boolean;
+  LColName: String;
+  LDotPos: Integer;
+  LTableAlias: String;
 begin
   if not Assigned(AAST.Select) then
     Exit('{}');
 
+  LHasJoins := Assigned(AAST.Joins) and (not AAST.Joins.IsEmpty);
   LProjected := TStringList.Create;
   try
     for LIdx := 0 to AAST.Select.Columns.Count - 1 do
@@ -419,24 +486,54 @@ begin
         Continue;
       end;
 
-      LField := NormalizeFieldName(LField);
-      if (LField = '') or SameText(LField, '*') then
+      LColName := NormalizeFieldName(LField);
+      if (LColName = '') or SameText(LColName, '*') then
         Continue;
 
       // Se houver ( e no for agregado, pula (pode ser subquery no suportada)
-      if (Pos('(', LField) > 0) and not (StartsText('AGG:', LField) or StartsText('SUM(', LField)) then
+      if (Pos('(', LColName) > 0) then
         Continue;
 
-      if LAlias = '' then LAlias := LField;
+      if LAlias = '' then LAlias := LColName;
 
       if AIsAggregation then
       begin
-        // Map _id back to field name if it was grouped
-        LSource := '$_id';
-        if AAST.GroupBy.Columns.Count > 1 then
-          LSource := '$_id.' + LField;
-
-        LProjected.Add(JsonString(LAlias) + ':' + JsonString(LSource));
+        if (AAST.GroupBy.Columns.Count > 0) then
+        begin
+          // Map _id back to field name if it was grouped
+          LSource := '$_id';
+          if AAST.GroupBy.Columns.Count > 1 then
+            LSource := '$_id.' + LColName;
+          
+          LProjected.Add(JsonString(LAlias) + ':' + JsonString(LSource));
+        end
+        else if LHasJoins then
+        begin
+        LDotPos := Pos('.', LField);
+        if LDotPos > 0 then
+        begin
+          LTableAlias := Copy(LField, 1, LDotPos - 1);
+          // If the alias refers to the main table and is not renamed, use :1
+          if (AAST.Select.TableNames.Count > 0) and SameText(LTableAlias, AAST.Select.TableNames[0].Alias) then
+          begin
+            if SameText(LAlias, LColName) then
+               LProjected.Add(JsonString(LAlias) + ':1')
+            else
+               LProjected.Add(JsonString(LAlias) + ':' + JsonString('$' + LColName));
+          end
+          else
+            LProjected.Add(JsonString(LAlias) + ':' + JsonString('$' + LTableAlias + '.' + LColName));
+        end
+        else
+        begin
+          if SameText(LAlias, LColName) then
+            LProjected.Add(JsonString(LAlias) + ':1')
+          else
+            LProjected.Add(JsonString(LAlias) + ':' + JsonString('$' + LColName));
+        end;
+      end
+      else
+        LProjected.Add(JsonString(LAlias) + ':1');
       end
       else
         LProjected.Add(JsonString(LAlias) + ':1');
@@ -498,7 +595,8 @@ begin
     Exit;
 
   if (Assigned(AAST.GroupBy) and (not AAST.GroupBy.Columns.IsEmpty)) or
-     (Assigned(AAST.Having) and (not AAST.Having.Expression.IsEmpty)) then
+     (Assigned(AAST.Having) and (not AAST.Having.Expression.IsEmpty)) or
+     (Assigned(AAST.Joins) and (not AAST.Joins.IsEmpty)) then
     Exit(True);
 
   for LIdx := 0 to AAST.Select.Columns.Count - 1 do
@@ -613,6 +711,14 @@ var
   LLimit: Integer;
   LSkip: Integer;
   LStages: String;
+  LJoin: IFluentSQLJoin;
+  LTargetTable: String;
+  LTargetAlias: String;
+  LLocalField: String;
+  LForeignField: String;
+  LMainAlias: String;
+  LMainTable: String;
+  LPreserve: String;
 begin
   LCollection := NormalizeFieldName(AAST.Select.TableNames[0].Name);
   if LCollection = '' then
@@ -624,8 +730,46 @@ begin
     if Assigned(AAST.Where) and not AAST.Where.Expression.IsEmpty then
       LPipeline.Add('{"$match":' + ParseExpressionToMongo(AAST, AAST.Where.Expression.Serialize) + '}');
 
+    // 1.1 $lookup / $unwind (Joins)
+    if Assigned(AAST.Joins) and (not AAST.Joins.IsEmpty) then
+    begin
+      for LIdx := 0 to AAST.Joins.Count - 1 do
+      begin
+        LJoin := AAST.Joins[LIdx] as IFluentSQLJoin;
+        LTargetTable := NormalizeFieldName(LJoin.JoinedTable.Name);
+        LTargetAlias := LJoin.JoinedTable.Alias;
+        if LTargetAlias = '' then LTargetAlias := LTargetTable;
+
+        LMainAlias := '';
+        LMainTable := '';
+        if Assigned(AAST.Select) and (AAST.Select.TableNames.Count > 0) then
+        begin
+          LMainAlias := AAST.Select.TableNames[0].Alias;
+          LMainTable := AAST.Select.TableNames[0].Name;
+        end;
+
+        ParseJoinCondition(LJoin.Condition.Serialize, LTargetAlias, LMainTable, LMainAlias, LLocalField, LForeignField);
+
+        LPipeline.Add('{"$lookup":{'
+          + '"from":' + JsonString(LTargetTable) + ','
+          + '"localField":' + JsonString(LLocalField) + ','
+          + '"foreignField":' + JsonString(LForeignField) + ','
+          + '"as":' + JsonString(LTargetAlias)
+          + '}}');
+
+        LPreserve := 'false';
+        if LJoin.JoinType = jtLEFT then LPreserve := 'true';
+
+        LPipeline.Add('{"$unwind":{'
+          + '"path":' + JsonString('$' + LTargetAlias) + ','
+          + '"preserveNullAndEmptyArrays":' + LPreserve
+          + '}}');
+      end;
+    end;
+
     // 2. $group
-    LPipeline.Add(BuildGroupStage(AAST));
+    if Assigned(AAST.GroupBy) and (not AAST.GroupBy.Columns.IsEmpty) then
+      LPipeline.Add(BuildGroupStage(AAST));
 
     // 3. $match (HAVING)
     if Assigned(AAST.Having) and not AAST.Having.Expression.IsEmpty then
@@ -854,15 +998,15 @@ var
   LLimit, LSkip: Integer;
   LIdx: Integer;
 begin
-  if (AAST.GroupBy.Columns.Count > 0) or _HasAggregates(AAST) then
+  if (AAST.GroupBy.Columns.Count > 0) or 
+     (Assigned(AAST.Joins) and (not AAST.Joins.IsEmpty)) or 
+     _HasAggregates(AAST) then
   begin
     Result := SerializeMongoAggregate(AAST);
     Exit;
   end;
 
   LCollection := '';
-  if AAST.Select.TableNames.Count > 0 then
-    Exit('');
 
   if (AAST.WithAlias <> '') or (AAST.UnionType <> '') then
     raise EFluentSQLMongoDBSerialize.Create('MongoDB serializer: CTE (WITH) and UNION/INTERSECT are not supported for dbnMongoDB');
