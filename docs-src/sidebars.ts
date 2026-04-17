@@ -45,6 +45,7 @@ const sidebars: SidebarsConfig = {
             'fluentsql/guides/ddl-alter-table-rename-column',
             'fluentsql/guides/ddl-alter-table-rename-table',
             'fluentsql/guides/cache-distribuido',
+            'fluentsql/guides/mongodb-support',
             'fluentsql/guides/ddl-create-index',
             'fluentsql/guides/ddl-drop-index',
             'fluentsql/guides/ddl-truncate-table',
