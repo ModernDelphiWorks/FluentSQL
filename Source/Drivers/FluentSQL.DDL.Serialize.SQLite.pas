@@ -78,31 +78,9 @@ end;
 
 function TFluentDDLSerializerSQLite.MapConstraints(const ACol: IFluentDDLColumn): string;
 begin
-  Result := '';
-  if ACol.DefaultValue <> '' then
-    Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue, ACol.LogicalType);
-  if ACol.NotNull then
-    Result := Result + ' NOT NULL';
-
-  if ACol.ConstraintName <> '' then
-    Result := Result + ' CONSTRAINT ' + Quote(ACol.ConstraintName);
-
-  if ACol.IsPrimaryKey then
-  begin
-    Result := Result + ' PRIMARY KEY';
-    if ACol.IsIdentity then
-      Result := Result + ' AUTOINCREMENT';
-  end;
-  if ACol.IsUnique then
-    Result := Result + ' UNIQUE';
-  if ACol.CheckCondition <> '' then
-    Result := Result + ' CHECK (' + ACol.CheckCondition + ')';
-  if ACol.ReferenceTable <> '' then
-  begin
-    Result := Result + ' REFERENCES ' + Quote(ACol.ReferenceTable);
-    if ACol.ReferenceColumn <> '' then
-      Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
-  end;
+  Result := inherited MapConstraints(ACol);
+  if ACol.IsPrimaryKey and ACol.IsIdentity then
+    Result := Result + ' AUTOINCREMENT';
 end;
 
 function TFluentDDLSerializerSQLite.GetDialect: TFluentSQLDriver;

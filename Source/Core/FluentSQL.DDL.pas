@@ -42,6 +42,8 @@ type
     FIdentityScope: TDDLIdentityScope;
     FReferenceTable: string;
     FReferenceColumn: string;
+    FOnDelete: TDDLReferentialAction;
+    FOnUpdate: TDDLReferentialAction;
     FDescription: string;
     FConstraintName: string;
   protected
@@ -63,6 +65,8 @@ type
     function GetIdentityScope: TDDLIdentityScope;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
     function GetDescription: string;
     function GetConstraintName: string;
     procedure SetNotNull(AValue: Boolean);
@@ -73,6 +77,8 @@ type
     procedure SetComputedBy(const AExpr: string);
     procedure SetIdentity(AValue: Boolean; AScope: TDDLIdentityScope = disAlways);
     procedure SetReferences(const ATableName, AColumnName: string);
+    procedure SetOnDelete(AAction: TDDLReferentialAction);
+    procedure SetOnUpdate(AAction: TDDLReferentialAction);
     procedure SetDescription(const AText: string);
   end;
 
@@ -85,6 +91,8 @@ type
     FCheckCondition: string;
     FReferenceTable: string;
     FReferenceColumn: string;
+    FOnDelete: TDDLReferentialAction;
+    FOnUpdate: TDDLReferentialAction;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -100,6 +108,10 @@ type
     function GetCheckCondition: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
+    procedure SetOnDelete(AAction: TDDLReferentialAction);
+    procedure SetOnUpdate(AAction: TDDLReferentialAction);
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
@@ -150,6 +162,9 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function ForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLBuilder;
     function Capped(ASize: Int64; AMaxDocs: Integer = 0): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
@@ -209,6 +224,8 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
     function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
@@ -783,6 +800,16 @@ begin
   Result := FReferenceColumn;
 end;
 
+function TFluentDDLColumn.GetOnDelete: TDDLReferentialAction;
+begin
+  Result := FOnDelete;
+end;
+
+function TFluentDDLColumn.GetOnUpdate: TDDLReferentialAction;
+begin
+  Result := FOnUpdate;
+end;
+
 function TFluentDDLColumn.GetDescription: string;
 begin
   Result := FDescription;
@@ -902,6 +929,30 @@ begin
   Result := FReferenceColumn;
 end;
 
+function TFluentDDLTableConstraint.GetOnDelete: TDDLReferentialAction;
+begin
+  Result := FOnDelete;
+end;
+
+function TFluentDDLTableConstraint.GetOnUpdate: TDDLReferentialAction;
+begin
+  Result := FOnUpdate;
+end;
+
+procedure TFluentDDLTableConstraint.SetOnDelete(AAction: TDDLReferentialAction);
+begin
+  if FConstraintType <> dctForeignKey then
+    raise EArgumentException.Create('DDL: .OnDelete can only be used on Foreign Key constraints.');
+  FOnDelete := AAction;
+end;
+
+procedure TFluentDDLTableConstraint.SetOnUpdate(AAction: TDDLReferentialAction);
+begin
+  if FConstraintType <> dctForeignKey then
+    raise EArgumentException.Create('DDL: .OnUpdate can only be used on Foreign Key constraints.');
+  FOnUpdate := AAction;
+end;
+
 function TFluentDDLTableConstraint.GetColumnCount: Integer;
 begin
   Result := Length(FColumns);
@@ -934,6 +985,20 @@ procedure TFluentDDLColumn.SetReferences(const ATableName, AColumnName: string);
 begin
   FReferenceTable := ATableName;
   FReferenceColumn := AColumnName;
+end;
+
+procedure TFluentDDLColumn.SetOnDelete(AAction: TDDLReferentialAction);
+begin
+  if FReferenceTable = '' then
+    raise EArgumentException.Create('DDL: .OnDelete requires a prior .References call.');
+  FOnDelete := AAction;
+end;
+
+procedure TFluentDDLColumn.SetOnUpdate(AAction: TDDLReferentialAction);
+begin
+  if FReferenceTable = '' then
+    raise EArgumentException.Create('DDL: .OnUpdate requires a prior .References call.');
+  FOnUpdate := AAction;
 end;
 
 procedure TFluentDDLColumn.SetDescription(const AText: string);
@@ -1164,6 +1229,30 @@ function TFluentDDLBuilder.References(const ATableName, AColumnName: string): IF
 begin
   if FColumns.Count > 0 then
     FColumns.Last.SetReferences(ATableName, AColumnName);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.ForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string): IFluentDDLBuilder;
+begin
+  FTableConstraints.Add(TFluentDDLTableConstraint.Create(AName, dctForeignKey, AColumn, ARefTable, ARefColumn));
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.OnDelete(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+begin
+  if FTableConstraints.Count > 0 then
+    FTableConstraints.Last.SetOnDelete(AAction)
+  else if FColumns.Count > 0 then
+    FColumns.Last.SetOnDelete(AAction);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.OnUpdate(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+begin
+  if FTableConstraints.Count > 0 then
+    FTableConstraints.Last.SetOnUpdate(AAction)
+  else if FColumns.Count > 0 then
+    FColumns.Last.SetOnUpdate(AAction);
   Result := Self;
 end;
 
@@ -1417,6 +1506,24 @@ function TFluentDDLAlterTableAddBuilder.References(const ATableName, AColumnName
 begin
   if FHasColumn then
     FColumn.SetReferences(ATableName, AColumnName);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.OnDelete(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasConstraint then
+    FConstraint.SetOnDelete(AAction)
+  else if FHasColumn then
+    FColumn.SetOnDelete(AAction);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.OnUpdate(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasConstraint then
+    FConstraint.SetOnUpdate(AAction)
+  else if FHasColumn then
+    FColumn.SetOnUpdate(AAction);
   Result := Self;
 end;
 

@@ -46,6 +46,7 @@ type
     function GetTableComment(const ATable: IFluentDDLTableDef): string; virtual;
     function GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string; virtual;
     function GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
+    function ReferentialActionToString(AAction: TDDLReferentialAction): string; virtual;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -102,6 +103,12 @@ begin
     Result := Result + ' REFERENCES ' + Quote(ACol.ReferenceTable);
     if ACol.ReferenceColumn <> '' then
       Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
+
+    if ACol.OnDelete <> raNoAction then
+      Result := Result + ' ON DELETE ' + ReferentialActionToString(ACol.OnDelete);
+
+    if ACol.OnUpdate <> raNoAction then
+      Result := Result + ' ON UPDATE ' + ReferentialActionToString(ACol.OnUpdate);
   end;
 end;
 
@@ -259,6 +266,12 @@ begin
       Result := Result + 'FOREIGN KEY (' + Quote(AConstraint.GetColumnName(0)) + ') REFERENCES ' + Quote(AConstraint.GetReferenceTable);
       if AConstraint.GetReferenceColumn <> '' then
         Result := Result + '(' + Quote(AConstraint.GetReferenceColumn) + ')';
+
+      if AConstraint.OnDelete <> raNoAction then
+        Result := Result + ' ON DELETE ' + ReferentialActionToString(AConstraint.OnDelete);
+
+      if AConstraint.OnUpdate <> raNoAction then
+        Result := Result + ' ON UPDATE ' + ReferentialActionToString(AConstraint.OnUpdate);
     end;
   end;
 end;
@@ -393,6 +406,18 @@ end;
 function TFluentDDLSerializeAbstract.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropFunction', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.ReferentialActionToString(AAction: TDDLReferentialAction): string;
+begin
+  case AAction of
+    raCascade: Result := 'CASCADE';
+    raSetNull: Result := 'SET NULL';
+    raSetDefault: Result := 'SET DEFAULT';
+    raRestrict: Result := 'RESTRICT';
+    raNoAction: Result := 'NO ACTION';
+    else Result := '';
+  end;
 end;
 
 end.
