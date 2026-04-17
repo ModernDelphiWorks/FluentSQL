@@ -27,6 +27,16 @@ type
     procedure TestMultipleGroupFields_GeneratesObjectId;
     [Test]
     procedure TestPaginationWithAggregate_GeneratesSkipLimitStages;
+    [Test]
+    procedure TestInnerJoin_GeneratesLookupAndUnwind;
+    [Test]
+    procedure TestLeftJoin_GeneratesLookupAndUnwindWithPreserveNulls;
+    [Test]
+    procedure TestMultipleJoins_GeneratesMultipleLookupStages;
+    [Test]
+    procedure TestChainedJoin_PreservesAliasInLocalField;
+    [Test]
+    procedure TestSimpleSelectRegression_ReturnsFindCommand;
   end;
 
 implementation
@@ -188,6 +198,88 @@ begin
 
   Assert.Contains(LResult, '{"$skip":10}');
   Assert.Contains(LResult, '{"$limit":5}');
+end;
+
+procedure TTestDMLMongoDB.TestInnerJoin_GeneratesLookupAndUnwind;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('o.id')
+    .Select('u.name')
+    .From('orders', 'o')
+    .InnerJoin('users', 'u').OnCond('o.userId = u.id')
+    .AsString;
+
+  Assert.Contains(LResult, '"aggregate":"orders"');
+  Assert.Contains(LResult, '"$lookup":{"from":"users","localField":"userId","foreignField":"id","as":"u"}');
+  Assert.Contains(LResult, '"$unwind":{"path":"$u","preserveNullAndEmptyArrays":false}');
+  Assert.Contains(LResult, '"$project":{"id":1,"name":"$u.name","_id":0}');
+end;
+
+procedure TTestDMLMongoDB.TestLeftJoin_GeneratesLookupAndUnwindWithPreserveNulls;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('p.name')
+    .Select('c.title')
+    .From('products', 'p')
+    .LeftJoin('categories', 'c').OnCond('p.categoryId = c.id')
+    .AsString;
+
+  Assert.Contains(LResult, '"$unwind":{"path":"$c","preserveNullAndEmptyArrays":true}');
+end;
+
+procedure TTestDMLMongoDB.TestMultipleJoins_GeneratesMultipleLookupStages;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('o.id')
+    .Select('u.name')
+    .Select('p.name').Alias('product_name')
+    .From('orders', 'o')
+    .InnerJoin('users', 'u').OnCond('o.userId = u.id')
+    .InnerJoin('products', 'p').OnCond('o.productId = p.id')
+    .AsString;
+
+  Assert.Contains(LResult, '"$lookup":{"from":"users"');
+  Assert.Contains(LResult, '"$lookup":{"from":"products"');
+  Assert.Contains(LResult, '"$project":{"id":1,"name":"$u.name","product_name":"$p.name","_id":0}');
+end;
+
+procedure TTestDMLMongoDB.TestChainedJoin_PreservesAliasInLocalField;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('o.id')
+    .Select('p.name')
+    .From('orders', 'o')
+    .InnerJoin('users', 'u').OnCond('o.userId = u.id')
+    .InnerJoin('profiles', 'p').OnCond('u.profileId = p.id')
+    .AsString;
+
+  // First join localField: userId (stripped 'o.')
+  Assert.Contains(LResult, '"$lookup":{"from":"users","localField":"userId","foreignField":"id","as":"u"}');
+  // Second join localField: u.profileId (preserved 'u.')
+  Assert.Contains(LResult, '"$lookup":{"from":"profiles","localField":"u.profileId","foreignField":"id","as":"p"}');
+end;
+
+procedure TTestDMLMongoDB.TestSimpleSelectRegression_ReturnsFindCommand;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('name')
+    .From('users')
+    .Where('id').Equal(1)
+    .AsString;
+
+  Assert.Contains(LResult, '"find":"users"');
+  Assert.Contains(LResult, '"filter":{"id":1}');
+  Assert.Contains(LResult, '"projection":{"name":1}');
 end;
 
 initialization
