@@ -7,6 +7,24 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-04-17
+
+### Added
+- **MongoDB — Aggregations & Joins (ESP-067, ESP-068, issues [#86], [#87]):** comprehensive SQL-to-MQL mapping for `GROUP BY`, `HAVING`, `INNER JOIN`, and `LEFT JOIN` (using `$lookup`, `$group`, `$unwind`, and `$project` stages).
+- **MongoDB — DDL Extensions (ESP-065, ESP-066, issues [#83], [#84], [#85]):** added support for Capped Collections, TTL Indexes, Index Management (Create/Drop), Collection Rename and Truncate.
+- **DDL — Core Expansion (issues [#67], [#68], [#69], [#70], [#71], [#72], [#73], [#74], [#75], [#79], [#82]):**
+  - Native Identity / Auto-Increment support and Advanced Identity (`ALWAYS`/`BY DEFAULT`) for PG, FB, and Oracle.
+  - Alter Column and Computed Columns support.
+  - Native CREATE/DROP VIEW and SEQUENCE support.
+  - Table and Column Comments support.
+  - Composite/Named Constraints and Alter Table constraint management.
+  - Dialect-specific support for MongoDB DDL.
+
+### Changed
+- **DDL — API Refactoring (issue [#80]):** transitioned DDL API to a "context-first" pattern to improve readability and consistency across dialects.
+- **Repository Strategy:** finalized test suite fragmentation to better handle dialect-specific integration tests.
+- **Documentation:** updated DDL guides and README to reflect the expanded feature set and new entry points.
+
 ## [1.3.0] — 2026-04-14
 
 ### Added
