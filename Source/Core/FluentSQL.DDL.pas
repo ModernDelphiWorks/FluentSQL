@@ -459,6 +459,108 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLProcedureBuilder = class(TInterfacedObject, IFluentDDLProcedureBuilder, IFluentDDLProcedureDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FParams: string;
+    FBody: string;
+    FOrReplace: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLProcedureDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetProcedureName: string;
+    function GetParams: string;
+    function GetBody: string;
+    function GetOrReplace: Boolean;
+    { IFluentDDLProcedureBuilder }
+    function Params(const AValue: string): IFluentDDLProcedureBuilder;
+    function Body(const AValue: string): IFluentDDLProcedureBuilder;
+    function OrReplace: IFluentDDLProcedureBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLDropProcedureBuilder = class(TInterfacedObject, IFluentDDLDropProcedureBuilder, IFluentDDLDropProcedureDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLDropProcedureDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetProcedureName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropProcedureBuilder }
+    function IfExists: IFluentDDLDropProcedureBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLTriggerBuilder = class(TInterfacedObject, IFluentDDLTriggerBuilder, IFluentDDLTriggerDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FTableName: string;
+    FEvent: TTriggerEvent;
+    FTime: TTriggerTime;
+    FBody: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLTriggerDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetEvent: TTriggerEvent;
+    function GetTime: TTriggerTime;
+    function GetBody: string;
+    { IFluentDDLTriggerBuilder }
+    function Table(const AValue: string): IFluentDDLTriggerBuilder;
+    function Before: IFluentDDLTriggerBuilder;
+    function After: IFluentDDLTriggerBuilder;
+    function OnInsert: IFluentDDLTriggerBuilder;
+    function OnUpdate: IFluentDDLTriggerBuilder;
+    function OnDelete: IFluentDDLTriggerBuilder;
+    function Body(const AValue: string): IFluentDDLTriggerBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLDropTriggerBuilder = class(TInterfacedObject, IFluentDDLDropTriggerBuilder, IFluentDDLDropTriggerDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FTableName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLDropTriggerDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropTriggerBuilder }
+    function OnTable(const AValue: string): IFluentDDLDropTriggerBuilder;
+    function IfExists: IFluentDDLDropTriggerBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLTriggerManagementBuilder = class(TInterfacedObject, IFluentDDLTriggerManagementBuilder, IFluentDDLTriggerManagementDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FTableName: string;
+    FEnabled: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName, ATriggerName: string; AEnabled: Boolean);
+    { IFluentDDLTriggerManagementDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetEnabled: Boolean;
+    { IFluentDDLTriggerManagementBuilder }
+    function AsString: string;
+  end;
+
   TFluentDDLTableDrop = class(TInterfacedObject, IFluentDDLTableDrop, IFluentDDLDropBuilder, IFluentDDLDropTableDef)
   strict private
     FDialect: TFluentSQLDriver;
@@ -506,6 +608,8 @@ type
     function Rename: IFluentDDLTableRename; overload;
     function Add: IFluentDDLAlterTableAddBuilder;
     function Alter: IFluentDDLTableAlter;
+    function EnableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function DisableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
   end;
 
   TFluentSchema = class(TInterfacedObject, IFluentSchema)
@@ -521,6 +625,12 @@ type
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
     function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
     function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
+    function CreateProcedure(const AName: string): IFluentDDLProcedureBuilder;
+    function DropProcedure(const AName: string): IFluentDDLDropProcedureBuilder;
+    function CreateTrigger(const AName: string): IFluentDDLTriggerBuilder;
+    function DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
+    function EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
   end;
 
 
@@ -2122,6 +2232,327 @@ begin
   end;
 end;
 
+{ TFluentDDLProcedureBuilder }
+
+constructor TFluentDDLProcedureBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FOrReplace := False;
+end;
+
+function TFluentDDLProcedureBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLProcedureBuilder.GetProcedureName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLProcedureBuilder.GetParams: string;
+begin
+  Result := FParams;
+end;
+
+function TFluentDDLProcedureBuilder.GetBody: string;
+begin
+  Result := FBody;
+end;
+
+function TFluentDDLProcedureBuilder.GetOrReplace: Boolean;
+begin
+  Result := FOrReplace;
+end;
+
+function TFluentDDLProcedureBuilder.Params(const AValue: string): IFluentDDLProcedureBuilder;
+begin
+  FParams := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLProcedureBuilder.Body(const AValue: string): IFluentDDLProcedureBuilder;
+begin
+  FBody := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLProcedureBuilder.OrReplace: IFluentDDLProcedureBuilder;
+begin
+  FOrReplace := True;
+  Result := Self;
+end;
+
+function TFluentDDLProcedureBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: procedure name is required');
+  if Trim(FBody) = '' then
+    raise EArgumentException.Create('DDL: procedure body is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateProcedure(Self as IFluentDDLProcedureDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropProcedureBuilder }
+
+constructor TFluentDDLDropProcedureBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropProcedureBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropProcedureBuilder.GetProcedureName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLDropProcedureBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropProcedureBuilder.IfExists: IFluentDDLDropProcedureBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropProcedureBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: procedure name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropProcedure(Self as IFluentDDLDropProcedureDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLTriggerBuilder }
+
+constructor TFluentDDLTriggerBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FEvent := teInsert;
+  FTime := ttAfter;
+end;
+
+function TFluentDDLTriggerBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLTriggerBuilder.GetTriggerName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLTriggerBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLTriggerBuilder.GetEvent: TTriggerEvent;
+begin
+  Result := FEvent;
+end;
+
+function TFluentDDLTriggerBuilder.GetTime: TTriggerTime;
+begin
+  Result := FTime;
+end;
+
+function TFluentDDLTriggerBuilder.GetBody: string;
+begin
+  Result := FBody;
+end;
+
+function TFluentDDLTriggerBuilder.Table(const AValue: string): IFluentDDLTriggerBuilder;
+begin
+  FTableName := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.Before: IFluentDDLTriggerBuilder;
+begin
+  FTime := ttBefore;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.After: IFluentDDLTriggerBuilder;
+begin
+  FTime := ttAfter;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.OnInsert: IFluentDDLTriggerBuilder;
+begin
+  FEvent := teInsert;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.OnUpdate: IFluentDDLTriggerBuilder;
+begin
+  FEvent := teUpdate;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.OnDelete: IFluentDDLTriggerBuilder;
+begin
+  FEvent := teDelete;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.Body(const AValue: string): IFluentDDLTriggerBuilder;
+begin
+  FBody := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: trigger name is required');
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: trigger table name is required');
+  if Trim(FBody) = '' then
+    raise EArgumentException.Create('DDL: trigger body is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateTrigger(Self as IFluentDDLTriggerDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropTriggerBuilder }
+
+constructor TFluentDDLDropTriggerBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetTriggerName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropTriggerBuilder.OnTable(const AValue: string): IFluentDDLDropTriggerBuilder;
+begin
+  FTableName := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLDropTriggerBuilder.IfExists: IFluentDDLDropTriggerBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropTriggerBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: trigger name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropTrigger(Self as IFluentDDLDropTriggerDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLTriggerManagementBuilder }
+
+constructor TFluentDDLTriggerManagementBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName, ATriggerName: string; AEnabled: Boolean);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FName := ATriggerName;
+  FEnabled := AEnabled;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetTriggerName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetEnabled: Boolean;
+begin
+  Result := FEnabled;
+end;
+
+function TFluentDDLTriggerManagementBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: trigger name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.ManageTrigger(Self as IFluentDDLTriggerManagementDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
 { TFluentDDLTableDrop }
 
 constructor TFluentDDLTableDrop.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -2235,6 +2666,16 @@ begin
   Result := TFluentDDLTableAlter.Create(FDialect, FTableName);
 end;
 
+function TFluentDDLTable.EnableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, FTableName, ATriggerName, True);
+end;
+
+function TFluentDDLTable.DisableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, FTableName, ATriggerName, False);
+end;
+
 { TFluentSchema }
 
 constructor TFluentSchema.Create(const ADialect: TFluentSQLDriver);
@@ -2280,6 +2721,36 @@ end;
 function TFluentSchema.DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
 begin
   Result := TFluentDDLDropSequenceBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.CreateProcedure(const AName: string): IFluentDDLProcedureBuilder;
+begin
+  Result := TFluentDDLProcedureBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropProcedure(const AName: string): IFluentDDLDropProcedureBuilder;
+begin
+  Result := TFluentDDLDropProcedureBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.CreateTrigger(const AName: string): IFluentDDLTriggerBuilder;
+begin
+  Result := TFluentDDLTriggerBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
+begin
+  Result := TFluentDDLDropTriggerBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, ATableName, ATriggerName, True);
+end;
+
+function TFluentSchema.DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, ATableName, ATriggerName, False);
 end;
 
 end.

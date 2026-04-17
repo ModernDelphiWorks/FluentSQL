@@ -52,6 +52,11 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; override;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; override;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
   end;
 
 implementation
@@ -327,6 +332,79 @@ end;
 function TFluentDDLSerializerMSSQL.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
 begin
   Result := inherited AlterTableDropConstraint(ADef);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR ALTER PROCEDURE ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'CREATE PROCEDURE ' + Quote(ADef.ProcedureName);
+
+  if ADef.Params <> '' then
+    Result := Result + ' ' + ADef.Params;
+
+  Result := Result + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMSSQL.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP PROCEDURE IF EXISTS ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'DROP PROCEDURE ' + Quote(ADef.ProcedureName);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+var
+  LEvent, LTime: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  case ADef.Event of
+    teInsert: LEvent := 'INSERT';
+    teUpdate: LEvent := 'UPDATE';
+    teDelete: LEvent := 'DELETE';
+  else
+    LEvent := 'INSERT';
+  end;
+
+  if ADef.Time = ttBefore then
+    LTime := 'FOR'
+  else
+    LTime := 'AFTER';
+
+  Result := 'CREATE TRIGGER ' + Quote(ADef.TriggerName) + ' ON ' + Quote(ADef.TableName) +
+            ' ' + LTime + ' ' + LEvent + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMSSQL.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP TRIGGER IF EXISTS ' + Quote(ADef.TriggerName)
+  else
+    Result := 'DROP TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerMSSQL.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.Enabled then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ENABLE TRIGGER ' + Quote(ADef.TriggerName)
+  else
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DISABLE TRIGGER ' + Quote(ADef.TriggerName);
 end;
 
 end.
