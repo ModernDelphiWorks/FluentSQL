@@ -16,6 +16,7 @@ uses
   {$ENDIF }
   DUnitX.TestFramework,
   test.ddl.mongodb in 'test.ddl.mongodb.pas',
+  test.dml.mongodb in 'test.dml.mongodb.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
   FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',
   FluentSQL.Cases in '..\..\Source\Core\FluentSQL.Cases.pas',
