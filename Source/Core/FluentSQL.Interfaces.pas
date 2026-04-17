@@ -810,9 +810,15 @@ type
     function GetColumn(AIndex: Integer): IFluentDDLColumn;
     function GetTableConstraintCount: Integer;
     function GetTableConstraint(AIndex: Integer): IFluentDDLTableConstraint;
+    function GetIsCapped: Boolean;
+    function GetCappedSize: Int64;
+    function GetCappedMax: Integer;
     function GetDescription: string;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
+    property IsCapped: Boolean read GetIsCapped;
+    property CappedSize: Int64 read GetCappedSize;
+    property CappedMax: Integer read GetCappedMax;
     property Description: string read GetDescription;
   end;
 
@@ -839,6 +845,7 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function Capped(ASize: Int64; AMaxDocs: Integer = 0): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
   end;
@@ -1047,10 +1054,12 @@ type
     function GetIsUnique: Boolean;
     function GetColumnCount: Integer;
     function GetColumnName(AIndex: Integer): string;
+    function GetExpireAfter: Integer;
     property Dialect: TFluentSQLDriver read GetDialect;
     property IndexName: string read GetIndexName;
     property TableName: string read GetTableName;
     property IsUnique: Boolean read GetIsUnique;
+    property ExpireAfter: Integer read GetExpireAfter;
   end;
 
   /// <summary>ESP-022: fluent builder for CREATE INDEX SQL text (one command per AsString).</summary>
@@ -1058,6 +1067,7 @@ type
     ['{B2D35F6A-C48E-5E9F-A1B2-3D4E5F6A7081}']
     function Column(const AName: string): IFluentDDLCreateIndexBuilder;
     function Unique: IFluentDDLCreateIndexBuilder;
+    function ExpireAfter(ASeconds: Integer): IFluentDDLCreateIndexBuilder;
     function AsString: string;
   end;
 

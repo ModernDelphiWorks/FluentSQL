@@ -109,6 +109,9 @@ type
     FDescription: string;
     FColumns: TObjectList<TFluentDDLColumn>;
     FTableConstraints: TObjectList<TFluentDDLTableConstraint>;
+    FIsCapped: Boolean;
+    FCappedSize: Int64;
+    FCappedMax: Integer;
     function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
     procedure _CheckPKDuplicity;
   public
@@ -121,6 +124,9 @@ type
     function GetColumn(AIndex: Integer): IFluentDDLColumn;
     function GetTableConstraintCount: Integer;
     function GetTableConstraint(AIndex: Integer): IFluentDDLTableConstraint;
+    function GetIsCapped: Boolean;
+    function GetCappedSize: Int64;
+    function GetCappedMax: Integer;
     function GetDescription: string;
     { IFluentDDLBuilder }
     function ColumnInteger(const AName: string): IFluentDDLBuilder;
@@ -144,6 +150,7 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function Capped(ASize: Int64; AMaxDocs: Integer = 0): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
   end;
@@ -276,6 +283,7 @@ type
     FTableName: string;
     FUnique: Boolean;
     FColumns: TList<string>;
+    FExpireAfter: Integer;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const AIndexName, ATableName: string);
     destructor Destroy; override;
@@ -286,9 +294,11 @@ type
     function GetIsUnique: Boolean;
     function GetColumnCount: Integer;
     function GetColumnName(AIndex: Integer): string;
+    function GetExpireAfter: Integer;
     { IFluentDDLCreateIndexBuilder }
     function Column(const AName: string): IFluentDDLCreateIndexBuilder;
     function Unique: IFluentDDLCreateIndexBuilder;
+    function ExpireAfter(ASeconds: Integer): IFluentDDLCreateIndexBuilder;
     function AsString: string;
   end;
 
@@ -787,6 +797,7 @@ begin
   FTableName := ATableName;
   FColumns := TObjectList<TFluentDDLColumn>.Create(True);
   FTableConstraints := TObjectList<TFluentDDLTableConstraint>.Create(True);
+  FIsCapped := False;
 end;
 
 destructor TFluentDDLBuilder.Destroy;
@@ -829,6 +840,21 @@ end;
 function TFluentDDLBuilder.GetDescription: string;
 begin
   Result := FDescription;
+end;
+ 
+function TFluentDDLBuilder.GetIsCapped: Boolean;
+begin
+  Result := FIsCapped;
+end;
+ 
+function TFluentDDLBuilder.GetCappedSize: Int64;
+begin
+  Result := FCappedSize;
+end;
+ 
+function TFluentDDLBuilder.GetCappedMax: Integer;
+begin
+  Result := FCappedMax;
 end;
 
 procedure TFluentDDLBuilder._CheckPKDuplicity;
@@ -988,6 +1014,14 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLBuilder.Capped(ASize: Int64; AMaxDocs: Integer): IFluentDDLBuilder;
+begin
+  FIsCapped := True;
+  FCappedSize := ASize;
+  FCappedMax := AMaxDocs;
+  Result := Self;
+end;
+ 
 function TFluentDDLBuilder.Description(const AText: string): IFluentDDLBuilder;
 begin
   if FColumns.Count > 0 then
@@ -1690,6 +1724,7 @@ begin
   FTableName := ATableName;
   FUnique := False;
   FColumns := TList<string>.Create;
+  FExpireAfter := 0;
 end;
 
 destructor TFluentDDLCreateIndexBuilder.Destroy;
@@ -1727,6 +1762,11 @@ function TFluentDDLCreateIndexBuilder.GetColumnName(AIndex: Integer): string;
 begin
   Result := FColumns[AIndex];
 end;
+ 
+function TFluentDDLCreateIndexBuilder.GetExpireAfter: Integer;
+begin
+  Result := FExpireAfter;
+end;
 
 function TFluentDDLCreateIndexBuilder.Column(const AName: string): IFluentDDLCreateIndexBuilder;
 begin
@@ -1745,6 +1785,12 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLCreateIndexBuilder.ExpireAfter(ASeconds: Integer): IFluentDDLCreateIndexBuilder;
+begin
+  FExpireAfter := ASeconds;
+  Result := Self;
+end;
+ 
 function TFluentDDLCreateIndexBuilder.AsString: string;
 var
   LSerializer: TFluentDDLSerialize;
