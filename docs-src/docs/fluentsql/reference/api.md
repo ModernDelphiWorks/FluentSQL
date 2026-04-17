@@ -3,7 +3,7 @@ displayed_sidebar: fluentsqlSidebar
 title: API reference
 ---
 
-Documentation aligned with release **v1.2.0** (2026-04-13): **ESP-034** (Advanced Constraints: NotNull, Default, PK), **ESP-035** (Foreign Keys), **ESP-032** (Redis Cache), plus DDL improvements from **v1.1.0** and **v1.1.1**. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
+Documentation aligned with release **v1.3.0** (2026-04-14), featuring Rename Table support and new entry points. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
 
 ## Main entry points
 
@@ -17,7 +17,7 @@ Documentation aligned with release **v1.2.0** (2026-04-13): **ESP-034** (Advance
 | DDL (`ALTER TABLE DROP`) | **`Schema(ADialect).AlterTableDrop('TABELA')`** devolve **`IFluentDDLAlterTableDropBuilder`**. Ver [DDL — ALTER TABLE DROP COLUMN](../guides/ddl-alter-table-drop-column.md). |
 | DDL (`RENAME COLUMN`) | **`Schema(ADialect).AlterTableRename('TABELA', 'ANTIGA', 'NOVA')`** (3 args) devolve **`IFluentDDLAlterTableRenameColumnBuilder`**. Ver [RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
 | DDL (`RENAME TABLE`) | **`Schema(ADialect).AlterTableRename('ANTIGA', 'NOVA')`** (2 args) devolve **`IFluentDDLAlterTableRenameTableBuilder`**. Ver [RENAME TABLE](../guides/ddl-alter-table-rename-table.md). |
-| **Constraints** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`**, **`.ComputedBy(AExpr)`** disponíveis após a definição de coluna no builder de DDL. |
+| **Constraints** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`** disponíveis após a definição de coluna no builder de DDL. |
 | **Foreign Keys** | **`.References('TABELA', 'COLUNA')`** disponível no builder de DDL; gera a cláusula REFERENCES. |
 | Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** fecha a linha corrente e inicia a próxima para **INSERT em lote**. |
 | Subquery em conjunto | `Union`, `UnionAll` e `Intersect` recebem `IFluentSQL` da ramificação secundária; a AST armazena `UnionType` e `UnionQuery`. |
@@ -31,25 +31,25 @@ Documentation aligned with release **v1.2.0** (2026-04-13): **ESP-034** (Advance
 
 ## Rules and contracts
 
-- **1:1 placeholders × Params:** a string retornada por `AsString` e os itens expostos em `Params` devem permanecer alinhados; a v0.2.0 reforça isso para operações de conjunto com remapeamento no ramo secundário (`FluentSQL.Serialize.pas`).
-- **`IN` / `NOT IN` (v1.0.3):** sobrecargas com **`TArray<String>`** ou **`TArray<Double>`** em `InValues` / `NotIn` emitem **um placeholder por elemento** (por exemplo `:p1`, `:p2`, … no Firebird; `?` repetidos no MySQL, na ordem de binding) e registram cada valor em `IFluentSQLParams`. Sobrecargas com **`String`** única tratam o argumento como **subconsulta ou expressão literal entre parênteses** (comportamento anterior preservado), sem expandir para múltiplos parâmetros de lista. Os operadores SQL normalizados na concatenação são **`IN`** e **`NOT IN`**. Ver `CHANGELOG.md` **[1.0.3]** e a issue [#19](https://github.com/ModernDelphiWorks/FluentSQL/issues/19); ressalvas pós-review em [#20](https://github.com/ModernDelphiWorks/FluentSQL/issues/20).
-- **`array of const` (v1.0.4, ESP-010):** sobrecargas em `FluentSQL.pas` (`Where`, `AndOpe`, `OrOpe`, `Having`, `OnCond`, `SetValue`, `Values`) e em `TFluentSQLCriteriaCase` em `FluentSQL.Cases.pas` (`When`, `AndOpe`, `OrOpe`) expandem **valores escalares** (inteiro, int64, extended, currency, boolean, variant numérico/data) para placeholders (`:pN` no AST; `?` conforme serializador) e `IFluentSQLParams`. Entradas **textuais** em `TVarRec` (identificadores, operadores `Char`, strings) permanecem **literais** na expressão (**RN-P3**). O overload **`CaseExpr(array of const)`** foi alinhado ao mesmo helper na **v1.0.7** (**ESP-013**); ver bullet seguinte. Ver `CHANGELOG.md` **[1.0.4]**, issue [#21](https://github.com/ModernDelphiWorks/FluentSQL/issues/21); helper **`TUtils.SqlArrayOfConstToParameterizedSql`**. Caveats: [#22](https://github.com/ModernDelphiWorks/FluentSQL/issues/22).
-- **`Column(array of const)` (v1.0.6, ESP-012):** `TFluentSQL.Column(const AColumnsName: array of const)` delega a **`SqlArrayOfConstToParameterizedSql`** com **`FAST.Params`**, alinhado a **ADR-009** / **ADR-011**; escalares na **projeção** viram placeholders em vez de literais concatenados. Ver `CHANGELOG.md` **[1.0.6]**, issue [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25); dívida técnica pós-caveats: [#26](https://github.com/ModernDelphiWorks/FluentSQL/issues/26).
-- **`CaseExpr(array of const)` (v1.0.7, ESP-013):** `TFluentSQL.CaseExpr(const AExpression: array of const)` delega a **`SqlArrayOfConstToParameterizedSql`** com **`FAST.Params`** antes de reutilizar o fluxo de **`CaseExpr(string)`**, alinhado a **ADR-009** / **ADR-011** / **ADR-012**; escalares na expressão discriminante do `CASE` viram placeholders; **strings** no array continuam fragmentos literais. Ver `CHANGELOG.md` **[1.0.7]** (rastreio da **ESP-013**; a issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27) no GitHub é **ESP-016**, não a entrega v1.0.7). Dívida técnica pós-caveats: [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28).
-- **Critérios e `Expression` (v1.0.5, ESP-011):** em `FluentSQL.Expression.pas`, `TFluentSQLCriteriaExpression` pode receber **`IFluentSQLParams`** (`FSQLParams`); com ela atribuída, sobrecargas `AndOpe` / `OrOpe` / `Ope` / `Fun` com `array of const` usam **`SqlArrayOfConstToParameterizedSql`**; sem coleção, mantêm **`SqlParamsToStr`** (retrocompatível). `TFluentSQL.Expression(string | array of const)` e integrações em Where/Having/Join passam **`FAST.Params`**; ramos de `CASE` instanciam critérios com **`FOwner.Params`**. **Strings** em `TVarRec` não são promovidas a bind (**ADR-011**). Ver `CHANGELOG.md` **[1.0.5]**, issue [#23](https://github.com/ModernDelphiWorks/FluentSQL/issues/23); caveats: [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24).
+- **1:1 placeholders × Params:** a string retornada por `AsString` e os itens expostos em `Params` devem permanecer alinhados para todas as operações, incluindo conjuntos (`UNION`, `INTERSECT`).
+- **`IN` / `NOT IN`:** sobrecargas com `TArray<String>` ou `TArray<Double>` emitem um placeholder por elemento e registram cada valor em `IFluentSQLParams`. Sobrecargas com `String` única tratam o argumento como subconsulta ou expressão literal entre parênteses.
+- **`array of const`:** sobrecargas em predicados e DML expandem valores escalares (inteiros, booleanos, variantes numéricos/data) para placeholders. Entradas textuais em `TVarRec` permanecem literais na expressão.
+- **`Column(array of const)`:** escalares na projeção tornam-se placeholders em vez de literais concatenados.
+- **`CaseExpr(array of const)`:** escalares na expressão discriminante do `CASE` tornam-se placeholders; strings no array continuam fragmentos literais.
+- **Critérios e `Expression`:** instâncias de critério podem ser associadas a `IFluentSQLParams`. Quando fornecidas com uma coleção, as sobrecargas `array of const` utilizam parametrização automática.
 - **Interfaces sobre tipos concretos:** consumo preferencial via interfaces definidas em `FluentSQL.Interfaces.pas`, conforme convenções do projeto.
-- **EXCEPT:** não documentado como operação de conjunto na interface citada nesta página; se for adicionado no futuro, deve seguir o mesmo contrato de parâmetros que `Union`/`Intersect`.
-- **INSERT em lote (v1.0.9, ESP-015, ADR-014):** em **`IFluentSQLInsert`** / **`TFluentSQLInsert`** (`FluentSQL.Insert.pas`), **`AddRow`** grava a linha corrente (pares em `Values` / `SetValue`) e abre uma linha vazia; exige **linha corrente não vazia** (caso contrário `EFluentSQLInsertBatch`). Ao serializar, a **última** linha pendente entra no resultado sem precisar de **`AddRow`** extra (*flush* implícito em **`AsString`**). SQL: `INSERT INTO … (colunas) VALUES (…), (…), …` com placeholders **na ordem linha a linha** (**ADR-009**), por exemplo `:p1,:p2` depois `:p3,:p4` no Firebird; `?,?,?,?` no MySQL. Colunas explícitas (`.Columns`) ou inferidas pela **primeira** linha serializada devem bater em **contagem e nomes** em todas as linhas (`EFluentSQLInsertBatch` em inconsistência). **`Clear`** na secção Insert zera tabela, colunas, linhas acumuladas e a linha corrente.
-- **Extensão por motor (ESP-016, ADR-016):** **`ForDialectOnly`** acrescenta fragmentos **opt-in** associados a um **`TFluentSQLDriver`**; só entram na string final quando o dialeto da instância coincide. Não substitui o núcleo portável por recursos “modernos” universais. Issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27). Ver o guia [Extensão explícita por motor](../guides/extensao-por-dialeto.md).
-- **MongoDB — INSERT em lote (v1.0.9):** com **`dbnMongoDB`**, uma linha lógica continua com **`insertOne`**; **mais de uma** linha produz **`insertMany`** com array **`documents`**, alinhado a **ADR-014** / **ADR-013**. Ver `CHANGELOG.md` **[1.0.9]**, issue [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31); dívida técnica pós-caveats: [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
-- **DDL (v1.1.0: ESP-017–ESP-019; v1.1.1: ESP-020 / ESP-022):** builders em `FluentSQL.DDL.pas` e serializers em `FluentSQL.DDL.Serialize.pas` emitem **apenas strings**; o FluentSQL não executa DDL. Dialetos não suportados levantam **`ENotSupportedException`** com mensagem estável referindo o âmbito da entrega (**ESP-017**–**ESP-022**).
+- **INSERT em lote:** em `IFluentSQLInsert`, `AddRow` grava a linha corrente e abre uma nova linha; exige que a linha corrente não esteja vazia. A última linha pendente é serializada automaticamente no `AsString` (flush implícito).
+- **Extensão por motor:** `ForDialectOnly` acrescenta fragmentos opt-in associados a um dialeto específico; estes fragmentos só entram na string final quando o dialeto da instância coincide.
+- **MongoDB — INSERT em lote:** com `dbnMongoDB`, o uso de múltiplas linhas através de `AddRow` produz um comando `insertMany` com um array de documentos.
+- **DDL:** builders e serializers para DDL emitem apenas strings SQL; o framework não realiza a execução dos comandos no banco de dados. Dialetos não suportados levantam `ENotSupportedException`.
 
 ## Suggested reading in code
 
 - `FluentSQL.Insert.pas` — `AddRow`, batch serialize, `EFluentSQLInsertBatch`.
-- `FluentSQL.pas` — set operations, merged `Params`, `InValues` / `NotIn`, `Column` / `CaseExpr` / `Expression`, `AddRow` delegation and ESP-032 (Cache).
-- `FluentSQL.DDL.pas` / `FluentSQL.DDL.Serialize.pas` — DDL builders and `DDLCreateTableSQL` / `DDLDropTableSQL` / `DDLAlterTableAddColumnSQL` / `DDLAlterTableDropColumnSQL` / `DDLAlterTableRenameColumnSQL` / `DDLCreateIndexSQL`.
-- `FluentSQL.Expression.pas` — `TFluentSQLCriteriaExpression`, `FSQLParams`, ESP-011.
+- `FluentSQL.pas` — `Query` and `Schema` entry points.
+- `FluentSQL.DDL.pas` — `TFluentSchema` and DDL builders.
+- `FluentSQL.DDL.SerializeAbstract.pas` — base DDL serialization logic.
+- `Source/Drivers/` — per-dialect serialization overrides.
 
 - `FluentSQL.Cases.pas` — `When` / `CASE` with `array of const`.
 - `FluentSQL.Operators.pas` — `IsIn` / `IsNotIn` (arrays vs string).

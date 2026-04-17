@@ -15,7 +15,7 @@
 | Funcionalidade | Estado |
 |----------------|--------|
 | DML fluente (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) | ✅ |
-| DDL fluente (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP coluna — conforme dialeto e entregas) | ✅ |
+| DDL fluente (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP/RENAME — conforme dialeto e entregas) | ✅ |
 | Serialização multi-dialeto (`dbn*`, `Source/Drivers/`) | ✅ |
 | Parametrização (`IFluentSQLParams`, placeholders `:pN` / `?`) | ✅ |
 | `UNION` / `UNION ALL` / `INTERSECT` com `Params` mesclados | ✅ |
@@ -53,7 +53,9 @@ O manifesto Boss na raiz **não** impõe dependências transitórias obrigatóri
 
 ---
 
-## Início rápido (DML)
+## Início rápido
+
+**DML (Consultas):**
 
 ```delphi
 uses FluentSQL;
@@ -63,17 +65,14 @@ var
 begin
   SQL := Query(dbnFirebird)
     .Select
-    .Column('ID')
-    .Column('NOME')
+    .Column('ID').Column('NOME')
     .From('CLIENTES')
     .Where('ATIVO').Equal(1)
     .AsString;
 end;
 ```
 
-O método `Query(dbnDialect)` é o ponto de entrada principal para operações **DML** (Select, Insert, Update, Delete). O atalho `TCQ(dbnDialect)` também está disponível por retrocompatibilidade.
-
-## Início rápido (DDL)
+**DDL (Definição de dados):**
 
 ```delphi
 uses FluentSQL;
@@ -82,15 +81,14 @@ var
   SQL: string;
 begin
   SQL := Schema(dbnPostgreSQL)
-    .CreateTable('PRODUTOS')
-      .Column('ID', dltInteger).NotNull.PrimaryKey
-      .Column('NOME', dltString, 100).NotNull
-      .Column('PRECO', dltNumeric, 12, 2).Default(0)
+    .CreateTable('USUARIOS')
+    .ColumnInteger('ID').PrimaryKey
+    .ColumnVarChar('NOME', 100).NotNull
     .AsString;
 end;
 ```
 
-O método `Schema(dbnDialect)` é o ponto de entrada para operações **DDL** (Create, Alter, Drop, Truncate).
+O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Para operações de definição de dados, utilize **`Schema(ADialect)`**. As fábricas legadas (`CreateFluentSQL`, `TCQ`, `CreateFluentDDLTable`, etc.) encontram-se obsoletas. Em código reutilizável, prefira as interfaces definidas em `FluentSQL.Interfaces`.
 
 ---
 
@@ -128,6 +126,7 @@ Projetos **DUnitX** em `Test Delphi/`:
 | `Firebird_tests/PTestFluentSQLFirebird.dpr` | Cenários principais (parametrização, multi-dialeto). |
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Exemplo mínimo. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
+
 
 **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Extensão por dialeto (fechamento ESP-016):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 

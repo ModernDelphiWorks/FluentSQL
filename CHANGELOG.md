@@ -7,6 +7,23 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-04-14
+
+### Added
+- **DDL — Rename Table Support (ESP-047, issue [#65]):** added `.AlterTableRename(const AOldName, ANewName: string)` to `Schema` API, with dialect-specific serialization for Firebird, PostgreSQL, MySQL, MSSQL (using `sp_rename`), and SQLite.
+- **DDL — GUID Type Support (ESP-043, issue [#63]):** centralized GUID literal translation and added support for GUID types in DDL column definitions.
+- **DDL — Logic Centralization (ESP-042, issue [#60]):** mandatory identifier quoting and refactored DDL serialization logic into a robust abstract layer.
+- **Core — Portability (ESP-046, issue [#64]):** removed `Winapi.Windows` dependency from `FluentSQL.DDL.pas` for better cross-platform support.
+
+### Fixed
+- **MSSQL — Boolean Serialization (issue [#62]):** fixed compatibility issues with boolean literal serialization in MSSQL environments.
+- **Pipeline — Root Cleanliness (issue [#64]):** enforced "no root pollution" policy, redirecting temporary artifacts to `.local-readonly/`.
+
+### Tests
+- DUnitX: `TTestDDLAlterTableRenameTable` coverage for all 5 core dialects.
+- Verified 157 passing tests in the Firebird suite.
+
+
 ## [1.2.0] — 2026-04-13
 
 ### Added

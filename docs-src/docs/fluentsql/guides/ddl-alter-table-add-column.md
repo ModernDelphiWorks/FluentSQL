@@ -9,7 +9,7 @@ A partir da entrega **ESP-019** / **ADR-019**, o FluentSQL gera **texto SQL** pa
 
 ## Ponto de entrada
 
-- **`CreateFluentDDLAlterTableAddColumn(ADialect, 'NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLAlterTableAddBuilder`** (`FluentSQL.Interfaces`).
+- **`Schema(ADialect).AlterTableAdd('NOME_TABELA')`** (unit `FluentSQL`), devolvendo **`IFluentDDLAlterTableAddBuilder`** (`FluentSQL.Interfaces`). Tambem suportado via `CreateFluentDDLAlterTableAddColumn`.
 
 Chame **um único** método `ColumnInteger`, `ColumnVarChar`, etc., encadeie as **Constraints Avançadas** (**ESP-034**) ou **Foreign Keys** (**ESP-035**) se necessário, e finalize com **`AsString`**. 
 
@@ -17,12 +17,12 @@ Chame **um único** método `ColumnInteger`, `ColumnVarChar`, etc., encadeie as 
 
 ```delphi
   // Adicionar coluna com NOT NULL e DEFAULT
-  LSql := CreateFluentDDLAlterTableAddColumn(dbnPostgreSQL, 'CLIENTES')
+  LSql := Schema(dbnPostgreSQL).AlterTableAdd('CLIENTES')
     .ColumnBoolean('VIP').NotNull.DefaultValue(False)
     .AsString;
 
   // Adicionar coluna que é uma Chave Estrangeira
-  LSql := CreateFluentDDLAlterTableAddColumn(dbnPostgreSQL, 'PEDIDOS')
+  LSql := Schema(dbnPostgreSQL).AlterTableAdd('PEDIDOS')
     .ColumnInteger('VENDEDOR_ID').References('VENDEDORES', 'ID')
     .AsString;
 ```
