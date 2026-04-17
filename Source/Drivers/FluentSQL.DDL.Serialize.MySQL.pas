@@ -54,6 +54,8 @@ type
     function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
     function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
   end;
 
 implementation
@@ -361,6 +363,29 @@ begin
     Result := Result + 'ALTER TRIGGER ' + Quote(ADef.TriggerName) + ' ENABLE'
   else
     Result := Result + 'ALTER TRIGGER ' + Quote(ADef.TriggerName) + ' DISABLE';
+end;
+
+function TFluentDDLSerializerMySQL.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    raise ENotSupportedException.Create('DDL MySQL: CREATE OR REPLACE FUNCTION is not supported (ADR-071); use DropFunction.IfExists first.');
+
+  Result := 'CREATE FUNCTION ' + Quote(ADef.FunctionName) + '(' + ADef.Params + ') ' +
+            'RETURNS ' + ADef.Returns + ' ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMySQL.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
+  else
+    Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
 end;
 
 end.

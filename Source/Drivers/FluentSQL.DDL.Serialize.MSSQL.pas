@@ -57,6 +57,8 @@ type
     function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
     function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
   end;
 
 implementation
@@ -405,6 +407,33 @@ begin
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ENABLE TRIGGER ' + Quote(ADef.TriggerName)
   else
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DISABLE TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR ALTER FUNCTION ' + Quote(ADef.FunctionName)
+  else
+    Result := 'CREATE FUNCTION ' + Quote(ADef.FunctionName);
+
+  if ADef.Params <> '' then
+    Result := Result + ' (' + ADef.Params + ')';
+
+  Result := Result + ' RETURNS ' + ADef.Returns + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMSSQL.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
+  else
+    Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
 end;
 
 end.

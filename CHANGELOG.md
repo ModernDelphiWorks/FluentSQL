@@ -12,6 +12,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 ### Added
 - **MongoDB — Aggregations & Joins (ESP-067, ESP-068, issues [#86], [#87]):** comprehensive SQL-to-MQL mapping for `GROUP BY`, `HAVING`, `INNER JOIN`, and `LEFT JOIN` (using `$lookup`, `$group`, `$unwind`, and `$project` stages).
 - **MongoDB — DDL Extensions (ESP-065, ESP-066, issues [#83], [#84], [#85]):** added support for Capped Collections, TTL Indexes, Index Management (Create/Drop), Collection Rename and Truncate.
+- **DDL — Procedural Support (ESP-070, ESP-071, issues [#134], [#135]):** added comprehensive support for Stored Procedures, Triggers, and Stored Functions across PostgreSQL, Firebird, MS SQL Server, and MySQL. Includes support for `OR REPLACE`, `IF EXISTS`, and trigger management (Enable/Disable).
 - **DDL — Core Expansion (issues [#67], [#68], [#69], [#70], [#71], [#72], [#73], [#74], [#75], [#79], [#82]):**
   - Native Identity / Auto-Increment support and Advanced Identity (`ALWAYS`/`BY DEFAULT`) for PG, FB, and Oracle.
   - Alter Column and Computed Columns support.
