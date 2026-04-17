@@ -63,6 +63,11 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; virtual;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; virtual;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; virtual;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; virtual;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; virtual;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; virtual;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; virtual;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; virtual;
   end;
 
 implementation
@@ -351,6 +356,31 @@ begin
   if not Assigned(ADef) or (ADef.ConstraintName = '') then
     Exit('');
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
+end;
+
+function TFluentDDLSerializeAbstract.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateProcedure', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropProcedure', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateTrigger', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropTrigger', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['ManageTrigger', Self.ClassName]);
 end;
 
 end.

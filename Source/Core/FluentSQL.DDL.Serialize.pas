@@ -45,6 +45,11 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; override;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; override;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
     function GetDialect: TFluentSQLDriver; override;
   end;
 
@@ -242,6 +247,66 @@ begin
   LReg := TFluentSQLRegister.Create;
   try
     Result := LReg.DDLSerialize(ADef.Dialect).AlterTableDropConstraint(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateProcedure(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropProcedure(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateTrigger(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropTrigger(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).ManageTrigger(ADef);
   finally
     LReg.Free;
   end;
