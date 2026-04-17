@@ -164,6 +164,13 @@ begin
   Result := Trim(Result);
 end;
 
+function MongoField(const AFieldName: String): String;
+begin
+  Result := NormalizeFieldName(AFieldName);
+  if (Result <> '') and (Result <> '*') and (Result[1] <> '$') then
+    Result := '$' + Result;
+end;
+
 function TryGetParamValue(const AAST: IFluentSQLAST; const AToken: String; out AValue: Variant): Boolean;
 var
   LParamName: String;
@@ -379,36 +386,75 @@ begin
   Result := ParseConditionToMongo(AAST, LExpr);
 end;
 
-function BuildProjectionForSelect(const ASelect: IFluentSQLSelect): String;
+function BuildProjection(const AAST: IFluentSQLAST; AIsAggregation: Boolean = False): String;
 var
   LIdx: Integer;
   LField: String;
+  LAlias: String;
   LFirst: Boolean;
-begin
-  if not Assigned(ASelect) then
-    Exit('{}');
-
-  Result := '{';
-  LFirst := True;
-  for LIdx := 0 to ASelect.Columns.Count - 1 do
-  begin
-    LField := NormalizeFieldName(ASelect.Columns[LIdx].Name);
-    if (LField = '') or SameText(LField, '*') or (Pos('(', LField) > 0) then
-      Continue;
-
-    if not LFirst then
-      Result := Result + ',';
-    Result := Result + JsonString(LField) + ':1';
-    LFirst := False;
-  end;
-  Result := Result + '}';
-end;
-
-function BuildProjection(const AAST: IFluentSQLAST): String;
+  LSource: String;
+  LProjected: TStringList;
+  LStages: String;
 begin
   if not Assigned(AAST.Select) then
     Exit('{}');
-  Result := BuildProjectionForSelect(AAST.Select);
+
+  LProjected := TStringList.Create;
+  try
+    for LIdx := 0 to AAST.Select.Columns.Count - 1 do
+    begin
+      LField := AAST.Select.Columns[LIdx].Name;
+      LAlias := AAST.Select.Columns[LIdx].Alias;
+
+      if AIsAggregation and (StartsText('AGG:', LField) or
+                             StartsText('SUM(', LField) or
+                             StartsText('COUNT(', LField) or
+                             StartsText('MIN(', LField) or
+                             StartsText('MAX(', LField) or
+                             StartsText('AVG(', LField) or
+                             StartsText('AVERAGE(', LField)) then
+      begin
+        if LAlias = '' then LAlias := 'agg' + IntToStr(LIdx);
+        LProjected.Add(JsonString(LAlias) + ':1');
+        Continue;
+      end;
+
+      LField := NormalizeFieldName(LField);
+      if (LField = '') or SameText(LField, '*') then
+        Continue;
+
+      // Se houver ( e no for agregado, pula (pode ser subquery no suportada)
+      if (Pos('(', LField) > 0) and not (StartsText('AGG:', LField) or StartsText('SUM(', LField)) then
+        Continue;
+
+      if LAlias = '' then LAlias := LField;
+
+      if AIsAggregation then
+      begin
+        // Map _id back to field name if it was grouped
+        LSource := '$_id';
+        if AAST.GroupBy.Columns.Count > 1 then
+          LSource := '$_id.' + LField;
+
+        LProjected.Add(JsonString(LAlias) + ':' + JsonString(LSource));
+      end
+      else
+        LProjected.Add(JsonString(LAlias) + ':1');
+    end;
+
+    if AIsAggregation then
+      LProjected.Add(JsonString('_id') + ':0');
+
+    LStages := '';
+    for LIdx := 0 to LProjected.Count - 1 do
+    begin
+      if LIdx > 0 then LStages := LStages + ',';
+      LStages := LStages + LProjected[LIdx];
+    end;
+    Result := '{' + LStages + '}';
+  finally
+    LProjected.Free;
+  end;
 end;
 
 function BuildSort(const AAST: IFluentSQLAST): String;
@@ -440,6 +486,188 @@ begin
     LFirst := False;
   end;
   Result := Result + '}';
+end;
+
+function IsAggregation(const AAST: IFluentSQLAST): Boolean;
+var
+  LIdx: Integer;
+  LName: String;
+begin
+  Result := False;
+  if not Assigned(AAST.Select) then
+    Exit;
+
+  if (Assigned(AAST.GroupBy) and (not AAST.GroupBy.Columns.IsEmpty)) or
+     (Assigned(AAST.Having) and (not AAST.Having.Expression.IsEmpty)) then
+    Exit(True);
+
+  for LIdx := 0 to AAST.Select.Columns.Count - 1 do
+  begin
+    LName := AAST.Select.Columns[LIdx].Name;
+    if StartsText('AGG:', LName) or
+       StartsText('SUM(', LName) or
+       StartsText('COUNT(', LName) or
+       StartsText('MIN(', LName) or
+       StartsText('MAX(', LName) or
+       StartsText('AVG(', LName) or
+       StartsText('AVERAGE(', LName) then
+      Exit(True);
+  end;
+end;
+
+function ParseAggregateToMongo(const AAgg: String): String;
+var
+  LParts: TArray<String>;
+  LFunc: String;
+  LField: String;
+  LTemp: String;
+begin
+  LTemp := AAgg;
+  if LTemp.ToUpper.StartsWith('AGG:') then
+  begin
+    LTemp := LTemp.Substring(4);
+    LParts := LTemp.Split([':']);
+  end
+  else
+  begin
+    // Format: FUNCTION(FIELD)
+    LParts := LTemp.Split(['(', ')']);
+  end;
+
+  if Length(LParts) < 2 then
+    Exit('{}');
+
+  LFunc := LParts[0].Trim;
+  LField := LParts[1].Trim;
+
+  if SameText(LFunc, 'COUNT') then
+    Result := '{"$sum":1}'
+  else if SameText(LFunc, 'SUM') then
+    Result := '{"$sum":' + JsonString(MongoField(LField)) + '}'
+  else if SameText(LFunc, 'MIN') then
+    Result := '{"$min":' + JsonString(MongoField(LField)) + '}'
+  else if SameText(LFunc, 'MAX') then
+    Result := '{"$max":' + JsonString(MongoField(LField)) + '}'
+  else if SameText(LFunc, 'AVG') or SameText(LFunc, 'AVERAGE') then
+    Result := '{"$avg":' + JsonString(MongoField(LField)) + '}'
+  else
+    Result := '{}';
+end;
+
+function BuildGroupStage(const AAST: IFluentSQLAST): String;
+var
+  LIdx: Integer;
+  LFirst: Boolean;
+  LId: String;
+  LField: String;
+  LAlias: String;
+  LName: String;
+begin
+  // Build _id
+  if AAST.GroupBy.Columns.Count = 0 then
+    LId := 'null'
+  else if AAST.GroupBy.Columns.Count = 1 then
+    LId := JsonString(MongoField(AAST.GroupBy.Columns[0].Name))
+  else
+  begin
+    LId := '{';
+    for LIdx := 0 to AAST.GroupBy.Columns.Count - 1 do
+    begin
+      if LIdx > 0 then LId := LId + ',';
+      LField := NormalizeFieldName(AAST.GroupBy.Columns[LIdx].Name);
+      LId := LId + JsonString(LField) + ':' + JsonString(MongoField(LField));
+    end;
+    LId := LId + '}';
+  end;
+
+  Result := '{"$group":{"_id":' + LId;
+
+  // Build accumulators from Select
+  for LIdx := 0 to AAST.Select.Columns.Count - 1 do
+  begin
+    LName := AAST.Select.Columns[LIdx].Name;
+    if StartsText('AGG:', LName) or
+       StartsText('SUM(', LName) or
+       StartsText('COUNT(', LName) or
+       StartsText('MIN(', LName) or
+       StartsText('MAX(', LName) or
+       StartsText('AVG(', LName) or
+       StartsText('AVERAGE(', LName) then
+    begin
+      LAlias := AAST.Select.Columns[LIdx].Alias;
+      if LAlias = '' then
+        LAlias := 'agg' + IntToStr(LIdx);
+      Result := Result + ',' + JsonString(LAlias) + ':' + ParseAggregateToMongo(LName);
+    end;
+  end;
+
+  Result := Result + '}}';
+end;
+
+function SerializeMongoAggregate(const AAST: IFluentSQLAST): String;
+var
+  LCollection: String;
+  LPipeline: TStringList;
+  LIdx: Integer;
+  LSort: String;
+  LLimit: Integer;
+  LSkip: Integer;
+  LStages: String;
+begin
+  LCollection := NormalizeFieldName(AAST.Select.TableNames[0].Name);
+  if LCollection = '' then
+    LCollection := Trim(AAST.Select.TableNames[0].Name);
+
+  LPipeline := TStringList.Create;
+  try
+    // 1. $match (WHERE)
+    if Assigned(AAST.Where) and not AAST.Where.Expression.IsEmpty then
+      LPipeline.Add('{"$match":' + ParseExpressionToMongo(AAST, AAST.Where.Expression.Serialize) + '}');
+
+    // 2. $group
+    LPipeline.Add(BuildGroupStage(AAST));
+
+    // 3. $match (HAVING)
+    if Assigned(AAST.Having) and not AAST.Having.Expression.IsEmpty then
+      LPipeline.Add('{"$match":' + ParseExpressionToMongo(AAST, AAST.Having.Expression.Serialize) + '}');
+
+    // 4. $project
+    LPipeline.Add('{"$project":' + BuildProjection(AAST, True) + '}');
+
+    // 5. $sort
+    LSort := BuildSort(AAST);
+    if LSort <> '' then
+      LPipeline.Add('{"$sort":' + LSort + '}');
+
+    // 6. $skip / 7. $limit
+    LSkip := -1;
+    LLimit := -1;
+    for LIdx := 0 to AAST.Select.Qualifiers.Count - 1 do
+      case AAST.Select.Qualifiers[LIdx].Qualifier of
+        sqFirst: LLimit := AAST.Select.Qualifiers[LIdx].Value;
+        sqSkip: LSkip := AAST.Select.Qualifiers[LIdx].Value;
+      end;
+
+    if LSkip >= 0 then
+      LPipeline.Add('{"$skip":' + IntToStr(LSkip) + '}');
+    if LLimit >= 0 then
+      LPipeline.Add('{"$limit":' + IntToStr(LLimit) + '}');
+
+    LStages := '';
+    for LIdx := 0 to LPipeline.Count - 1 do
+    begin
+      if LIdx > 0 then LStages := LStages + ',';
+      LStages := LStages + LPipeline[LIdx];
+    end;
+
+    Result := '{'
+      + JsonString('aggregate') + ':' + JsonString(LCollection) + ','
+      + JsonString('pipeline') + ':[' + LStages + '],'
+      + JsonString('cursor') + ':{}'
+      + '}';
+  finally
+    LPipeline.Free;
+  end;
 end;
 
 function BuildMongoDocumentFromNameValues(const AAST: IFluentSQLAST;
@@ -557,6 +785,31 @@ begin
     + '}}';
 end;
 
+function BuildProjectionForSelect(const ASelect: IFluentSQLSelect): String;
+var
+  LIdx: Integer;
+  LField: String;
+  LFirst: Boolean;
+begin
+  if not Assigned(ASelect) then
+    Exit('{}');
+
+  Result := '{';
+  LFirst := True;
+  for LIdx := 0 to ASelect.Columns.Count - 1 do
+  begin
+    LField := NormalizeFieldName(ASelect.Columns[LIdx].Name);
+    if (LField = '') or SameText(LField, '*') or (Pos('(', LField) > 0) then
+      Continue;
+
+    if not LFirst then
+      Result := Result + ',';
+    Result := Result + JsonString(LField) + ':1';
+    LFirst := False;
+  end;
+  Result := Result + '}';
+end;
+
 function FluentMongoSelectSerializeFragment(const ASelect: IFluentSQLSelect): String;
 var
   LCollection: String;
@@ -576,17 +829,39 @@ begin
     + '}';
 end;
 
+function _HasAggregates(const AAST: IFluentSQLAST): Boolean;
+var
+  LIdx: Integer;
+begin
+  Result := False;
+  for LIdx := 0 to AAST.Select.Columns.Count - 1 do
+    if StartsText('AGG:', AAST.Select.Columns[LIdx].Name) or
+       StartsText('SUM(', AAST.Select.Columns[LIdx].Name) or
+       StartsText('COUNT(', AAST.Select.Columns[LIdx].Name) or
+       StartsText('MIN(', AAST.Select.Columns[LIdx].Name) or
+       StartsText('MAX(', AAST.Select.Columns[LIdx].Name) or
+       StartsText('AVG(', AAST.Select.Columns[LIdx].Name) or
+       StartsText('AVERAGE(', AAST.Select.Columns[LIdx].Name) then
+      Exit(True);
+end;
+
 function TFluentSQLSerializerMongoDB.AsString(const AAST: IFluentSQLAST): String;
 var
   LCollection: String;
   LFilter: String;
   LProjection: String;
   LSort: String;
-  LLimit: Integer;
-  LSkip: Integer;
+  LLimit, LSkip: Integer;
   LIdx: Integer;
 begin
-  if not Assigned(AAST) then
+  if (AAST.GroupBy.Columns.Count > 0) or _HasAggregates(AAST) then
+  begin
+    Result := SerializeMongoAggregate(AAST);
+    Exit;
+  end;
+
+  LCollection := '';
+  if AAST.Select.TableNames.Count > 0 then
     Exit('');
 
   if (AAST.WithAlias <> '') or (AAST.UnionType <> '') then
@@ -602,6 +877,12 @@ begin
     Result := '{}'
   else
   begin
+    if IsAggregation(AAST) then
+    begin
+      Result := SerializeMongoAggregate(AAST);
+      Exit;
+    end;
+
     LCollection := NormalizeFieldName(AAST.Select.TableNames[0].Name);
     if LCollection = '' then
       LCollection := Trim(AAST.Select.TableNames[0].Name);
@@ -611,7 +892,7 @@ begin
     else
       LFilter := '{}';
 
-    LProjection := BuildProjection(AAST);
+    LProjection := BuildProjection(AAST, False);
     LSort := BuildSort(AAST);
     LLimit := -1;
     LSkip := -1;

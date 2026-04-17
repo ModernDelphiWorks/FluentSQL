@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-15
+**Última atualização:** 2026-04-17
 
 ## Como este roadmap evolui
 
@@ -109,8 +109,10 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-057** — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT) — delivered 2026-04-15.
 - [x] **ESP-058** — DDL Advanced Alter Table: Default Value & Rename Column Completion.
 - [x] **ESP-063** — DDL MongoDB (Collection Management) — delivered 2026-04-16.
-- [x] **ESP-064** — DDL MongoDB (Index Management).
-- [ ] **ESP-065** — DDL MongoDB (Rename & Truncate).
+- [x] **ESP-064** — DDL MongoDB (Index Management) — delivered 2026-04-17.
+- [x] **ESP-065** — DDL MongoDB (Rename & Truncate) — delivered 2026-04-17.
+- [x] **ESP-066** — DDL MongoDB (Phase 4 — Capped & TTL) — delivered 2026-04-17.
+- [x] **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having) — delivered 2026-04-17.
 - [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 
 ---
@@ -161,6 +163,9 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-17 | Entregue **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having). |
+| 2026-04-17 | Planeada **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having); **ADR-067** no pipeline. |
+| 2026-04-17 | Entregue **ESP-066** — DDL MongoDB Phase 4 (Capped & TTL). |
 | 2026-04-17 | Planeada **ESP-065** — DDL MongoDB Support Phase 3: Rename & Truncate; **ADR-065** no pipeline. |
 | 2026-04-17 | Entregue **ESP-064** — DDL MongoDB Support Phase 2: Index Management. |
 | 2026-04-16 | Entregue **ESP-063** — DDL MongoDB Support (Collection Management). |

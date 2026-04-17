@@ -138,8 +138,8 @@ var
 begin
   LResult := FluentSQL.Schema(dbnMongoDB)
     .Table('logs')
-    .Capped(1024 * 1024)
     .Create
+    .Capped(1024 * 1024)
     .AsString;
   Assert.AreEqual('{"create":"logs","capped":true,"size":1048576}', LResult);
 end;
@@ -150,8 +150,8 @@ var
 begin
   LResult := FluentSQL.Schema(dbnMongoDB)
     .Table('events')
-    .Capped(1024 * 1024, 5000)
     .Create
+    .Capped(1024 * 1024, 5000)
     .AsString;
   Assert.AreEqual('{"create":"events","capped":true,"size":1048576,"max":5000}', LResult);
 end;

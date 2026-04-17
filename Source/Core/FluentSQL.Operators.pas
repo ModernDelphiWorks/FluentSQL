@@ -88,18 +88,22 @@ type
     function IsNotEqual(const AValue: TGUID): String; overload;
     function IsGreaterThan(const AValue: Extended): String; overload;
     function IsGreaterThan(const AValue: Integer): String; overload;
+    function IsGreaterThan(const AValue: String): String; overload;
     function IsGreaterThan(const AValue: TDate): String; overload;
     function IsGreaterThan(const AValue: TDateTime): String; overload;
     function IsGreaterEqThan(const AValue: Extended): String; overload;
     function IsGreaterEqThan(const AValue: Integer): String; overload;
+    function IsGreaterEqThan(const AValue: String): String; overload;
     function IsGreaterEqThan(const AValue: TDate): String; overload;
     function IsGreaterEqThan(const AValue: TDateTime): String; overload;
     function IsLessThan(const AValue: Extended): String; overload;
     function IsLessThan(const AValue: Integer): String; overload;
+    function IsLessThan(const AValue: String): String; overload;
     function IsLessThan(const AValue: TDate): String; overload;
     function IsLessThan(const AValue: TDateTime): String; overload;
     function IsLessEqThan(const AValue: Extended): String; overload;
     function IsLessEqThan(const AValue: Integer) : String; overload;
+    function IsLessEqThan(const AValue: String) : String; overload;
     function IsLessEqThan(const AValue: TDate) : String; overload;
     function IsLessEqThan(const AValue: TDateTime) : String; overload;
     function IsNull: String;
@@ -373,9 +377,19 @@ begin
   Result := _CreateOperator('', AValue, fcGreaterEqual, dftInteger).AsString;
 end;
 
+function TFluentSQLOperators.IsGreaterEqThan(const AValue: String): String;
+begin
+  Result := _CreateOperator('', AValue, fcGreaterEqual, dftString).AsString;
+end;
+
 function TFluentSQLOperators.IsGreaterThan(const AValue: Integer): String;
 begin
   Result := _CreateOperator('', AValue, fcGreater, dftInteger).AsString;
+end;
+
+function TFluentSQLOperators.IsGreaterThan(const AValue: String): String;
+begin
+  Result := _CreateOperator('', AValue, fcGreater, dftString).AsString;
 end;
 
 function TFluentSQLOperators.IsIn(const AValue: String): String;
@@ -416,6 +430,16 @@ end;
 function TFluentSQLOperators.IsLessThan(const AValue: Integer): String;
 begin
   Result := _CreateOperator('', AValue, fcLess, dftInteger).AsString;
+end;
+
+function TFluentSQLOperators.IsLessThan(const AValue: String): String;
+begin
+  Result := _CreateOperator('', AValue, fcLess, dftString).AsString;
+end;
+
+function TFluentSQLOperators.IsLessEqThan(const AValue: String): String;
+begin
+  Result := _CreateOperator('', AValue, fcLessEqual, dftString).AsString;
 end;
 
 function TFluentSQLOperators.IsLike(const AValue: String): String;
