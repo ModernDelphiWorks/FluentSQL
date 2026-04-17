@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-13
+**Última atualização:** 2026-04-17
 
 ## Como este roadmap evolui
 
@@ -23,6 +23,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 
 - **Fase 0 (identidade / rebranding, âmbito consumidor):** encerrada no roadmap após auditoria **ESP-008** (evidências e matriz em `.claude/pipeline/implement-report.md`). Issue: [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17).
 - **Fase 2 — ESP-016 (extensão explícita por motor):** fecho formal verificado em **2026-04-09** (issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27)). **Fase 3 — DDL (ESP-017 … ESP-019):** entregues em **v1.1.0** (**2026-04-09**, `CHANGELOG.md`): `CREATE TABLE` (**ESP-017**, [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28)), `DROP TABLE` (**ESP-018**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29) / [#30](https://github.com/ModernDelphiWorks/FluentSQL/issues/30)), `ALTER TABLE ADD COLUMN` (**ESP-019**, [#31](https://github.com/ModernDelphiWorks/FluentSQL/issues/31)); guias em `docs-src`. **ESP-020** (`ALTER TABLE DROP COLUMN`, **ADR-020**, issue [#34](https://github.com/ModernDelphiWorks/FluentSQL/issues/34)):** implementação e documentação no repositório; `task.md` reconciliado com `review-report.md` / `test-report.md`; **próximo passo:** **`/develop`** e **`/release`** (entrada em `CHANGELOG`/versão — contrato do pipeline). **Retirado do roadmap de núcleo:** CTE genérico, window functions, `RETURNING` / `ON CONFLICT` / `EXCEPT` como promessa universal (ver **ADR-016** em `.claude/pipeline/adr.md`). **Fase 1:** batch INSERT (**ESP-015**) entregue (**CHANGELOG [1.0.9]**, [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24)); **ESP-014** Mongo entregue (**CHANGELOG [1.0.8]**, [#29](https://github.com/ModernDelphiWorks/FluentSQL/issues/29)).
+- **ESP-057 — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT):** entregue em **2026-04-15** (issue [#75](https://github.com/ModernDelphiWorks/FluentSQL/issues/75)). **ESP-059 — Documentation Refresh:** entregue em **2026-04-15** (issue [#77](https://github.com/ModernDelphiWorks/FluentSQL/issues/77)). **ESP-060 — Kanban Hygiene:** entregue em **2026-04-16** (issue #78).
+- **ESP-061 — DDL Advanced Identity Support (BY DEFAULT / ALWAYS):** /architect planeado na rodada 52.
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios (`implement-report.md`, etc.) para rastreio fino da esteira.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`).
 - **Visibilidade de execução (ESP-024):** especificação e ADR em `.claude/pipeline/esp.md` (**ESP-024**) e **ADR-024** em `adr.md`. Quadro executivo e pendências rastreáveis: [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) na raiz (versionado).
@@ -91,16 +93,28 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [ ] **ESP-026** — DDL alargado (6ª vertical): **`DROP INDEX IF EXISTS`** (opt-in na fluent API + serialização **Firebird** e **PostgreSQL**, **ADR-026**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
 - [ ] **ESP-027** — DDL alargado (7ª vertical): **`DROP INDEX CONCURRENTLY`** (PostgreSQL, **ADR-027**); testes em `test.ddl.pas` e guia em `docs-src`; issue [#42](https://github.com/ModernDelphiWorks/FluentSQL/issues/42); *ver `.claude/pipeline/esp.md` / `plan.md`.*
 - [ ] **ESP-028** — DDL alargado (8ª vertical): **`DROP INDEX … ON …` (MySQL / MariaDB)** (**ADR-028**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação + QA **[#43](https://github.com/ModernDelphiWorks/FluentSQL/issues/43)**; entrega versionada via **`/release`**.
-- [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entrega versionada via **`/release`**.
-- [ ] **ESP-030** — DDL alargado (10ª vertical): **`ALTER TABLE … RENAME COLUMN`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-030**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* implementação no repositório; issue [#45](https://github.com/ModernDelphiWorks/FluentSQL/issues/45); entrega versionada via **`/release`**.
-- [ ] **ESP-031** — DDL alargado (11ª vertical): **`ALTER TABLE … RENAME TO …`** (renomear **tabela**; API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-031**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.*
-- [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (API fluente + serialização Firebird e PostgreSQL, **ADR-034**); integração no builder base e testes em `test.ddl.pas`.
-- [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (API fluente + serialização Firebird e PostgreSQL, **ADR-035**); suporte a chaves estrangeiras no builder de DDL e testes em `test.ddl.pas`.
-- [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído; arquitetura desacoplada e API Hub `FluentSQL.Schema` implementada).
-- [x] **ESP-036** — Advanced DDL: **Unique & Check Constraints** (Concluído; suporte universal FB/PG/MySQL).
-- [x] **ESP-040** — DDL Support: **SQLite** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE — entregue 2026-04-13).
-- [x] **ESP-041** — DDL Support: **MS SQL Server** (Concluído; suporte completo a CREATE, DROP, ALTER, INDEX e TRUNCATE via `sp_rename` — entregue 2026-04-13).
-- [ ] DDL Fluente (âmbito alargado): `ALTER TABLE` (além de ADD/DROP column, **RENAME COLUMN** e **renomear tabela**), restantes índices/alterações e extensões ainda não cobertas por ESP dedicadas (avaliar portabilidade; o que for estritamente específico de um motor → **ESP-016** ou app). *Nota: `DROP TABLE` — **ESP-018**; **ADD COLUMN** — **ESP-019**; **DROP COLUMN** — **ESP-020**; **CREATE INDEX** — **ESP-022**; **DROP INDEX** — **ESP-025**; **`IF EXISTS` em `DROP INDEX`** — **ESP-026**; **`CONCURRENTLY` (PG)** — **ESP-027**; **`ON table` (MySQL)** — **ESP-028**; **`TRUNCATE TABLE`** — **ESP-029**; **`RENAME COLUMN`** — **ESP-030**; **renomear tabela (`RENAME TO`)** — **ESP-031**; **Advanced Constraints** — **ESP-034**; **Foreign Keys** — **ESP-035**; **Unique/Check** — **ESP-036**; **Refactor Drivers** — **ESP-037**; esta linha cobre o restante alargamento.*
+- [ ] **ESP-029** — DDL alargado (9ª vertical): **`TRUNCATE TABLE`** (API fluente + **PostgreSQL** / **Firebird** / **MySQL**, **ADR-029**); testes em `test.ddl.pas` e guia em `docs-src`; *ver `.claude/pipeline/esp.md` / `plan.md`.* *Estado:* código no repositório; issue [#44](https://github.com/ModernDelphiWorks/FluentSQL/issues/44); entregue.
+- [x] **ESP-051** — DDL alargado (14ª vertical): **Identity / Auto-Increment** (Concluído).
+- [x] **ESP-034** — Advanced DDL: **NotNull, Default e Primary Keys** (Concluído).
+- [x] **ESP-035** — DDL Foreign Keys: **References & FKs** (Concluído).
+- [x] **ESP-037** — DDL Architecture: **Driver-based Serialization** (Concluído).
+- [x] **ESP-036** — Advanced DDL: **Unique & Check Constraints** (Concluído).
+- [x] **ESP-040** — DDL Support: **SQLite** (Concluído).
+- [x] **ESP-041** — DDL Support: **MS SQL Server** (Concluído).
+- [x] **ESP-049** — DDL alargado (13ª vertical): **Computed Columns** (Concluído).
+- [x] **ESP-053** — DDL View Support (CREATE/DROP VIEW) — delivered 2026-04-15.
+- [x] **ESP-054** — DDL Sequence Support (CREATE/DROP SEQUENCE) — delivered 2026-04-15.
+- [x] **ESP-055** — DDL Advanced Constraints (Composite Keys & Named Constraints) — delivered 2026-04-15.
+- [x] **ESP-056** — DDL Index Management (CREATE/DROP INDEX, Unified) — delivered 2026-04-15.
+- [x] **ESP-057** — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT) — delivered 2026-04-15.
+- [x] **ESP-058** — DDL Advanced Alter Table: Default Value & Rename Column Completion.
+- [x] **ESP-063** — DDL MongoDB (Collection Management) — delivered 2026-04-16.
+- [x] **ESP-064** — DDL MongoDB (Index Management) — delivered 2026-04-17.
+- [x] **ESP-065** — DDL MongoDB (Rename & Truncate) — delivered 2026-04-17.
+- [x] **ESP-066** — DDL MongoDB (Phase 4 — Capped & TTL) — delivered 2026-04-17.
+- [x] **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having) — delivered 2026-04-17.
+- [ ] **ESP-068** — SQL-to-MQL Translation: Joins ($lookup).
+- [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 
 ---
 
@@ -150,6 +164,32 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-17 | Entregue **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having). |
+| 2026-04-17 | Planeada **ESP-068** — SQL-to-MQL Translation: Joins ($lookup); **ADR-068** no pipeline. |
+| 2026-04-17 | Planeada **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having); **ADR-067** no pipeline. |
+| 2026-04-17 | Entregue **ESP-066** — DDL MongoDB Phase 4 (Capped & TTL). |
+| 2026-04-17 | Planeada **ESP-065** — DDL MongoDB Support Phase 3: Rename & Truncate; **ADR-065** no pipeline. |
+| 2026-04-17 | Entregue **ESP-064** — DDL MongoDB Support Phase 2: Index Management. |
+| 2026-04-16 | Entregue **ESP-063** — DDL MongoDB Support (Collection Management). |
+| 2026-04-16 | Entregue **ESP-060** — Kanban Hygiene & README Cleanup. | `.claude/pipeline/implement-report.md` |
+| 2026-04-16 | Entregue **ESP-061** — DDL Advanced Identity Support (BY DEFAULT / ALWAYS). | `.claude/pipeline/implement-report.md`, `.claude/pipeline/test-report.md` |
+| 2026-04-15 | Entregue **ESP-059** — Documentation Refresh: Modern API Patterns (Query & Schema). | `.claude/pipeline/implement-report.md` |
+| 2026-04-15 | Planeada **ESP-058** — DDL Advanced Alter Table: Default Value & Rename Column Completion; **ADR-058** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-057** — DDL Alter Table: Constraint Management; validado na rodada 48. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-056** — DDL Index Management (CREATE/DROP INDEX); validado na rodada 47. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-055** — DDL Advanced Constraints (Composite Keys & Named Constraints); validado na rodada 46. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-054** — DDL Sequence Support; validado na rodada 45. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-053** — DDL View Support (CREATE/DROP VIEW); validado na rodada 44. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Entregue **ESP-052** — DDL Table and Column Comments Support; validado na rodada 43. | `.claude/pipeline/develop-report.md` |
+| 2026-04-15 | Planeada **ESP-052** — DDL Table and Column Comments Support; **ADR-052** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-051** — DDL Identity / Auto-Increment Support; validado na rodada 42. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Planeada **ESP-051** — Identity / Auto-Increment Support; **ADR-051** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-050** — Advanced DDL: Alter Column (Re-work); validado na rodada 41. | `.claude/pipeline/implement-report.md`, `test-report.md` |
+| 2026-04-15 | Planeada **ESP-050** — Advanced DDL: Alter Column (Re-work); **ADR-050** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-15 | Entregue **ESP-049** — Advanced DDL: Computed Columns Support (FB/PG/MySQL/MSSQL). | `.claude/pipeline/implement-report.md` |
+| 2026-04-15 | Planeada **ESP-049** — Advanced DDL: Computed Columns; **ADR-049** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-14 | Planeada **ESP-048** — Advanced DDL: Alter Column; **ADR-048** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
+| 2026-04-14 | Entregue **ESP-047** — Advanced DDL: Rename Table Support (incl. MSSQL/SQLite). | `CHANGELOG.md` [1.3.0] |
 | 2026-04-14 | Planeada **ESP-045** — Estabilização de Literais DDL (Date, GUID); **ADR-045** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Planeada **ESP-040** — DDL Support for SQLite; **ADR-040** no pipeline. | `.claude/pipeline/esp.md`, `adr.md`, `plan.md`, `task-input.md` |
 | 2026-04-13 | Entregue **ESP-039** — Refatoração de Entrypoints (Query/Func); **ESP-038** — Cleanup Global Functions DDL. | `.claude/pipeline/implement-report.md` |

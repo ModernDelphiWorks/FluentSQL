@@ -92,7 +92,7 @@ procedure TTestFluentSQLFunctionsMSSQL.TestYearWhere;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (YEAR(NASCTO) = 9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (YEAR(NASCTO) = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
@@ -118,7 +118,7 @@ procedure TTestFluentSQLFunctionsMSSQL.TestMonthWhere;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (MONTH(NASCTO) = 9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (MONTH(NASCTO) = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
@@ -194,7 +194,7 @@ procedure TTestFluentSQLFunctionsMSSQL.TestConcatWhere;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT CONCAT(''-'', NOME) FROM CLIENTES WHERE (CONCAT(''-'', NOME) = ''-NOME'')';
+  LAsString := 'SELECT CONCAT(''-'', NOME) FROM CLIENTES WHERE (CONCAT(''-'', NOME) = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                  .Select
                                  .Column.Concat(['''-''', 'NOME'])
@@ -220,12 +220,12 @@ procedure TTestFluentSQLFunctionsMSSQL.TestDate;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE NASCTO = ''02/11/2020''';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (NASCTO = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                  .Select
                                  .All
                                  .From('CLIENTES')
-                                 .Where.Date('NASCTO').Equal.Date('''02/11/2020''')
+                                 .Where.Date('NASCTO').Equal('''02/11/2020''')
                                  .AsString);
 end;
 
@@ -245,7 +245,7 @@ procedure TTestFluentSQLFunctionsMSSQL.TestDayWhere;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (DAY(NASCTO) = 9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (DAY(NASCTO) = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All

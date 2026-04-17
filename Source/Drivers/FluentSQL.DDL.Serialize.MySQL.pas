@@ -27,23 +27,54 @@ uses
 type
   TFluentDDLSerializerMySQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
+    function MapConstraints(const ACol: IFluentDDLColumn): string; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
     function AlterTableAddColumn(const ADef: IFluentDDLAlterTableAddColumnDef): string; override;
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; override;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
   end;
 
 implementation
 
 { TFluentDDLSerializerMySQL }
+
+function TFluentDDLSerializerMySQL.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.ComputedExpression <> '' then
+    Result := ' AS (' + ACol.ComputedExpression + ') VIRTUAL';
+end;
+
+function TFluentDDLSerializerMySQL.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+  if ACol.IsIdentity then
+    Result := ' AUTO_INCREMENT';
+end;
+
+function TFluentDDLSerializerMySQL.MapConstraints(const ACol: IFluentDDLColumn): string;
+begin
+  Result := inherited MapConstraints(ACol);
+  if ACol.Description <> '' then
+    Result := Result + ' COMMENT ' + QuotedStr(ACol.Description);
+end;
 
 function TFluentDDLSerializerMySQL.Quote(const AName: string): string;
 begin
@@ -57,15 +88,15 @@ begin
   Result := dbnMySQL;
 end;
 
-function TFluentDDLSerializerMySQL.MapLogicalType(const ACol: IFluentDDLColumn): string;
+function TFluentDDLSerializerMySQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
 begin
-  case ACol.LogicalType of
+  case AType of
     dltInteger:
       Result := 'INT';
     dltBigInt:
       Result := 'BIGINT';
     dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(ACol.TypeArg) + ')';
+      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
     dltBoolean:
       Result := 'BOOLEAN';
     dltDate:
@@ -90,7 +121,10 @@ begin
   if ADef.GetColumnCount <= 0 then
     raise EArgumentException.Create('DDL: empty column list');
 
-  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + ')';
+  Result := 'CREATE TABLE ' + Quote(ADef.TableName) + ' (' + GetColumnDefinitionList(ADef) + GetTableConstraintList(ADef) + ')';
+  
+  if ADef.Description <> '' then
+    Result := Result + ' COMMENT = ' + QuotedStr(ADef.Description);
 end;
 
 function TFluentDDLSerializerMySQL.DropTable(const ADef: IFluentDDLDropTableDef): string;
@@ -136,6 +170,39 @@ begin
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' RENAME COLUMN ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
 end;
 
+function TFluentDDLSerializerMySQL.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+var
+  LType: string;
+  LBase: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LBase := 'ALTER TABLE ' + Quote(ADef.TableName);
+
+  if ADef.DefaultSet or ADef.DefaultDropped then
+  begin
+    Result := LBase + ' ALTER COLUMN ' + Quote(ADef.ColumnName);
+    if ADef.DefaultDropped then
+      Result := Result + ' DROP DEFAULT'
+    else
+      Result := Result + ' SET DEFAULT ' + GetLiteralValue(ADef.DefaultValue, ADef.LogicalType);
+  end
+  else
+  begin
+    if not ADef.TypeChanged then
+      raise EArgumentException.Create('DDL MySQL: column type must be restated during ALTER COLUMN (MODIFY COLUMN).');
+
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    Result := LBase + ' MODIFY COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
+
+    if ADef.NotNull then
+      Result := Result + ' NOT NULL'
+    else
+      Result := Result + ' NULL';
+  end;
+end;
+
 
 
 function TFluentDDLSerializerMySQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
@@ -176,6 +243,52 @@ begin
     raise ENotSupportedException.Create(
       'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
   Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if ADef.OrReplace then
+    Result := 'CREATE OR REPLACE VIEW ' + Quote(ADef.ViewName) + ' AS ' + ADef.Query.AsString
+  else
+    Result := 'CREATE VIEW ' + Quote(ADef.ViewName) + ' AS ' + ADef.Query.AsString;
+end;
+
+function TFluentDDLSerializerMySQL.DropView(const ADef: IFluentDDLDropViewDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  if ADef.IfExists then
+    Result := 'DROP VIEW IF EXISTS ' + Quote(ADef.ViewName)
+  else
+    Result := 'DROP VIEW ' + Quote(ADef.ViewName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+begin
+  raise ENotSupportedException.Create('DDL MySQL: sequences are not supported (use AUTO_INCREMENT on columns instead; ADR-054).');
+end;
+
+function TFluentDDLSerializerMySQL.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+begin
+  raise ENotSupportedException.Create('DDL MySQL: sequences are not supported (ADR-054).');
+end;
+
+function TFluentDDLSerializerMySQL.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  Result := inherited AlterTableAddConstraint(ADef);
+end;
+
+function TFluentDDLSerializerMySQL.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  if not Assigned(ADef) or (ADef.ConstraintName = '') then
+    Exit('');
+  // ESP-057: special handling for PK drop in MySQL
+  if SameText(ADef.ConstraintName, 'PRIMARY') then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP PRIMARY KEY'
+  else
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
 end;
 
 end.
