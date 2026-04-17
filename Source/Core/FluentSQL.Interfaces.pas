@@ -782,6 +782,9 @@ type
     dctForeignKey
   );
 
+  /// <summary>ESP-072: referential actions for Foreign Keys.</summary>
+  TDDLReferentialAction = (raNoAction, raCascade, raSetNull, raSetDefault, raRestrict);
+
   /// <summary>ESP-055: represents a composite or named constraint at the table level.</summary>
   IFluentDDLTableConstraint = interface
     ['{6E7F8A91-0B1C-2D3E-4F5A-B61C8D9E0F1A}']
@@ -792,8 +795,12 @@ type
     function GetCheckCondition: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
     property Name: string read GetName;
     property ConstraintType: TDDLConstraintType read GetConstraintType;
+    property OnDelete: TDDLReferentialAction read GetOnDelete;
+    property OnUpdate: TDDLReferentialAction read GetOnUpdate;
   end;
 
   IFluentDDLColumn = interface
@@ -812,6 +819,8 @@ type
     function GetIdentityScope: TDDLIdentityScope;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
     function GetDescription: string;
     /// <summary>ESP-055: optional explicit name for inline constraints (PK, UNIQUE, CHECK).</summary>
     function GetConstraintName: string;
@@ -828,6 +837,8 @@ type
     property IdentityScope: TDDLIdentityScope read GetIdentityScope;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
+    property OnDelete: TDDLReferentialAction read GetOnDelete;
+    property OnUpdate: TDDLReferentialAction read GetOnUpdate;
     property Description: string read GetDescription;
     property ConstraintName: string read GetConstraintName;
   end;
@@ -875,6 +886,9 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function ForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLBuilder;
     function Capped(ASize: Int64; AMaxDocs: Integer = 0): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
@@ -933,6 +947,8 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function AddUnique(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
