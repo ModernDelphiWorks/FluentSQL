@@ -35,9 +35,17 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; override;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; override;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; override;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; override;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; override;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; override;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; override;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; override;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function GetDialect: TFluentSQLDriver; override;
   end;
 
 implementation
@@ -119,6 +127,18 @@ begin
   end;
 end;
 
+function TFluentDDLSerialize.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableAlterColumn(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
 function TFluentDDLSerialize.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
 var
   LReg: TFluentSQLRegister;
@@ -153,6 +173,83 @@ begin
   finally
     LReg.Free;
   end;
+end;
+
+function TFluentDDLSerialize.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateView(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.DropView(const ADef: IFluentDDLDropViewDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropView(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateSequence(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropSequence(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableAddConstraint(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).AlterTableDropConstraint(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.GetDialect: TFluentSQLDriver;
+begin
+  raise EAbstractError.Create('TFluentDDLSerialize is a proxy; it has no specific dialect. Use a concrete driver.');
 end;
 
 end.

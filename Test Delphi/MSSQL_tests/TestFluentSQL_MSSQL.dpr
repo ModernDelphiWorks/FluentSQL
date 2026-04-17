@@ -3,6 +3,12 @@ program TestFluentSQL_MSSQL;
 {$IFNDEF TESTINSIGHT}
 {$APPTYPE CONSOLE}
 {$ENDIF}{$STRONGLINKTYPES ON}
+{$DEFINE MSSQL}
+{$DEFINE MYSQL}
+{$DEFINE POSTGRESQL}
+{$DEFINE SQLITE}
+{$DEFINE FIREBIRD}
+{$DEFINE ORACLE}
 uses
   System.SysUtils,
   {$IFDEF TESTINSIGHT}
@@ -13,7 +19,9 @@ uses
   DUnitX.TestFramework,
   test.functions.mssql in 'test.functions.mssql.pas',
   test.select.mssql in 'test.select.mssql.pas',
+  test.ddl.mssql in 'test.ddl.mssql.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
+  FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',
   FluentSQL.Cases in '..\..\Source\Core\FluentSQL.Cases.pas',
   FluentSQL.Core in '..\..\Source\Core\FluentSQL.Core.pas',
   FluentSQL.Delete in '..\..\Source\Core\FluentSQL.Delete.pas',
@@ -36,6 +44,15 @@ uses
   FluentSQL.Section in '..\..\Source\Core\FluentSQL.Section.pas',
   FluentSQL.Select in '..\..\Source\Core\FluentSQL.Select.pas',
   FluentSQL.Serialize in '..\..\Source\Core\FluentSQL.Serialize.pas',
+  FluentSQL.DDL.Serialize in '..\..\Source\Core\FluentSQL.DDL.Serialize.pas',
+  FluentSQL.DDL.SerializeAbstract in '..\..\Source\Core\FluentSQL.DDL.SerializeAbstract.pas',
+  FluentSQL.DDL in '..\..\Source\Core\FluentSQL.DDL.pas',
+  FluentSQL.DDL.Serialize.MSSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas',
+  FluentSQL.DDL.Serialize.Firebird in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Firebird.pas',
+  FluentSQL.DDL.Serialize.MySQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MySQL.pas',
+  FluentSQL.DDL.Serialize.PostgreSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.PostgreSQL.pas',
+  FluentSQL.DDL.Serialize.Oracle in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas',
+  FluentSQL.DDL.Serialize.SQLite in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas',
   FluentSQL.Update in '..\..\Source\Core\FluentSQL.Update.pas',
   FluentSQL.Utils in '..\..\Source\Core\FluentSQL.Utils.pas',
   FluentSQL.Where in '..\..\Source\Core\FluentSQL.Where.pas',
@@ -59,13 +76,13 @@ uses
   FluentSQL.QualifierSQLite in '..\..\Source\Drivers\FluentSQL.QualifierSQLite.pas',
   FluentSQL.Select.SQLite in '..\..\Source\Drivers\FluentSQL.Select.SQLite.pas',
   FluentSQL.SelectDB2 in '..\..\Source\Drivers\FluentSQL.SelectDB2.pas',
-  FluentSQL.SelectFirebird in '..\..\Source\Drivers\FluentSQL.SelectFirebird.pas',
+  FluentSQL.Select.Firebird in '..\..\Source\Drivers\FluentSQL.Select.Firebird.pas',
   FluentSQL.SelectInterbase in '..\..\Source\Drivers\FluentSQL.SelectInterbase.pas',
   FluentSQL.SelectMongoDB in '..\..\Source\Drivers\FluentSQL.SelectMongoDB.pas',
-  FluentSQL.SelectMSSQL in '..\..\Source\Drivers\FluentSQL.SelectMSSQL.pas',
-  FluentSQL.SelectMySQL in '..\..\Source\Drivers\FluentSQL.SelectMySQL.pas',
-  FluentSQL.SelectOracle in '..\..\Source\Drivers\FluentSQL.SelectOracle.pas',
-  FluentSQL.SelectPostgreSQL in '..\..\Source\Drivers\FluentSQL.SelectPostgreSQL.pas',
+  FluentSQL.Select.MSSQL in '..\..\Source\Drivers\FluentSQL.Select.MSSQL.pas',
+  FluentSQL.Select.MySQL in '..\..\Source\Drivers\FluentSQL.Select.MySQL.pas',
+  FluentSQL.Select.Oracle in '..\..\Source\Drivers\FluentSQL.Select.Oracle.pas',
+  FluentSQL.Select.PostgreSQL in '..\..\Source\Drivers\FluentSQL.Select.PostgreSQL.pas',
   FluentSQL.SerializeDB2 in '..\..\Source\Drivers\FluentSQL.SerializeDB2.pas',
   FluentSQL.SerializeFirebird in '..\..\Source\Drivers\FluentSQL.SerializeFirebird.pas',
   FluentSQL.SerializeInterbase in '..\..\Source\Drivers\FluentSQL.SerializeInterbase.pas',

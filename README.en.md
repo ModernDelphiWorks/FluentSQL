@@ -53,7 +53,7 @@ The root Boss manifest does **not** force mandatory transitive packages for the 
 
 ---
 
-## Quick start
+## Quick start (DML)
 
 ```delphi
 uses FluentSQL;
@@ -61,7 +61,7 @@ uses FluentSQL;
 var
   SQL: string;
 begin
-  SQL := CreateFluentSQL(dbnFirebird)
+  SQL := Query(dbnFirebird)
     .Select
     .Column('ID')
     .Column('NOME')
@@ -71,7 +71,26 @@ begin
 end;
 ```
 
-The `TCQ(dbnFirebird)` shortcut in unit `FluentSQL` is equivalent to `CreateFluentSQL`. For reusable code, prefer `IFluentSQL` / `FluentSQL.Interfaces`.
+The `Query(dbnDialect)` method is the primary entry point for **DML** operations (Select, Insert, Update, Delete). The `TCQ(dbnDialect)` shortcut is also available for backward compatibility.
+
+## Quick start (DDL)
+
+```delphi
+uses FluentSQL;
+
+var
+  SQL: string;
+begin
+  SQL := Schema(dbnPostgreSQL)
+    .CreateTable('PRODUTOS')
+      .Column('ID', dltInteger).NotNull.PrimaryKey
+      .Column('NOME', dltString, 100).NotNull
+      .Column('PRECO', dltNumeric, 12, 2).Default(0)
+    .AsString;
+end;
+```
+
+The `Schema(dbnDialect)` method is the entry point for **DDL** operations (Create, Alter, Drop, Truncate).
 
 ---
 
@@ -109,8 +128,6 @@ The static site under `docs/` is built and committed in CI when `docs-src/` chan
 | `Firebird_tests/PTestFluentSQLFirebird.dpr` | Main parameterized / multi-dialect scenarios. |
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Minimal sample. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
-
-Automation commands are listed under **Comandos** in [`.claude/SKILL.md`](.claude/SKILL.md) (agent ecosystem).
 
 **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Dialect extension (ESP-016 closure):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guide [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 

@@ -32,13 +32,20 @@ type
   TFluentDDLSerializeAbstract = class(TInterfacedObject, IFluentDDLSerialize)
   protected
     function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
-    function MapLogicalType(const ACol: IFluentDDLColumn): string; virtual; abstract;
+    function MapLogicalType(const ACol: IFluentDDLColumn): string; overload; virtual;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; overload; virtual; abstract;
     function GetDialect: TFluentSQLDriver; virtual; abstract;
     function Quote(const AName: string): string; virtual;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
+    function GetComputedDefinition(const ACol: IFluentDDLColumn): string; virtual;
+    function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; virtual;
     function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
     function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
     function GetColumnNameList(const ADef: IFluentDDLCreateIndexDef): string;
+    function GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string; virtual;
+    function GetTableComment(const ATable: IFluentDDLTableDef): string; virtual;
+    function GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string; virtual;
+    function GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -46,9 +53,16 @@ type
     function AlterTableDropColumn(const ADef: IFluentDDLAlterTableDropColumnDef): string; virtual;
     function AlterTableRenameColumn(const ADef: IFluentDDLAlterTableRenameColumnDef): string; virtual;
     function AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string; virtual;
+    function AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string; virtual;
     function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; virtual;
     function DropIndex(const ADef: IFluentDDLDropIndexDef): string; virtual;
     function TruncateTable(const ADef: IFluentDDLTruncateTableDef): string; virtual;
+    function CreateView(const ADef: IFluentDDLCreateViewDef): string; virtual;
+    function DropView(const ADef: IFluentDDLDropViewDef): string; virtual;
+    function CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string; virtual;
+    function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; virtual;
+    function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; virtual;
+    function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; virtual;
   end;
 
 implementation
@@ -66,6 +80,10 @@ begin
     Result := Result + ' DEFAULT ' + GetLiteralValue(ACol.DefaultValue, ACol.LogicalType);
   if ACol.NotNull then
     Result := Result + ' NOT NULL';
+
+  if ACol.ConstraintName <> '' then
+    Result := Result + ' CONSTRAINT ' + Quote(ACol.ConstraintName);
+
   if ACol.IsPrimaryKey then
     Result := Result + ' PRIMARY KEY';
   if ACol.IsUnique then
@@ -78,6 +96,11 @@ begin
     if ACol.ReferenceColumn <> '' then
       Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
   end;
+end;
+
+function TFluentDDLSerializeAbstract.MapLogicalType(const ACol: IFluentDDLColumn): string;
+begin
+  Result := MapLogicalType(ACol.LogicalType, ACol.TypeArg);
 end;
 
 function TFluentDDLSerializeAbstract.Quote(const AName: string): string;
@@ -139,9 +162,20 @@ begin
   Result := AValue;
 end;
 
+function TFluentDDLSerializeAbstract.GetComputedDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+end;
+
+function TFluentDDLSerializeAbstract.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+end;
+
 function TFluentDDLSerializeAbstract.GetColumnDefinition(const ACol: IFluentDDLColumn): string;
 begin
-  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + MapConstraints(ACol);
+  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + GetComputedDefinition(ACol) +
+    GetIdentityDefinition(ACol) + MapConstraints(ACol);
 end;
 
 function TFluentDDLSerializeAbstract.GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
@@ -170,6 +204,69 @@ begin
   end;
 end;
 
+function TFluentDDLSerializeAbstract.GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string;
+begin
+  Result := '';
+end;
+
+function TFluentDDLSerializeAbstract.GetTableComment(const ATable: IFluentDDLTableDef): string;
+begin
+  Result := '';
+end;
+
+function TFluentDDLSerializeAbstract.GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string;
+var
+  LI: Integer;
+begin
+  Result := '';
+  if AConstraint.Name <> '' then
+    Result := 'CONSTRAINT ' + Quote(AConstraint.Name) + ' ';
+
+  case AConstraint.ConstraintType of
+    dctPrimaryKey:
+    begin
+      Result := Result + 'PRIMARY KEY (';
+      for LI := 0 to AConstraint.GetColumnCount - 1 do
+      begin
+        if LI > 0 then Result := Result + ', ';
+        Result := Result + Quote(AConstraint.GetColumnName(LI));
+      end;
+      Result := Result + ')';
+    end;
+    dctUnique:
+    begin
+      Result := Result + 'UNIQUE (';
+      for LI := 0 to AConstraint.GetColumnCount - 1 do
+      begin
+        if LI > 0 then Result := Result + ', ';
+        Result := Result + Quote(AConstraint.GetColumnName(LI));
+      end;
+      Result := Result + ')';
+    end;
+    dctCheck:
+    begin
+      Result := Result + 'CHECK (' + AConstraint.GetCheckCondition + ')';
+    end;
+    dctForeignKey:
+    begin
+      Result := Result + 'FOREIGN KEY (' + Quote(AConstraint.GetColumnName(0)) + ') REFERENCES ' + Quote(AConstraint.GetReferenceTable);
+      if AConstraint.GetReferenceColumn <> '' then
+        Result := Result + '(' + Quote(AConstraint.GetReferenceColumn) + ')';
+    end;
+  end;
+end;
+
+function TFluentDDLSerializeAbstract.GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
+var
+  LI: Integer;
+begin
+  Result := '';
+  for LI := 0 to ADef.GetTableConstraintCount - 1 do
+  begin
+    Result := Result + ', ' + GetTableConstraintDefinition(ADef.GetTableConstraint(LI));
+  end;
+end;
+
 function TFluentDDLSerializeAbstract.CreateTable(const ADef: IFluentDDLTableDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateTable', Self.ClassName]);
@@ -195,6 +292,11 @@ begin
     raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableRenameColumn', Self.ClassName]);
 end;
 
+function TFluentDDLSerializeAbstract.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['AlterTableAlterColumn', Self.ClassName]);
+end;
+
 function TFluentDDLSerializeAbstract.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
 begin
   if not Assigned(ADef) then
@@ -215,6 +317,40 @@ end;
 function TFluentDDLSerializeAbstract.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['TruncateTable', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateView(const ADef: IFluentDDLCreateViewDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateView', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropView(const ADef: IFluentDDLDropViewDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropView', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateSequence(const ADef: IFluentDDLCreateSequenceDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateSequence', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropSequence', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
+begin
+  if not Assigned(ADef) or not Assigned(ADef.Constraint) then
+    Exit('');
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ADD ' + GetTableConstraintDefinition(ADef.Constraint);
+end;
+
+function TFluentDDLSerializeAbstract.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+begin
+  if not Assigned(ADef) or (ADef.ConstraintName = '') then
+    Exit('');
+  Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
 end;
 
 end.

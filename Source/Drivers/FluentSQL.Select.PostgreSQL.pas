@@ -11,7 +11,7 @@
   ------------------------------------------------------------------------------
 }
 
-unit FluentSQL.SelectOracle;
+unit FluentSQL.Select.PostgreSQL;
 
 {$ifdef fpc}
   {$mode delphi}{$H+}
@@ -24,7 +24,7 @@ uses
   FluentSQL.Select;
 
 type
-  TFluentSQLSelectOracle = class(TFluentSQLSelect)
+  TFluentSQLSelectPostgreSQL = class(TFluentSQLSelect)
   public
     constructor Create; override;
     function Serialize: String; override;
@@ -34,26 +34,26 @@ implementation
 
 uses
   FluentSQL.Utils,
-  FluentSQL.Interfaces,
   FluentSQL.Register,
-  FluentSQL.QualifierOracle;
+  FluentSQL.Interfaces,
+  FluentSQL.QualifierPostgresql;
 
-{ TFluentSQLSelectOracle }
+{ TFluentSQLSelectPostgreSQL }
 
-constructor TFluentSQLSelectOracle.Create;
+constructor TFluentSQLSelectPostgreSQL.Create;
 begin
   inherited;
-  FQualifiers := TFluentSQLSelectQualifiersOracle.Create;
+  FQualifiers := TFluentSQLSelectQualifiersPostgreSQL.Create;
 end;
 
-function TFluentSQLSelectOracle.Serialize: String;
+function TFluentSQLSelectPostgreSQL.Serialize: String;
 begin
   if IsEmpty then
     Result := ''
   else
     Result := TUtils.Concat(['SELECT',
-                             FColumns.Serialize,
                              FQualifiers.SerializeDistinct,
+                             FColumns.Serialize,
                              'FROM',
                              FTableNames.Serialize]);
 end;

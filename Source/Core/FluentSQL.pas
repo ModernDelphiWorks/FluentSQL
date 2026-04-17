@@ -169,18 +169,22 @@ type
     function NotEqual(const AValue: TGUID): IFluentSQL; overload;
     function GreaterThan(const AValue: Extended): IFluentSQL; overload;
     function GreaterThan(const AValue: Integer) : IFluentSQL; overload;
+    function GreaterThan(const AValue: String) : IFluentSQL; overload;
     function GreaterThan(const AValue: TDate): IFluentSQL; overload;
     function GreaterThan(const AValue: TDateTime) : IFluentSQL; overload;
     function GreaterEqThan(const AValue: Extended): IFluentSQL; overload;
     function GreaterEqThan(const AValue: Integer) : IFluentSQL; overload;
+    function GreaterEqThan(const AValue: String) : IFluentSQL; overload;
     function GreaterEqThan(const AValue: TDate): IFluentSQL; overload;
     function GreaterEqThan(const AValue: TDateTime) : IFluentSQL; overload;
     function LessThan(const AValue: Extended): IFluentSQL; overload;
     function LessThan(const AValue: Integer) : IFluentSQL; overload;
+    function LessThan(const AValue: String) : IFluentSQL; overload;
     function LessThan(const AValue: TDate): IFluentSQL; overload;
     function LessThan(const AValue: TDateTime) : IFluentSQL; overload;
     function LessEqThan(const AValue: Extended): IFluentSQL; overload;
     function LessEqThan(const AValue: Integer) : IFluentSQL; overload;
+    function LessEqThan(const AValue: String) : IFluentSQL; overload;
     function LessEqThan(const AValue: TDate): IFluentSQL; overload;
     function LessEqThan(const AValue: TDateTime) : IFluentSQL; overload;
     function IsNull: IFluentSQL;
@@ -889,6 +893,20 @@ begin
   Result := _CreateJoin(jtFULL, ATableName);
 end;
 
+function TFluentSQL.GreaterThan(const AValue: Extended): IFluentSQL;
+begin
+  _AssertOperator([opeWhere, opeAND, opeOR]);
+  FActiveExpr.Ope(FOperator.IsGreaterThan(AValue));
+  Result := Self;
+end;
+
+function TFluentSQL.GreaterThan(const AValue: String): IFluentSQL;
+begin
+  _AssertOperator([opeWhere, opeAND, opeOR]);
+  FActiveExpr.Ope(FOperator.IsGreaterThan(AValue));
+  Result := Self;
+end;
+
 function TFluentSQL.GreaterEqThan(const AValue: Integer): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
@@ -903,14 +921,14 @@ begin
   Result := Self;
 end;
 
-function TFluentSQL.GreaterThan(const AValue: Integer): IFluentSQL;
+function TFluentSQL.GreaterEqThan(const AValue: String): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
-  FActiveExpr.Ope(FOperator.IsGreaterThan(AValue));
+  FActiveExpr.Ope(FOperator.IsGreaterEqThan(AValue));
   Result := Self;
 end;
 
-function TFluentSQL.GreaterThan(const AValue: Extended): IFluentSQL;
+function TFluentSQL.GreaterThan(const AValue: Integer): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
   FActiveExpr.Ope(FOperator.IsGreaterThan(AValue));
@@ -1046,6 +1064,13 @@ begin
   Result := Self;
 end;
 
+function TFluentSQL.LessEqThan(const AValue: String): IFluentSQL;
+begin
+  _AssertOperator([opeWhere, opeAND, opeOR]);
+  FActiveExpr.Ope(FOperator.IsLessEqThan(AValue));
+  Result := Self;
+end;
+
 function TFluentSQL.LessThan(const AValue: Integer): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
@@ -1054,6 +1079,13 @@ begin
 end;
 
 function TFluentSQL.LessThan(const AValue: Extended): IFluentSQL;
+begin
+  _AssertOperator([opeWhere, opeAND, opeOR]);
+  FActiveExpr.Ope(FOperator.IsLessThan(AValue));
+  Result := Self;
+end;
+
+function TFluentSQL.LessThan(const AValue: String): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
   FActiveExpr.Ope(FOperator.IsLessThan(AValue));
@@ -1302,7 +1334,7 @@ function TFluentSQL.First(const AValue: Integer): IFluentSQL;
 var
   LQualifier: IFluentSQLSelectQualifier;
 begin
-  _AssertSection([secSelect, secWhere, secOrderBy]);
+  _AssertSection([secSelect, secWhere, secOrderBy, secGroupBy, secHaving]);
   LQualifier := FAST.Select.Qualifiers.Add;
   LQualifier.Qualifier := sqFirst;
   LQualifier.Value := AValue;
@@ -1315,7 +1347,7 @@ function TFluentSQL.Skip(const AValue: Integer): IFluentSQL;
 var
   LQualifier: IFluentSQLSelectQualifier;
 begin
-  _AssertSection([secSelect, secWhere, secOrderBy]);
+  _AssertSection([secSelect, secWhere, secOrderBy, secGroupBy, secHaving]);
   LQualifier := FAST.Select.Qualifiers.Add;
   LQualifier.Qualifier := sqSkip;
   LQualifier.Value := AValue;
