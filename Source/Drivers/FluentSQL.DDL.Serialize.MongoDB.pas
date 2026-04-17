@@ -61,7 +61,17 @@ begin
   if Trim(ADef.TableName) = '' then
     raise EArgumentException.Create('DDL MongoDB: collection name is required');
 
-  Result := '{"create":"' + ADef.TableName + '"}';
+  Result := '{"create":"' + ADef.TableName + '"';
+  
+  if ADef.IsCapped then
+  begin
+    Result := Result + ',"capped":true';
+    Result := Result + ',"size":' + IntToStr(ADef.CappedSize);
+    if ADef.CappedMax > 0 then
+      Result := Result + ',"max":' + IntToStr(ADef.CappedMax);
+  end;
+  
+  Result := Result + '}';
 end;
 
 function TFluentDDLSerializerMongoDB.DropTable(const ADef: IFluentDDLDropTableDef): string;
@@ -105,6 +115,9 @@ begin
 
   if ADef.GetIsUnique then
     Result := Result + ',"unique":true';
+
+  if ADef.ExpireAfter > 0 then
+    Result := Result + ',"expireAfterSeconds":' + IntToStr(ADef.ExpireAfter);
 
   Result := Result + '}]}';
 end;

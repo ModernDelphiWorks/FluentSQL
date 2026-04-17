@@ -26,6 +26,12 @@ type
     [Test]
     procedure TestTruncateCollection_GeneratesExpected;
     [Test]
+    procedure TestCreateCollection_Capped_GeneratesExpected;
+    [Test]
+    procedure TestCreateCollection_CappedWithMax_GeneratesExpected;
+    [Test]
+    procedure TestCreateIndex_TTL_GeneratesExpected;
+    [Test]
     procedure TestCreateCollection_EmptyName_RaisesError;
     [Test]
     procedure TestDropCollection_EmptyName_RaisesError;
@@ -124,6 +130,42 @@ var
 begin
   LResult := FluentSQL.Schema(dbnMongoDB).TruncateTable('customers').AsString;
   Assert.AreEqual('{"delete":"customers","deletes":[{"q":{},"limit":0}]}', LResult);
+end;
+
+procedure TTestDDLMongoDB.TestCreateCollection_Capped_GeneratesExpected;
+var
+  LResult: string;
+begin
+  LResult := FluentSQL.Schema(dbnMongoDB)
+    .Table('logs')
+    .Capped(1024 * 1024)
+    .Create
+    .AsString;
+  Assert.AreEqual('{"create":"logs","capped":true,"size":1048576}', LResult);
+end;
+
+procedure TTestDDLMongoDB.TestCreateCollection_CappedWithMax_GeneratesExpected;
+var
+  LResult: string;
+begin
+  LResult := FluentSQL.Schema(dbnMongoDB)
+    .Table('events')
+    .Capped(1024 * 1024, 5000)
+    .Create
+    .AsString;
+  Assert.AreEqual('{"create":"events","capped":true,"size":1048576,"max":5000}', LResult);
+end;
+
+procedure TTestDDLMongoDB.TestCreateIndex_TTL_GeneratesExpected;
+var
+  LResult: string;
+begin
+  LResult := FluentSQL.Schema(dbnMongoDB)
+    .CreateIndex('idx_ttl', 'sessions')
+    .Column('createdAt')
+    .ExpireAfter(3600)
+    .AsString;
+  Assert.AreEqual('{"createIndexes":"sessions","indexes":[{"key":{"createdAt":1},"name":"idx_ttl","expireAfterSeconds":3600}]}', LResult);
 end;
 
 procedure TTestDDLMongoDB.TestCreateCollection_EmptyName_RaisesError;
