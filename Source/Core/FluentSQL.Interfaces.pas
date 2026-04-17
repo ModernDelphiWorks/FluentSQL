@@ -679,12 +679,16 @@ type
   IFluentDDLDropSequenceBuilder = interface;
   IFluentDDLProcedureBuilder = interface;
   IFluentDDLDropProcedureBuilder = interface;
+  IFluentDDLFunctionBuilder = interface;
+  IFluentDDLDropFunctionBuilder = interface;
   IFluentDDLTriggerBuilder = interface;
   IFluentDDLDropTriggerBuilder = interface;
   IFluentDDLTriggerManagementBuilder = interface;
 
   IFluentDDLProcedureDef = interface;
   IFluentDDLDropProcedureDef = interface;
+  IFluentDDLFunctionDef = interface;
+  IFluentDDLDropFunctionDef = interface;
   IFluentDDLTriggerDef = interface;
   IFluentDDLDropTriggerDef = interface;
   IFluentDDLTriggerManagementDef = interface;
@@ -712,6 +716,8 @@ type
     function CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
     function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
   end;
 
 
@@ -1217,6 +1223,51 @@ type
   end;
 
 
+  /// <summary>ESP-071 / ADR-071: read-only view of CREATE FUNCTION for serializers.</summary>
+  IFluentDDLFunctionDef = interface
+    ['{84EA2B3C-9F1D-4C5A-8B6E-7F0A1B2C3D4E}']
+    function GetDialect: TFluentSQLDriver;
+    function GetFunctionName: string;
+    function GetParams: string;
+    function GetReturns: string;
+    function GetBody: string;
+    function GetOrReplace: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property FunctionName: string read GetFunctionName;
+    property Params: string read GetParams;
+    property Returns: string read GetReturns;
+    property Body: string read GetBody;
+    property OrReplace: Boolean read GetOrReplace;
+  end;
+
+  /// <summary>ESP-071: fluent builder for CREATE FUNCTION SQL text.</summary>
+  IFluentDDLFunctionBuilder = interface(IFluentDDLFunctionDef)
+    ['{95FB3C4D-A02E-5D6B-9C7F-8A1B2C3D4E5F}']
+    function Params(const AValue: string): IFluentDDLFunctionBuilder;
+    function Returns(const AValue: string): IFluentDDLFunctionBuilder;
+    function Body(const AValue: string): IFluentDDLFunctionBuilder;
+    function OrReplace: IFluentDDLFunctionBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-071: read-only view of DROP FUNCTION for serializers.</summary>
+  IFluentDDLDropFunctionDef = interface
+    ['{A60C4D5E-B13F-6E7C-AD80-9B2C3D4E5F6A}']
+    function GetDialect: TFluentSQLDriver;
+    function GetFunctionName: string;
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property FunctionName: string read GetFunctionName;
+    property IfExists: Boolean read GetIfExists;
+  end;
+
+  /// <summary>ESP-071: fluent builder for DROP FUNCTION SQL text.</summary>
+  IFluentDDLDropFunctionBuilder = interface(IFluentDDLDropFunctionDef)
+    ['{B71D5E6F-C240-7F8D-BE91-AC3D4E5F6A7B}']
+    function IfExists: IFluentDDLDropFunctionBuilder;
+    function AsString: string;
+  end;
+
   /// <summary>ESP-070 / ADR-070: read-only view of CREATE PROCEDURE for serializers.</summary>
   IFluentDDLProcedureDef = interface
     ['{8A9048E1-2C3D-4B5A-961F-0E1A2B3D4C5E}']
@@ -1374,6 +1425,8 @@ type
     function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
     function CreateProcedure(const AName: string): IFluentDDLProcedureBuilder;
     function DropProcedure(const AName: string): IFluentDDLDropProcedureBuilder;
+    function CreateFunction(const AName: string): IFluentDDLFunctionBuilder;
+    function DropFunction(const AName: string): IFluentDDLDropFunctionBuilder;
     function CreateTrigger(const AName: string): IFluentDDLTriggerBuilder;
     function DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
     function EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;

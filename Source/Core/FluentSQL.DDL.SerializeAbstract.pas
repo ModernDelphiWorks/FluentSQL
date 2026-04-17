@@ -68,6 +68,8 @@ type
     function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; virtual;
     function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; virtual;
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; virtual;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; virtual;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; virtual;
   end;
 
 implementation
@@ -381,6 +383,16 @@ end;
 function TFluentDDLSerializeAbstract.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['ManageTrigger', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateFunction', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropFunction', Self.ClassName]);
 end;
 
 end.
