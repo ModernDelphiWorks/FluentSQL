@@ -32,6 +32,8 @@ type
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; override;
+    function CreateIndex(const ADef: IFluentDDLCreateIndexDef): string; override;
+    function DropIndex(const ADef: IFluentDDLDropIndexDef): string; override;
   end;
 
 implementation
@@ -69,6 +71,54 @@ begin
     raise EArgumentException.Create('DDL MongoDB: collection name is required');
 
   Result := '{"drop":"' + ADef.TableName + '"}';
+end;
+
+function TFluentDDLSerializerMongoDB.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
+var
+  I: Integer;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if Trim(ADef.TableName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: collection name is required for create index');
+
+  if Trim(ADef.IndexName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: index name is required');
+
+  if ADef.GetColumnCount = 0 then
+    raise EArgumentException.Create('DDL MongoDB: at least one column is required for create index');
+
+  Result := '{"createIndexes":"' + ADef.TableName + '","indexes":[';
+  Result := Result + '{"key":{';
+
+  for I := 0 to ADef.GetColumnCount - 1 do
+  begin
+    if I > 0 then
+      Result := Result + ',';
+    Result := Result + '"' + ADef.GetColumnName(I) + '":1';
+  end;
+
+  Result := Result + '},"name":"' + ADef.IndexName + '"';
+
+  if ADef.GetIsUnique then
+    Result := Result + ',"unique":true';
+
+  Result := Result + '}]}';
+end;
+
+function TFluentDDLSerializerMongoDB.DropIndex(const ADef: IFluentDDLDropIndexDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if Trim(ADef.TableName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: collection name is required for drop index');
+
+  if Trim(ADef.IndexName) = '' then
+    raise EArgumentException.Create('DDL MongoDB: index name is required for drop index');
+
+  Result := '{"dropIndexes":"' + ADef.TableName + '","index":"' + ADef.IndexName + '"}';
 end;
 
 initialization

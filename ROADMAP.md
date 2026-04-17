@@ -108,7 +108,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-056** — DDL Index Management (CREATE/DROP INDEX, Unified) — delivered 2026-04-15.
 - [x] **ESP-057** — DDL Alter Table: Constraint Management (ADD/DROP CONSTRAINT) — delivered 2026-04-15.
 - [x] **ESP-058** — DDL Advanced Alter Table: Default Value & Rename Column Completion.
-- [x] **ESP-061** — DDL Advanced Identity (BY DEFAULT / ALWAYS) support — delivered 2026-04-16.
+- [x] **ESP-063** — DDL MongoDB (Collection Management) — delivered 2026-04-16.
+- [ ] **ESP-064** — DDL MongoDB (Index Management).
 - [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 
 ---
@@ -159,6 +160,8 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
+| 2026-04-16 | Planeada **ESP-064** — DDL MongoDB Support Phase 2: Index Management; **ADR-064** no pipeline. |
+| 2026-04-16 | Entregue **ESP-063** — DDL MongoDB Support (Collection Management). |
 | 2026-04-16 | Entregue **ESP-060** — Kanban Hygiene & README Cleanup. | `.claude/pipeline/implement-report.md` |
 | 2026-04-16 | Entregue **ESP-061** — DDL Advanced Identity Support (BY DEFAULT / ALWAYS). | `.claude/pipeline/implement-report.md`, `.claude/pipeline/test-report.md` |
 | 2026-04-15 | Entregue **ESP-059** — Documentation Refresh: Modern API Patterns (Query & Schema). | `.claude/pipeline/implement-report.md` |
