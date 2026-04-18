@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerMSSQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -124,27 +125,21 @@ begin
   end;
 end;
 
-function TFluentDDLSerializerMSSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerMSSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INT';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BIT';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'DATETIME2';
-    dltLongText:
-      Result := 'VARCHAR(MAX)';
-    dltBlob:
-      Result := 'VARBINARY(MAX)';
-    dltGuid:
-      Result := 'UNIQUEIDENTIFIER';
+    dltInteger: Result := 'INT';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BIT';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'DATETIME2';
+    dltLongText: Result := 'VARCHAR(MAX)';
+    dltBlob: Result := 'VARBINARY(MAX)';
+    dltGuid: Result := 'UNIQUEIDENTIFIER';
+    dltNumeric: Result := MapNumeric('NUMERIC', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL MSSQL: unknown logical type');
   end;
@@ -239,7 +234,7 @@ begin
     if not ADef.TypeChanged then
       raise EArgumentException.Create('DDL MSSQL: column type must be restated during ALTER COLUMN.');
 
-    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale);
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
 
     if ADef.NotNull then
@@ -283,9 +278,11 @@ function TFluentDDLSerializerMSSQL.TruncateTable(const ADef: IFluentDDLTruncateT
 begin
   if not Assigned(ADef) then
     Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL MSSQL: table name is required');
-    
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL MSSQL: multiple tables in a single TRUNCATE are not supported.');
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL MSSQL: advanced TRUNCATE options are not supported in this build.');
+
   Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
