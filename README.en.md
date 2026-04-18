@@ -21,7 +21,7 @@
 | `UNION` / `UNION ALL` / `INTERSECT` with merged `Params` | ✅ |
 | Batch INSERT (multi-`VALUES` / Mongo `insertMany`) | ✅ |
 | **MongoDB** driver (MQL/JSON as text) | ✅ |
-| Per-engine explicit extension (dialect opt-in, **ESP-016** / **ADR-016**) | ✅ |
+| Per-engine explicit extension (dialect opt-in) | ✅ |
 | **String generation only via OOP** — no data-access layer | ✅ *by design* |
 
 ---
@@ -129,7 +129,7 @@ The static site under `docs/` is built and committed in CI when `docs-src/` chan
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Minimal sample. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
-**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Dialect extension (ESP-016 closure):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guide [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
+**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Dialect extension:** guide [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
 ---
 
