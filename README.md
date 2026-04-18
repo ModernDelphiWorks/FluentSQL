@@ -105,7 +105,6 @@ O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Para o
 | [Configuração e `dbn*`](docs-src/docs/fluentsql/reference/configuration.md) | Constantes de dialeto |
 | [Testes](docs-src/docs/fluentsql/tests/overview.md) | Suíte DUnitX |
 | [Troubleshooting](docs-src/docs/fluentsql/troubleshooting/common-errors.md) | Erros comuns |
-| [CI da documentação](docs-src/docs/fluentsql/getting-started/documentation-ci.md) | Build Docusaurus / GitHub Actions |
 
 O site estático em `docs/` é gerado e commitado no CI quando `docs-src/` muda nos ramos `main` ou `develop` (workflow [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml)). PRs que alterem `docs-src/` passam por [`.github/workflows/docs-build.yml`](.github/workflows/docs-build.yml).
 
@@ -128,7 +127,7 @@ Projetos **DUnitX** em `Test Delphi/`:
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
 
-**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Extensão por dialeto:** guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
+**Extensão por dialeto:** guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
 ---
 

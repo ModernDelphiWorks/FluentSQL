@@ -4,7 +4,7 @@
 >
 > **Isto não é** camada de acesso a dados: **não** há conexão, **não** há execução no SGBD, **não** há leitura de catálogo nem validação “classe vs base” *dentro* do pacote — isso fica na tua aplicação ou noutras bibliotecas. O FluentSQL **entrega `string` + `Params`** (quando aplicável) para tu ligares ao FireDAC, UniDAC, Zeos ou ao que quiseres. Recursos específicos de um motor entram por **extensão explícita opt-in** (**ESP-016**). Segurança no uso dos parâmetros continua no âmbito do projeto consumidor.
 
-**Última atualização:** 2026-04-17
+**Última atualização:** 2026-04-18
 
 ## Como este roadmap evolui
 
@@ -117,6 +117,18 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-070** — DDL: Stored Procedures and Triggers (Create/Drop/Enable/Disable) — delivered 2026-04-17.
 - [x] **ESP-071** — DDL: Stored Functions (Create/Drop) — delivered 2026-04-17.
 - [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
+
+---
+
+### Fase 5 — Governança e Operações Avançadas
+
+**Objetivo:** Fortalecer a infraestrutura de automação do projeto e introduzir operações de dados complexas que, embora específicas, podem ter uma fundação comum no núcleo.
+
+**Previsão:** Q1 2027
+
+- [x] **ESP-060 — Governance: Automated Kanban Drift Prevention:** Implementação de script de reconciliação contínua entre a realidade do repo e o GitHub Project V2.
+- [ ] **ESP-075 — DDL: Logical Namespaces (CREATE/DROP SCHEMA):** Suporte a criação e deleção de esquemas lógicos.
+- [ ] **ESP-076 — DML: MERGE Skeleton (UPSERT Pattern):** Prover o esqueleto de API no núcleo (ADR-016) para que os drivers implementem o `MERGE` conforme o dialeto (ex. `INSERT ... ON CONFLICT` vs `MERGE INTO`).
 
 ---
 
