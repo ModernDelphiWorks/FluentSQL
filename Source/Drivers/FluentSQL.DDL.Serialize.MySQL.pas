@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerMySQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -95,27 +96,21 @@ begin
   Result := dbnMySQL;
 end;
 
-function TFluentDDLSerializerMySQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerMySQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INT';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'DATETIME';
-    dltLongText:
-      Result := 'LONGTEXT';
-    dltBlob:
-      Result := 'LONGBLOB';
-    dltGuid:
-      Result := 'CHAR(36)';
+    dltInteger: Result := 'INT';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BOOLEAN';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'DATETIME';
+    dltLongText: Result := 'LONGTEXT';
+    dltBlob: Result := 'LONGBLOB';
+    dltGuid: Result := 'CHAR(36)';
+    dltNumeric: Result := MapNumeric('DECIMAL', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -200,7 +195,7 @@ begin
     if not ADef.TypeChanged then
       raise EArgumentException.Create('DDL MySQL: column type must be restated during ALTER COLUMN (MODIFY COLUMN).');
 
-    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale);
     Result := LBase + ' MODIFY COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
 
     if ADef.NotNull then
@@ -209,8 +204,6 @@ begin
       Result := Result + ' NULL';
   end;
 end;
-
-
 
 function TFluentDDLSerializerMySQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
 begin
@@ -243,13 +236,29 @@ begin
 end;
 
 function TFluentDDLSerializerMySQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
-  if ADef.GetRestartIdentity or ADef.GetCascade then
+
+  Result := 'TRUNCATE TABLE ';
+  for LI := 0 to Length(ADef.TableNames) - 1 do
+  begin
+    if LI > 0 then Result := Result + ', ';
+    Result := Result + Quote(ADef.TableNames[LI]);
+  end;
+
+  if ADef.PartitionName <> '' then
+  begin
+    if Length(ADef.TableNames) > 1 then
+      raise ENotSupportedException.Create('DDL MySQL: PARTITION clause is only supported for single-table TRUNCATE.');
+    Result := Result + ' PARTITION (' + ADef.PartitionName + ')';
+  end;
+
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade then
     raise ENotSupportedException.Create(
-      'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
-  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
+      'DDL TRUNCATE TABLE: identity management and CASCADE are PostgreSQL-specific in this build (ESP-074).');
 end;
 
 function TFluentDDLSerializerMySQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;
