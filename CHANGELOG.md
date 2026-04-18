@@ -7,6 +7,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **DDL — Advanced Truncate Support (ESP-074, issue [#136]):**
+  - Support for multi-table truncation in a single atomic command across all supported dialects.
+  - PostgreSQL: added `RESTART IDENTITY`, `CONTINUE IDENTITY`, and `CASCADE` support.
+  - MySQL: added `PARTITION` support for single-table truncation.
+  - Consistent validation and `ENotSupportedException` for advanced options in dialects that do not support them.
+
 ## [1.4.0] — 2026-04-17
 
 ### Added

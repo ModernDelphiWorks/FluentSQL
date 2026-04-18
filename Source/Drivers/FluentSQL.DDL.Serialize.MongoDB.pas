@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerMongoDB = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; override;
@@ -47,7 +48,8 @@ begin
   Result := dbnMongoDB;
 end;
 
-function TFluentDDLSerializerMongoDB.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer): string;
+function TFluentDDLSerializerMongoDB.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   { MongoDB is schema-less by default. Column mapping is out of scope for ESP-063. }
   Result := '';
@@ -154,6 +156,9 @@ function TFluentDDLSerializerMongoDB.TruncateTable(const ADef: IFluentDDLTruncat
 begin
   if not Assigned(ADef) then
     Exit('');
+
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL MongoDB: multiple collections in a single TRUNCATE are not supported.');
 
   if Trim(ADef.TableName) = '' then
     raise EArgumentException.Create('DDL MongoDB: collection name is required');

@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerSQLite = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -88,27 +89,21 @@ begin
   Result := dbnSQLite;
 end;
 
-function TFluentDDLSerializerSQLite.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerSQLite.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INTEGER';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'TEXT';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'TEXT';
-    dltDateTime:
-      Result := 'DATETIME';
-    dltLongText:
-      Result := 'TEXT';
-    dltBlob:
-      Result := 'BLOB';
-    dltGuid:
-      Result := 'GUID';
+    dltInteger: Result := 'INTEGER';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'TEXT';
+    dltBoolean: Result := 'BOOLEAN';
+    dltDate: Result := 'TEXT';
+    dltDateTime: Result := 'DATETIME';
+    dltLongText: Result := 'TEXT';
+    dltBlob: Result := 'BLOB';
+    dltGuid: Result := 'GUID';
+    dltNumeric: Result := MapNumeric('NUMERIC', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -199,6 +194,11 @@ function TFluentDDLSerializerSQLite.TruncateTable(const ADef: IFluentDDLTruncate
 begin
   if not Assigned(ADef) then
     Exit('');
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL SQLite: multiple tables in a single TRUNCATE are not supported.');
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL SQLite: advanced TRUNCATE options are not supported.');
+
   // SQLite mappings: DELETE FROM is the standard way to clear a table.
   Result := 'DELETE FROM ' + Quote(ADef.TableName);
 end;

@@ -21,7 +21,7 @@
 | `UNION` / `UNION ALL` / `INTERSECT` com `Params` mesclados | ✅ |
 | INSERT em lote (SQL multi-`VALUES` / Mongo `insertMany`) | ✅ |
 | Driver **MongoDB** (saída MQL/JSON como texto) | ✅ |
-| Extensão explícita por motor (opt-in por dialeto) | ✅ |
+| Extensão explícita por motor (opt-in por dialeto, **ESP-016** / **ADR-016**) | ✅ |
 | **Apenas geração de string via POO** — sem camada de acesso a dados | ✅ *by design* |
 
 ---
@@ -127,7 +127,7 @@ Projetos **DUnitX** em `Test Delphi/`:
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
 
-**Extensão por dialeto:** guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
+**Extensão por dialeto (fechamento ESP-016):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
 ---
 
