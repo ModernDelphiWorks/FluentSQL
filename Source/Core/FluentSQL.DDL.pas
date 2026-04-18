@@ -46,15 +46,20 @@ type
     FOnUpdate: TDDLReferentialAction;
     FDescription: string;
     FConstraintName: string;
+    FPrecision: Integer;
+    FScale: Integer;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
   public
-    constructor Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer = 0);
+    constructor Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer = 0;
+      APrecision: Integer = 0; AScale: Integer = 0);
     function GetName: string;
     function GetLogicalType: TDDLLogicalType;
     function GetTypeArg: Integer;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     function GetNotNull: Boolean;
     function GetIsPrimaryKey: Boolean;
     function GetIsUnique: Boolean;
@@ -124,7 +129,8 @@ type
     FIsCapped: Boolean;
     FCappedSize: Int64;
     FCappedMax: Integer;
-    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
+    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+      APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
     procedure _CheckPKDuplicity;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -150,6 +156,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function ColumnGuid(const AName: string): IFluentDDLBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLBuilder; overload;
@@ -195,7 +203,8 @@ type
     FConstraint: TFluentDDLTableConstraint;
     FHasColumn: Boolean;
     FHasConstraint: Boolean;
-    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
+    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+      APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
     destructor Destroy; override;
@@ -214,6 +223,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
@@ -344,19 +355,26 @@ type
   TFluentDDLTruncateTableBuilder = class(TInterfacedObject, IFluentDDLTruncateTableBuilder, IFluentDDLTruncateTableDef)
   strict private
     FDialect: TFluentSQLDriver;
-    FTableName: string;
+    FTableNames: TArray<string>;
     FRestartIdentity: Boolean;
+    FContinueIdentity: Boolean;
     FCascade: Boolean;
+    FPartitionName: string;
   public
-    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    constructor Create(const ADialect: TFluentSQLDriver; const ATables: array of string);
     { IFluentDDLTruncateTableDef }
     function GetDialect: TFluentSQLDriver;
     function GetTableName: string;
+    function GetTableNames: TArray<string>;
     function GetRestartIdentity: Boolean;
+    function GetContinueIdentity: Boolean;
     function GetCascade: Boolean;
+    function GetPartitionName: string;
     { IFluentDDLTruncateTableBuilder }
     function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function ContinueIdentity: IFluentDDLTruncateTableBuilder;
     function Cascade: IFluentDDLTruncateTableBuilder;
+    function Partition(const AName: string): IFluentDDLTruncateTableBuilder;
     function AsString: string;
   end;
 
@@ -377,7 +395,10 @@ type
     FIdentity: Boolean;
     FIdentityScope: TDDLIdentityScope;
     FIdentityChanged: Boolean;
-    function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+    FPrecision: Integer;
+    FScale: Integer;
+    function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+      APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName, AColumnName: string);
     { IFluentDDLAlterTableAlterColumnDef }
@@ -395,6 +416,8 @@ type
     function GetIsIdentity: Boolean;
     function GetIdentityScope: TDDLIdentityScope;
     function GetIdentityChanged: Boolean;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     { IFluentDDLAlterTableAlterColumnBuilder }
     function TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
@@ -404,6 +427,8 @@ type
     function TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeNumeric(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDecimal(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
     function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
@@ -678,7 +703,8 @@ type
     function Table(const ATableName: string): IFluentDDLTable;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
-    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder; overload;
+    function TruncateTable(const ATables: array of string): IFluentDDLTruncateTableBuilder; overload;
     function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
     function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
@@ -705,12 +731,15 @@ const
 
 { TFluentDDLColumn }
 
-constructor TFluentDDLColumn.Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer);
+constructor TFluentDDLColumn.Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer);
 begin
   inherited Create;
   FName := AName;
   FLogicalType := ALogicalType;
   FTypeArg := ATypeArg;
+  FPrecision := APrecision;
+  FScale := AScale;
   FIdentityScope := disAlways;
 end;
 
@@ -763,6 +792,16 @@ end;
 function TFluentDDLColumn.GetTypeArg: Integer;
 begin
   Result := FTypeArg;
+end;
+ 
+function TFluentDDLColumn.GetPrecision: Integer;
+begin
+  Result := FPrecision;
+end;
+ 
+function TFluentDDLColumn.GetScale: Integer;
+begin
+  Result := FScale;
 end;
 
 function TFluentDDLColumn.GetNotNull: Boolean;
@@ -1088,9 +1127,10 @@ begin
       raise EArgumentException.Create('DDL: Table already has a Primary Key defined (table constraint).');
 end;
 
-function TFluentDDLBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
+function TFluentDDLBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer): IFluentDDLBuilder;
 begin
-  FColumns.Add(TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg));
+  FColumns.Add(TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg, APrecision, AScale));
   Result := Self;
 end;
 
@@ -1139,6 +1179,16 @@ end;
 function TFluentDDLBuilder.ColumnGuid(const AName: string): IFluentDDLBuilder;
 begin
   Result := _AddColumn(AName, dltGuid, 0);
+end;
+ 
+function TFluentDDLBuilder.ColumnNumeric(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLBuilder;
+begin
+  Result := _AddColumn(AName, dltNumeric, 0, APrecision, AScale);
+end;
+ 
+function TFluentDDLBuilder.ColumnDecimal(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLBuilder;
+begin
+  Result := _AddColumn(AName, dltDecimal, 0, APrecision, AScale);
 end;
 
 function TFluentDDLBuilder.NotNull: IFluentDDLBuilder;
@@ -1380,14 +1430,15 @@ begin
     Result := nil;
 end;
 
-function TFluentDDLAlterTableAddBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
+function TFluentDDLAlterTableAddBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn or FHasConstraint then
     raise EArgumentException.Create(
       'DDL ALTER TABLE ADD: only one logical operation per AsString in this build (ESP-019/ESP-057).');
   if Trim(AName) = '' then
     raise EArgumentException.Create('DDL: column name is required');
-  FColumn := TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg);
+  FColumn := TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg, APrecision, AScale);
   FHasColumn := True;
   Result := Self;
 end;
@@ -1437,6 +1488,16 @@ end;
 function TFluentDDLAlterTableAddBuilder.ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
 begin
   Result := _AddColumn(AName, dltGuid, 0);
+end;
+ 
+function TFluentDDLAlterTableAddBuilder.ColumnNumeric(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltNumeric, 0, APrecision, AScale);
+end;
+ 
+function TFluentDDLAlterTableAddBuilder.ColumnDecimal(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltDecimal, 0, APrecision, AScale);
 end;
 
 function TFluentDDLAlterTableAddBuilder.NotNull: IFluentDDLAlterTableAddBuilder;
@@ -1864,10 +1925,23 @@ begin
   Result := FIdentityChanged;
 end;
 
-function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+function TFluentDDLAlterTableAlterColumnBuilder.GetPrecision: Integer;
+begin
+  Result := FPrecision;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetScale: Integer;
+begin
+  Result := FScale;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAlterColumnBuilder;
 begin
   FLogicalType := ALogicalType;
   FTypeArg := ATypeArg;
+  FPrecision := APrecision;
+  FScale := AScale;
   FTypeChanged := True;
   Result := Self;
 end;
@@ -1914,6 +1988,16 @@ end;
 function TFluentDDLAlterTableAlterColumnBuilder.TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
 begin
   Result := _SetType(dltGuid, 0);
+end;
+ 
+function TFluentDDLAlterTableAlterColumnBuilder.TypeNumeric(APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltNumeric, 0, APrecision, AScale);
+end;
+ 
+function TFluentDDLAlterTableAlterColumnBuilder.TypeDecimal(APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltDecimal, 0, APrecision, AScale);
 end;
 
 function TFluentDDLAlterTableAlterColumnBuilder.NotNull: IFluentDDLAlterTableAlterColumnBuilder;
@@ -2140,13 +2224,19 @@ end;
 
 { TFluentDDLTruncateTableBuilder }
 
-constructor TFluentDDLTruncateTableBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+constructor TFluentDDLTruncateTableBuilder.Create(const ADialect: TFluentSQLDriver; const ATables: array of string);
+var
+  LI: Integer;
 begin
   inherited Create;
   FDialect := ADialect;
-  FTableName := ATableName;
+  SetLength(FTableNames, Length(ATables));
+  for LI := 0 to Length(ATables) - 1 do
+    FTableNames[LI] := ATables[LI];
   FRestartIdentity := False;
+  FContinueIdentity := False;
   FCascade := False;
+  FPartitionName := '';
 end;
 
 function TFluentDDLTruncateTableBuilder.GetDialect: TFluentSQLDriver;
@@ -2156,7 +2246,15 @@ end;
 
 function TFluentDDLTruncateTableBuilder.GetTableName: string;
 begin
-  Result := FTableName;
+  if Length(FTableNames) > 0 then
+    Result := FTableNames[0]
+  else
+    Result := '';
+end;
+
+function TFluentDDLTruncateTableBuilder.GetTableNames: TArray<string>;
+begin
+  Result := FTableNames;
 end;
 
 function TFluentDDLTruncateTableBuilder.GetRestartIdentity: Boolean;
@@ -2164,14 +2262,32 @@ begin
   Result := FRestartIdentity;
 end;
 
+function TFluentDDLTruncateTableBuilder.GetContinueIdentity: Boolean;
+begin
+  Result := FContinueIdentity;
+end;
+
 function TFluentDDLTruncateTableBuilder.GetCascade: Boolean;
 begin
   Result := FCascade;
 end;
 
+function TFluentDDLTruncateTableBuilder.GetPartitionName: string;
+begin
+  Result := FPartitionName;
+end;
+
 function TFluentDDLTruncateTableBuilder.RestartIdentity: IFluentDDLTruncateTableBuilder;
 begin
   FRestartIdentity := True;
+  FContinueIdentity := False;
+  Result := Self;
+end;
+
+function TFluentDDLTruncateTableBuilder.ContinueIdentity: IFluentDDLTruncateTableBuilder;
+begin
+  FContinueIdentity := True;
+  FRestartIdentity := False;
   Result := Self;
 end;
 
@@ -2181,12 +2297,23 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLTruncateTableBuilder.Partition(const AName: string): IFluentDDLTruncateTableBuilder;
+begin
+  FPartitionName := AName;
+  Result := Self;
+end;
+
 function TFluentDDLTruncateTableBuilder.AsString: string;
 var
+  LI: Integer;
   LSerializer: TFluentDDLSerialize;
 begin
-  if Trim(FTableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
+  if Length(FTableNames) = 0 then
+    raise EArgumentException.Create('DDL: at least one table name is required');
+
+  for LI := 0 to Length(FTableNames) - 1 do
+    if Trim(FTableNames[LI]) = '' then
+      raise EArgumentException.Create('DDL: table name cannot be empty or blank');
 
   LSerializer := TFluentDDLSerialize.Create;
   try
@@ -2981,7 +3108,12 @@ end;
 
 function TFluentSchema.TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
 begin
-  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, ATableName);
+  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, [ATableName]);
+end;
+
+function TFluentSchema.TruncateTable(const ATables: array of string): IFluentDDLTruncateTableBuilder;
+begin
+  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, ATables);
 end;
 
 function TFluentSchema.CreateView(const AName: string): IFluentDDLCreateViewBuilder;

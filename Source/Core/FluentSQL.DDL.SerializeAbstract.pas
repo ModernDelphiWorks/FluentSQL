@@ -33,7 +33,8 @@ type
   protected
     function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
     function MapLogicalType(const ACol: IFluentDDLColumn): string; overload; virtual;
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; overload; virtual; abstract;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; overload; virtual; abstract;
     function GetDialect: TFluentSQLDriver; virtual; abstract;
     function Quote(const AName: string): string; virtual;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
@@ -47,6 +48,7 @@ type
     function GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string; virtual;
     function GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
     function ReferentialActionToString(AAction: TDDLReferentialAction): string; virtual;
+    function MapNumeric(const ATypeName: string; const APrecision, AScale: Integer): string; virtual;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -114,7 +116,7 @@ end;
 
 function TFluentDDLSerializeAbstract.MapLogicalType(const ACol: IFluentDDLColumn): string;
 begin
-  Result := MapLogicalType(ACol.LogicalType, ACol.TypeArg);
+  Result := MapLogicalType(ACol.LogicalType, ACol.TypeArg, ACol.Precision, ACol.Scale);
 end;
 
 function TFluentDDLSerializeAbstract.Quote(const AName: string): string;
@@ -336,7 +338,16 @@ end;
 
 function TFluentDDLSerializeAbstract.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
 begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['TruncateTable', Self.ClassName]);
+  if not Assigned(ADef) then
+    Exit('');
+
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL: multiple tables in a single TRUNCATE are not supported for this dialect (ESP-074).');
+
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL: advanced TRUNCATE options are not supported for this dialect (ESP-074).');
+
+  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
 function TFluentDDLSerializeAbstract.CreateView(const ADef: IFluentDDLCreateViewDef): string;
@@ -418,6 +429,20 @@ begin
     raNoAction: Result := 'NO ACTION';
     else Result := '';
   end;
+end;
+
+function TFluentDDLSerializeAbstract.MapNumeric(const ATypeName: string; const APrecision,
+  AScale: Integer): string;
+begin
+  if APrecision > 0 then
+  begin
+    if AScale > 0 then
+      Result := ATypeName + '(' + IntToStr(APrecision) + ',' + IntToStr(AScale) + ')'
+    else
+      Result := ATypeName + '(' + IntToStr(APrecision) + ')'
+  end
+  else
+    Result := ATypeName;
 end;
 
 end.

@@ -28,7 +28,8 @@ uses
 type
   TFluentDDLSerializerPostgreSQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -109,27 +110,21 @@ begin
     Result := '; ' + 'COMMENT ON TABLE ' + Quote(ATable.TableName) + ' IS ' + QuotedStr(ATable.Description);
 end;
 
-function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INTEGER';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'TIMESTAMP';
-    dltLongText:
-      Result := 'TEXT';
-    dltBlob:
-      Result := 'BYTEA';
-    dltGuid:
-      Result := 'UUID';
+    dltInteger: Result := 'INTEGER';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BOOLEAN';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'TIMESTAMP';
+    dltLongText: Result := 'TEXT';
+    dltBlob: Result := 'BYTEA';
+    dltGuid: Result := 'UUID';
+    dltNumeric: Result := MapNumeric('NUMERIC', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -207,7 +202,7 @@ begin
   LParts := TStringList.Create;
   try
     if ADef.TypeChanged then
-      LParts.Add('ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg));
+      LParts.Add('ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale));
 
     if ADef.NullabilityChanged then
     begin
@@ -274,14 +269,29 @@ begin
 end;
 
 function TFluentDDLSerializerPostgreSQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
-  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
-  if ADef.GetRestartIdentity then
-    Result := Result + ' RESTART IDENTITY';
-  if ADef.GetCascade then
+
+  Result := 'TRUNCATE TABLE ';
+  for LI := 0 to Length(ADef.TableNames) - 1 do
+  begin
+    if LI > 0 then Result := Result + ', ';
+    Result := Result + Quote(ADef.TableNames[LI]);
+  end;
+
+  if ADef.RestartIdentity then
+    Result := Result + ' RESTART IDENTITY'
+  else if ADef.ContinueIdentity then
+    Result := Result + ' CONTINUE IDENTITY';
+
+  if ADef.Cascade then
     Result := Result + ' CASCADE';
+
+  if ADef.PartitionName <> '' then
+    raise ENotSupportedException.Create('DDL PostgreSQL: PARTITION clause is not supported for TRUNCATE.');
 end;
 
 function TFluentDDLSerializerPostgreSQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;

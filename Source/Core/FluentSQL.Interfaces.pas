@@ -771,7 +771,9 @@ type
     dltDateTime,
     dltLongText,
     dltBlob,
-    dltGuid
+    dltGuid,
+    dltNumeric,
+    dltDecimal
   );
 
   /// <summary>ESP-055: types of constraints for table-level definitions.</summary>
@@ -809,6 +811,8 @@ type
     function GetLogicalType: TDDLLogicalType;
     /// <summary>For <c>dltVarChar</c>: max length; otherwise 0.</summary>
     function GetTypeArg: Integer;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     function GetNotNull: Boolean;
     function GetIsPrimaryKey: Boolean;
     function GetIsUnique: Boolean;
@@ -827,6 +831,8 @@ type
     property Name: string read GetName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
+    property Precision: Integer read GetPrecision;
+    property Scale: Integer read GetScale;
     property NotNull: Boolean read GetNotNull;
     property IsPrimaryKey: Boolean read GetIsPrimaryKey;
     property IsUnique: Boolean read GetIsUnique;
@@ -874,6 +880,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function ColumnGuid(const AName: string): IFluentDDLBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLBuilder; overload;
@@ -937,6 +945,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
@@ -1045,6 +1055,8 @@ type
     function GetColumnName: string;
     function GetLogicalType: TDDLLogicalType;
     function GetTypeArg: Integer;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     function GetNotNull: Boolean;
     function GetTypeChanged: Boolean;
     function GetNullabilityChanged: Boolean;
@@ -1059,6 +1071,8 @@ type
     property ColumnName: string read GetColumnName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
+    property Precision: Integer read GetPrecision;
+    property Scale: Integer read GetScale;
     property NotNull: Boolean read GetNotNull;
     property TypeChanged: Boolean read GetTypeChanged;
     property NullabilityChanged: Boolean read GetNullabilityChanged;
@@ -1081,6 +1095,8 @@ type
     function TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeNumeric(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDecimal(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
     function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
@@ -1150,19 +1166,27 @@ type
     ['{C6E8F1A2-3B4D-5E6F-A7B8-9C0D1E2F3A40}']
     function GetDialect: TFluentSQLDriver;
     function GetTableName: string;
+    function GetTableNames: TArray<string>;
     function GetRestartIdentity: Boolean;
+    function GetContinueIdentity: Boolean;
     function GetCascade: Boolean;
+    function GetPartitionName: string;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
+    property TableNames: TArray<string> read GetTableNames;
     property RestartIdentity: Boolean read GetRestartIdentity;
+    property ContinueIdentity: Boolean read GetContinueIdentity;
     property Cascade: Boolean read GetCascade;
+    property PartitionName: string read GetPartitionName;
   end;
 
   /// <summary>ESP-029: fluent builder for TRUNCATE TABLE SQL text (one command per AsString).</summary>
   IFluentDDLTruncateTableBuilder = interface(IFluentDDLTruncateTableDef)
     ['{D7F9A2B3-4C5E-6F70-B8C9-0D1E2F3A4B51}']
     function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function ContinueIdentity: IFluentDDLTruncateTableBuilder;
     function Cascade: IFluentDDLTruncateTableBuilder;
+    function Partition(const AName: string): IFluentDDLTruncateTableBuilder;
     function AsString: string;
   end;
 
@@ -1434,7 +1458,8 @@ type
     function Table(const ATableName: string): IFluentDDLTable;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
-    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder; overload;
+    function TruncateTable(const ATables: array of string): IFluentDDLTruncateTableBuilder; overload;
     function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
     function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
