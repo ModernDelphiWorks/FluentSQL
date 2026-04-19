@@ -120,18 +120,6 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 
 ---
 
-### Fase 5 — Governança e Operações Avançadas
-
-**Objetivo:** Fortalecer a infraestrutura de automação do projeto e introduzir operações de dados complexas que, embora específicas, podem ter uma fundação comum no núcleo.
-
-**Previsão:** Q1 2027
-
-- [x] **ESP-060 — Governance: Automated Kanban Drift Prevention:** Implementação de script de reconciliação contínua entre a realidade do repo e o GitHub Project V2.
-- [ ] **ESP-075 — DDL: Logical Namespaces (CREATE/DROP SCHEMA):** Suporte a criação e deleção de esquemas lógicos.
-- [ ] **ESP-076 — DML: MERGE Skeleton (UPSERT Pattern):** Prover o esqueleto de API no núcleo (ADR-016) para que os drivers implementem o `MERGE` conforme o dialeto (ex. `INSERT ... ON CONFLICT` vs `MERGE INTO`).
-
----
-
 ### Fase 4 — Performance e Extensões Distribuídas
 
 **Objetivo:** Introduzir optimizações para ambientes de larga escala e alta disponibilidade, permitindo que o FluentSQL se integre com caches distribuídas para evitar redundância de processamento.

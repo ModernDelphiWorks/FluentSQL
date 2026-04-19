@@ -107,6 +107,7 @@ The `Schema(dbnDialect)` method is the entry point for **DDL** operations (Creat
 | [Configuration & `dbn*`](docs-src/docs/fluentsql/reference/configuration.md) | Dialect constants |
 | [Tests](docs-src/docs/fluentsql/tests/overview.md) | DUnitX suite |
 | [Troubleshooting](docs-src/docs/fluentsql/troubleshooting/common-errors.md) | Common errors |
+| [Docs CI](docs-src/docs/fluentsql/getting-started/documentation-ci.md) | Docusaurus / GitHub Actions |
 
 The static site under `docs/` is built and committed in CI when `docs-src/` changes on `main` or `develop` ([`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml)). PRs touching `docs-src/` are validated by [`.github/workflows/docs-build.yml`](.github/workflows/docs-build.yml).
 
@@ -128,7 +129,7 @@ The static site under `docs/` is built and committed in CI when `docs-src/` chan
 | `Firebird_tests/PTestFluentSQLSample.dpr` | Minimal sample. |
 | `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
 
-**Dialect extension (ESP-016 closure):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guide [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
+**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Dialect extension (ESP-016 closure):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guide [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
 
 ---
 
