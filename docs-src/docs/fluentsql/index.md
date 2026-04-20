@@ -3,7 +3,7 @@ displayed_sidebar: fluentsqlSidebar
 title: FluentSQL
 ---
 
-**FluentSQL** é uma Fluent API para Delphi e Lazarus que monta consultas SQL (SELECT, INSERT, UPDATE, DELETE) de forma **agnóstica ao SGBD**, com serialização por driver e árvore sintática interna. Desde a **v1.1.0**, o repositório documenta builders DDL; na **v1.4.0** (atual) introduz-se suporte completo a **MongoDB Aggregations & Joins**, **DDL MongoDB** (Capped Collections, TTL), **Views**, **Sequences** e **Identidade Nativa**.
+**FluentSQL** é uma Fluent API para Delphi e Lazarus que monta consultas SQL (SELECT, INSERT, UPDATE, DELETE) de forma **agnóstica ao SGBD**, com serialização por driver e árvore sintática interna. Desde a **v1.1.0**, o repositório documenta builders DDL; na **v1.4.0** introduziu suporte completo a **MongoDB Aggregations & Joins**, **DDL MongoDB** (Capped Collections, TTL), **Views**, **Sequences** e **Identidade Nativa**. Na **v1.5.0** (atual), adiciona-se suporte a **DDL Schemas** e o esqueleto para operações **DML MERGE**.
 
 ## Where to start
 
@@ -17,11 +17,13 @@ title: FluentSQL
 
 - [Build a SELECT](guides/construir-select.md)
 - [INSERT, UPDATE, DELETE](guides/dml-insert-update-delete.md)
+- [DML — MERGE (Skeleton)](guides/dml-merge.md)
 - [Parameters and UNION / INTERSECT](guides/parametros-e-uniao.md)
 - [Explicit per-engine extension](guides/extensao-por-dialeto.md)
 - [Cache Distribuído (Redis)](guides/cache-distribuido.md)
 - [MongoDB Aggregations & Joins](guides/mongodb-aggregation-joins.md)
 - [MongoDB DDL Extensions](guides/mongodb-ddl.md)
+- [DDL — Schemas](guides/ddl-schemas.md)
 - [DDL — CREATE TABLE](guides/ddl-create-table.md)
 - [DDL — Foreign Keys](guides/ddl-foreign-keys.md)
 - [DDL — Views & Sequences](guides/ddl-views-sequences.md)
@@ -45,5 +47,5 @@ title: FluentSQL
 
 ## Scope
 
-- **Cobre:** construção fluente de SQL, dialetos suportados via `Source/Drivers/`; na **v1.4.0**, suporte robusto a **MongoDB Aggregations** (`GROUP BY`, `HAVING`) e **Joins** (`INNER`, `LEFT`) traduzidos para `$lookup`, além de extensões DDL para MongoDB, suporte a **Views**, **Sequences**, **Comments** e **Advanced Identity** em múltiplos dialetos.
+- **Cobre:** construção fluente de SQL, dialetos suportados via `Source/Drivers/`; na **v1.5.0**, suporte a **DDL Schemas** (namespaces lógicos) e esqueleto inicial para **DML MERGE**, além de **MongoDB Aggregations**, **Views**, **Sequences**, **Comments** e **Advanced Identity**.
 - **Não cobre:** binding em runtime com FireDAC/UniDAC (apenas contratos de SQL + `Params`), nem substituição de camada de acesso a dados.

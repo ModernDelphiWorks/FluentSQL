@@ -3,14 +3,17 @@ displayed_sidebar: fluentsqlSidebar
 title: API reference
 ---
 
-Documentation aligned with release **v1.4.0** (2026-04-17), featuring MongoDB Aggregations and Joins support. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
+Documentation aligned with release **v1.5.0** (2026-04-20), featuring DDL Schemas and MERGE DML skeleton. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
 
 ## Main entry points
 
 | Item | Descrição |
 |------|-----------|
 | **Query Factory (DML)** | **`Query(dbnFirebird)`** (unit `FluentSQL`) é o ponto de entrada principal para consultas. As fábricas legadas `CreateFluentSQL` e `TCQ` encontram-se obsoletas. |
+| **Merge (DML)** | **`Query(dbnMSSQL).Merge`** (unit `FluentSQL`) devolve **`IFluentSQLMerge`**, ponto de entrada para operações MERGE. |
 | **Schema Factory (DDL)** | **`Schema(dbnPostgreSQL)`** (unit `FluentSQL`) devolve **`IFluentSchema`**, ponto de entrada centralizado para todas as operações DDL. |
+| DDL (`CREATE SCHEMA`) | **`Schema(dbnPostgreSQL).Create`** (sem arg) devolve **`IFluentSQLSchemaDef`**; gera `CREATE SCHEMA`. Ver [DDL — Schemas](../guides/ddl-schemas.md). |
+| DDL (`DROP SCHEMA`) | **`Schema(dbnPostgreSQL).Drop`** (sem arg) devolve **`IFluentSQLSchemaDef`**; gera `DROP SCHEMA`. Ver [DDL — Schemas](../guides/ddl-schemas.md). |
 | DDL (`CREATE TABLE`) | **`Schema(dbnFirebird).CreateTable('TABELA')`** devolve **`IFluentDDLBuilder`**; suporte a constraints e chaves estrangeiras. Ver [DDL — CREATE TABLE](../guides/ddl-create-table.md). |
 | DDL (`DROP TABLE`) | **`Schema(dbnFirebird).DropTable('TABELA')`** devolve **`IFluentDDLDropBuilder`**; encadear **`.IfExists`** antes de **`AsString`**. Ver [DDL — DROP TABLE](../guides/ddl-drop-table.md). |
 | DDL (`ALTER TABLE ADD`) | **`Schema(ADialect).AlterTableAdd('TABELA')`** devolve **`IFluentDDLAlterTableAddBuilder`**. Ver [DDL — ALTER TABLE ADD COLUMN](../guides/ddl-alter-table-add-column.md). |

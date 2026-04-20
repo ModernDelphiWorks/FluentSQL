@@ -27,6 +27,12 @@ title: Erros comuns
 - **Provável causa:** **`AddRow`** chamado sem **`SetValue`** (ou equivalente) na linha corrente; linhas com **número ou nomes de colunas** diferentes; valor em falta para uma coluna esperada na linha.
 - **Ação:** preencha cada linha com o mesmo conjunto de colunas antes de **`AddRow`**; não chame **`AddRow`** com **`Values`** vazio. A **última** linha pode ser fechada só com **`AsString`** (*flush* implícito). Use **`Clear`** na secção Insert para recomeçar todas as linhas. Referência: **`FluentSQL.Insert.pas`**, guia [INSERT, UPDATE e DELETE](../guides/dml-insert-update-delete.md); rastreio **ESP-015** / **[1.0.9]**: issue [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24).
 
+## `ENotSupportedException` ao usar Schemas ou MERGE
+
+- **Sintoma:** erro em tempo de execução ao chamar `.AsString` em operações de Schema ou Merge.
+- **Provável causa:** o dialeto selecionado (ex: SQLite, Firebird) não possui suporte implementado para a operação solicitada (Schemas ou MERGE skeleton).
+- **Ação:** verifique a [Matriz de Suporte](../architecture/overview.md#matriz-de-dialetos). No caso de Schemas, utilize dialetos como PostgreSQL ou MSSQL. Operações de Schema no MySQL são mapeadas para Database.
+
 ## «Select do banco … não está registrado» em runtime (testes ou app)
 
 - **Sintoma:** em execução, exceção ao serializar indicando que o **select** do dialeto não foi registrado, apesar de units `FluentSQL.Select*` estarem no `uses`.
