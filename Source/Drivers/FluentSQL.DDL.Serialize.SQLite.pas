@@ -50,6 +50,8 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -240,6 +242,16 @@ end;
 function TFluentDDLSerializerSQLite.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
 begin
   raise ENotSupportedException.Create('DDL SQLite: ALTER TABLE DROP CONSTRAINT is not supported (ESP-057).');
+end;
+
+function TFluentDDLSerializerSQLite.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise ENotSupportedException.Create('DDL SQLite: CREATE SCHEMA is not supported (ADR-075).');
+end;
+
+function TFluentDDLSerializerSQLite.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise ENotSupportedException.Create('DDL SQLite: DROP SCHEMA is not supported (ADR-075).');
 end;
 
 end.

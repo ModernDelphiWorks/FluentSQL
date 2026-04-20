@@ -60,6 +60,8 @@ type
     function Ceil(const AValue: String): String; virtual;
     function Modulus(const AValue, ADivisor: String): String; virtual;
     function Abs(const AValue: String): String; virtual;
+    function Schema(const AName: string): IFluentSQLSchemaBuilder; virtual;
+    function Merge: IFluentSQLMerge; virtual;
   end;
 
 implementation
@@ -205,6 +207,16 @@ end;
 function TFluentSQLFunctionAbstract.Year(const AValue: String): String;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['Year', Self.ClassName]);
+end;
+
+function TFluentSQLFunctionAbstract.Schema(const AName: string): IFluentSQLSchemaBuilder;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['Schema', Self.ClassName]);
+end;
+
+function TFluentSQLFunctionAbstract.Merge: IFluentSQLMerge;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['Merge', Self.ClassName]);
 end;
 
 end.

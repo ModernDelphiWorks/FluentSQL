@@ -52,6 +52,8 @@ type
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
     function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
     function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
     function GetDialect: TFluentSQLDriver; override;
   end;
 
@@ -333,6 +335,30 @@ begin
   LReg := TFluentSQLRegister.Create;
   try
     Result := LReg.DDLSerialize(ADef.Dialect).DropFunction(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).CreateSchema(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentDDLSerialize.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.DDLSerialize(ADef.Dialect).DropSchema(ADef);
   finally
     LReg.Free;
   end;
