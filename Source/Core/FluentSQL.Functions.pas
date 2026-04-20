@@ -66,11 +66,15 @@ type
     function Round(const AValue: String; const ADecimals: Integer): String; override;
     function Floor(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
-    function Modulus(const AValue, ADivisor: String): String;
-    function Abs(const AValue: String): String;
+    function Modulus(const AValue, ADivisor: String): String; override;
+    function Abs(const AValue: String): String; override;
+    function Schema(const AName: string): IFluentSQLSchemaBuilder; override;
+    function Merge: IFluentSQLMerge; override;
   end;
 
 implementation
+
+uses FluentSQL;
 
 { TFluentSQLFunctions }
 
@@ -225,6 +229,20 @@ end;
 function TFluentSQLFunctions.Ceil(const AValue: String): String;
 begin
   Result := 'CEIL(' + AValue + ')';
+end;
+
+function TFluentSQLFunctions.Schema(const AName: string): IFluentSQLSchemaBuilder;
+begin
+  Result := FluentSQL.Schema(FDatabase).Schema(AName);
+end;
+
+function TFluentSQLFunctions.Merge: IFluentSQLMerge;
+begin
+  // Forward to a helper or implement here. For now, we'll need a way to get a Merge builder.
+  // In FluentSQL.pas we will add a Query(FDatabase).Merge entry if needed, 
+  // but Func.Merge is the required entry point.
+  // We'll implement TFluentSQLMerge in FluentSQL.pas and provide a factory.
+  Result := TFluentSQL.Create(FDatabase).Merge;
 end;
 
 end.

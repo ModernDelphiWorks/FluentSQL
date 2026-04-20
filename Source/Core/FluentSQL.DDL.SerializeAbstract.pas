@@ -73,6 +73,8 @@ type
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; virtual;
     function CreateFunction(const ADef: IFluentDDLFunctionDef): string; virtual;
     function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; virtual;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; virtual;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; virtual;
   end;
 
 implementation
@@ -443,6 +445,16 @@ begin
   end
   else
     Result := ATypeName;
+end;
+
+function TFluentDDLSerializeAbstract.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateSchema', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropSchema', Self.ClassName]);
 end;
 
 end.

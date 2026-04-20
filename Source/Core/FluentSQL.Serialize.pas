@@ -30,12 +30,17 @@ type
     /// <summary>SQL body without ESP-016 dialect tail (WITH/UNION included).</summary>
     function ComposeSqlCore(const AAST: IFluentSQLAST): String;
     function AsString(const AAST: IFluentSQLAST): String; virtual;
+    function Merge(const ADef: IFluentSQLMergeDef): string; virtual;
+    function QuotedName(const AName: string): string; virtual;
   end;
 
 /// <summary>Suffix emitted only for fragments whose dialect matches the query serialization dialect (ADR-016).</summary>
 function DialectOnlySqlSuffix(const AAST: IFluentSQLAST): String;
 
 implementation
+
+uses
+  FluentSQL.Register;
 
 function UnionRemapBranchSQL(const ABranchSQL: string; APrimaryParamCount,
   ABranchParamCount: Integer): string;
@@ -89,6 +94,9 @@ begin
                           AAST.GroupBy.Serialize,
                           AAST.Having.Serialize,
                           AAST.OrderBy.Serialize]);
+  
+  if Assigned(AAST.Merge) then
+    LBase := TUtils.Concat([LBase, AAST.Merge.Serialize]);
 
   if AAST.WithAlias <> '' then
     Result := 'WITH ' + AAST.WithAlias + ' AS (' + LBase + ') SELECT * FROM ' + AAST.WithAlias
@@ -106,6 +114,23 @@ end;
 function TFluentSQLSerialize.AsString(const AAST: IFluentSQLAST): String;
 begin
   Result := ComposeSqlCore(AAST) + DialectOnlySqlSuffix(AAST);
+end;
+
+function TFluentSQLSerialize.Merge(const ADef: IFluentSQLMergeDef): string;
+var
+  LReg: TFluentSQLRegister;
+begin
+  LReg := TFluentSQLRegister.Create;
+  try
+    Result := LReg.Serialize(ADef.GetDialect).Merge(ADef);
+  finally
+    LReg.Free;
+  end;
+end;
+
+function TFluentSQLSerialize.QuotedName(const AName: string): string;
+begin
+  Result := AName;
 end;
 
 end.

@@ -57,6 +57,8 @@ type
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
     function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
     function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -395,6 +397,20 @@ begin
     Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
   else
     Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'CREATE DATABASE ' + Quote(ADef.GetSchemaName);
+end;
+
+function TFluentDDLSerializerMySQL.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'DROP DATABASE ' + Quote(ADef.GetSchemaName);
 end;
 
 end.

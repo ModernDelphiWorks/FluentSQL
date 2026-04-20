@@ -59,6 +59,8 @@ type
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
     function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
     function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -405,6 +407,16 @@ begin
     Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
   else
     Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
+end;
+
+function TFluentDDLSerializerFirebird.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise ENotSupportedException.Create('DDL Firebird: CREATE SCHEMA is not supported (ADR-075).');
+end;
+
+function TFluentDDLSerializerFirebird.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise ENotSupportedException.Create('DDL Firebird: DROP SCHEMA is not supported (ADR-075).');
 end;
 
 end.

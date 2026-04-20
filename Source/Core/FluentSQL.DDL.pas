@@ -608,6 +608,22 @@ type
     function AsString: string;
   end;
 
+  TFluentSQLSchemaBuilder = class(TInterfacedObject, IFluentSQLSchemaBuilder, IFluentSQLSchemaDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FSchemaName: string;
+    FIsDrop: Boolean;
+    function DoCreate: IFluentSQLSchemaBuilder;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    function IFluentSQLSchemaBuilder.Create = DoCreate;
+    function Drop: IFluentSQLSchemaBuilder;
+    function AsString: string;
+    { IFluentSQLSchemaDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetSchemaName: string;
+  end;
+
   TFluentDDLDropTriggerBuilder = class(TInterfacedObject, IFluentDDLDropTriggerBuilder, IFluentDDLDropTriggerDef)
   strict private
     FDialect: TFluentSQLDriver;
@@ -717,6 +733,7 @@ type
     function DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
     function EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
     function DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function Schema(const AName: string): IFluentSQLSchemaBuilder;
   end;
 
 
@@ -3174,6 +3191,58 @@ end;
 function TFluentSchema.DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
 begin
   Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, ATableName, ATriggerName, False);
+end;
+
+function TFluentSchema.Schema(const AName: string): IFluentSQLSchemaBuilder;
+begin
+  Result := TFluentSQLSchemaBuilder.Create(FDialect, AName);
+end;
+
+{ TFluentSQLSchemaBuilder }
+
+constructor TFluentSQLSchemaBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FSchemaName := AName;
+  FIsDrop := False;
+end;
+
+function TFluentSQLSchemaBuilder.DoCreate: IFluentSQLSchemaBuilder;
+begin
+  FIsDrop := False;
+  Result := Self;
+end;
+
+function TFluentSQLSchemaBuilder.Drop: IFluentSQLSchemaBuilder;
+begin
+  FIsDrop := True;
+  Result := Self;
+end;
+
+function TFluentSQLSchemaBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    if FIsDrop then
+      Result := LSerializer.DropSchema(Self)
+    else
+      Result := LSerializer.CreateSchema(Self);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+function TFluentSQLSchemaBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentSQLSchemaBuilder.GetSchemaName: string;
+begin
+  Result := FSchemaName;
 end;
 
 end.

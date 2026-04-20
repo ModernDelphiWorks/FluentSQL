@@ -21,6 +21,7 @@ unit FluentSQL.Interfaces;
 interface
 
 uses
+  System.Classes,
   FluentSQL.Cache.Interfaces;
 
 type
@@ -43,6 +44,13 @@ type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
+  IFluentSQLMerge = interface;
+  IFluentSQLMergeDef = interface;
+  IFluentSQLMergeMatchClauseDef = interface;
+  IFluentSQLSchemaDef = interface;
+  IFluentSQLSchemaBuilder = interface;
+  IFluentSQLNameValuePairs = interface;
+  IFluentSQLNames = interface;
 
   IFluentSQLParam = interface
     ['{3320078D-5B6A-4A8E-8C79-D8763B8F8942}']
@@ -293,6 +301,7 @@ type
     function Month(const AValue: String): IFluentSQL;
     function Year(const AValue: String): IFluentSQL;
     function Concat(const AValue: array of String): IFluentSQL;
+    function Merge: IFluentSQLMerge;
     /// <summary>ESP-016 / ADR-016: append SQL only when serializing for ADialect; other engines omit. Not universal SQL.</summary>
     function ForDialectOnly(const ADialect: TFluentSQLDriver; const ASqlFragment: string): IFluentSQL; overload;
     /// <summary>ESP-016: same as string overload; scalars bind via IFluentSQLParams (placeholders :pN in AST dialect).</summary>
@@ -354,6 +363,31 @@ type
     procedure _SetDirection(const value: TOrderByDirection);
     //
     property Direction: TOrderByDirection read _GetDirection write _SetDirection;
+  end;
+
+
+  IFluentSQLMergeDef = interface(IFluentSQLSection)
+    ['{E1D2E3F4-A5B6-4C7D-8E9F-0A2B3C4D5E6F}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTargetTable: string;
+    function GetTargetAlias: string;
+    function GetSourceTable: string;
+    function GetSourceAlias: string;
+    function GetSourceQuery: IFluentSQL;
+    function GetOnCondition: string;
+    function GetMatchedClauses: TInterfaceList; // List of IFluentSQLMergeMatchClauseDef
+    function Serialize: string;
+  end;
+
+  IFluentSQLMergeMatchClauseType = (mctMatched, mctNotMatched);
+  IFluentSQLMergeActionType = (matUpdate, matDelete, matInsert);
+
+  IFluentSQLMergeMatchClauseDef = interface
+    ['{F1A2B3C4-D5E6-4F7A-8B9C-0D1E2F3A4B5C}']
+    function GetClauseType: IFluentSQLMergeMatchClauseType;
+    function GetCondition: string;
+    function GetActionType: IFluentSQLMergeActionType;
+    function GetValues: IFluentSQLNameValuePairs; // For Update/Insert
   end;
 
   IFluentSQLOrderBy = interface(IFluentSQLSection)
@@ -543,6 +577,8 @@ type
     function GroupBy: IFluentSQLGroupBy;
     function Having: IFluentSQLHaving;
     function OrderBy: IFluentSQLOrderBy;
+    function Merge: IFluentSQLMergeDef;
+    procedure _SetMerge(const Value: IFluentSQLMergeDef);
     property ASTColumns: IFluentSQLNames read _GetASTColumns write _SetASTColumns;
     property ASTSection: IFluentSQLSection read _GetASTSection write _SetASTSection;
     property ASTName: IFluentSQLName read _GetASTName write _SetASTName;
@@ -556,6 +592,8 @@ type
   IFluentSQLSerialize = interface
     ['{8F7A3C1F-2704-401F-B1DF-D334EEFFC8B7}']
     function AsString(const AAST: IFluentSQLAST): String;
+    function Merge(const ADef: IFluentSQLMergeDef): string;
+    function QuotedName(const AName: string): string;
   end;
 
   TFluentSQLOperatorCompare = (fcEqual, fcNotEqual,
@@ -718,6 +756,24 @@ type
     function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
     function CreateFunction(const ADef: IFluentDDLFunctionDef): string;
     function DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string;
+  end;
+
+
+  IFluentSQLSchemaDef = interface
+    ['{7A8B9C0D-1E2F-3A4B-5C6D-7E8F9A0B1C2D}']
+    function GetDialect: TFluentSQLDriver;
+    function GetSchemaName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property SchemaName: string read GetSchemaName;
+  end;
+
+  IFluentSQLSchemaBuilder = interface
+    ['{8A9B0C1D-2E3F-4A5B-6C7D-8E9F0A1B2C3D}']
+    function Create: IFluentSQLSchemaBuilder;
+    function Drop: IFluentSQLSchemaBuilder;
+    function AsString: string;
   end;
 
 
@@ -756,6 +812,35 @@ type
     function Ceil(const AValue: String): String;
     function Modulus(const AValue, ADivisor: String): String;
     function Abs(const AValue: String): String;
+    // Schema
+    function Schema(const AName: string): IFluentSQLSchemaBuilder;
+    // Merge (ESP-076)
+    function Merge: IFluentSQLMerge;
+  end;
+
+  IFluentSQLMergeWhenMatched = interface
+    ['{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5E}']
+    function Update: IFluentSQLMerge;
+    function Delete: IFluentSQLMerge;
+  end;
+
+  IFluentSQLMergeWhenNotMatched = interface
+    ['{B1A2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5F}']
+    function Insert: IFluentSQLMerge;
+  end;
+
+  IFluentSQLMerge = interface
+    ['{C1D2E3F4-A5B6-4C7D-8E9F-0A1B2C3D4E5F}']
+    function Into(const ATableName: string): IFluentSQLMerge; overload;
+    function Into(const ATableName, AAlias: string): IFluentSQLMerge; overload;
+    function Using(const ATableName: string): IFluentSQLMerge; overload;
+    function Using(const ATableName, AAlias: string): IFluentSQLMerge; overload;
+    function Using(const AQuery: IFluentSQL; const AAlias: string): IFluentSQLMerge; overload;
+    function On(const ACondition: string): IFluentSQLMerge; overload;
+    function On(const ACondition: array of const): IFluentSQLMerge; overload;
+    function WhenMatched: IFluentSQLMergeWhenMatched;
+    function WhenNotMatched: IFluentSQLMergeWhenNotMatched;
+    function AsString: string;
   end;
 
   /// <summary>ESP-061: scope of identity generation.</summary>
@@ -1472,6 +1557,7 @@ type
     function DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
     function EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
     function DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function Schema(const AName: string): IFluentSQLSchemaBuilder;
   end;
 
 implementation
