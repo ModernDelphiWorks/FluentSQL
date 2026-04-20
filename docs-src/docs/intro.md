@@ -16,7 +16,7 @@ Welcome to the **FluentSQL** technical documentation portal. Content is derived 
         <h3>FluentSQL</h3>
       </div>
       <div className="card__body">
-        <p>Fluent API for building SQL in Delphi/Lazarus with an AST, per-dialect drivers, and parameters aligned to the generated SQL. The stable public factory is <code>Query(ADialect)</code> for DML and <code>Schema(ADialect)</code> for DDL (since v1.3.0). <strong>v1.4.0</strong> (2026-04-17) introduces <strong>MongoDB Aggregations & Joins</strong> (<strong>ESP-067</strong>, <strong>ESP-068</strong>), <strong>MongoDB DDL</strong> (Capped Collections, TTL Indexes), and <strong>DDL Core Expansion</strong> (Views, Sequences, Identity columns, and Table/Column comments).</p>
+        <p>Fluent API for building SQL in Delphi/Lazarus with an AST, per-dialect drivers, and parameters aligned to the generated SQL. The stable public factory is <code>Query(ADialect)</code> for DML and <code>Schema(ADialect)</code> for DDL (since v1.3.0). <strong>v1.5.0</strong> (2026-04-20) introduces <strong>DDL Schema Support</strong> (<strong>ESP-075</strong>) and <strong>DML MERGE Skeleton</strong> (<strong>ESP-076</strong>).</p>
       </div>
       <div className="card__footer">
         <a className="button button--primary" href="./fluentsql/">Open documentation →</a>
@@ -27,9 +27,10 @@ Welcome to the **FluentSQL** technical documentation portal. Content is derived 
 
 ## Documented release
 
-This portal matches the published **v1.4.0** tag (2026-04-17), per `CHANGELOG.md`, `boss.json`, and repository tags.
+This portal matches the published **v1.5.0** tag (2026-04-20), per `CHANGELOG.md`, `boss.json`, and repository tags.
 
-- **[1.4.0]** (today) — **MongoDB Aggregations & Joins** (Issues [#86], [#87]), **MongoDB DDL** (Capped Collections, TTL Indexes, Issues [#83]-[#85]), **DDL Core Expansion** (Views, Sequences, Identity, Comments).
+- **[1.5.0]** (today) — **DDL Schema Support** (Issue [#142]), **DML MERGE Skeleton** (Issue [#142]), **DDL Advanced Truncate** (Issue [#136]).
+- **[1.4.0]** — **MongoDB Aggregations & Joins** (Issues [#86], [#87]), **MongoDB DDL** (Capped Collections, TTL Indexes), **DDL Core Expansion** (Views, Sequences, Identity, Comments).
 - **[1.3.0]** — **ESP-047** ([#65](https://github.com/ModernDelphiWorks/FluentSQL/issues/65)) Rename Table, GUID support, and DDL API refactoring.
 - **[1.2.0]** — **ESP-032** Redis Cache ([#47](https://github.com/ModernDelphiWorks/FluentSQL/issues/47)), **ESP-034** DDL Constraints ([#48](https://github.com/ModernDelphiWorks/FluentSQL/issues/48)), **ESP-035** Foreign Keys ([#49](https://github.com/ModernDelphiWorks/FluentSQL/issues/49)), plus TRUNCATE and RENAME.
 
