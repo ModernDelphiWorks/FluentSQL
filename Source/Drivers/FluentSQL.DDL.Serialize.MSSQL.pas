@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerMSSQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -52,6 +53,15 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; override;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; override;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -117,27 +127,21 @@ begin
   end;
 end;
 
-function TFluentDDLSerializerMSSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerMSSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INT';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BIT';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'DATETIME2';
-    dltLongText:
-      Result := 'VARCHAR(MAX)';
-    dltBlob:
-      Result := 'VARBINARY(MAX)';
-    dltGuid:
-      Result := 'UNIQUEIDENTIFIER';
+    dltInteger: Result := 'INT';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BIT';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'DATETIME2';
+    dltLongText: Result := 'VARCHAR(MAX)';
+    dltBlob: Result := 'VARBINARY(MAX)';
+    dltGuid: Result := 'UNIQUEIDENTIFIER';
+    dltNumeric: Result := MapNumeric('NUMERIC', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL MSSQL: unknown logical type');
   end;
@@ -232,7 +236,7 @@ begin
     if not ADef.TypeChanged then
       raise EArgumentException.Create('DDL MSSQL: column type must be restated during ALTER COLUMN.');
 
-    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale);
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
 
     if ADef.NotNull then
@@ -276,9 +280,11 @@ function TFluentDDLSerializerMSSQL.TruncateTable(const ADef: IFluentDDLTruncateT
 begin
   if not Assigned(ADef) then
     Exit('');
-  if Trim(ADef.TableName) = '' then
-    raise EArgumentException.Create('DDL MSSQL: table name is required');
-    
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL MSSQL: multiple tables in a single TRUNCATE are not supported.');
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL MSSQL: advanced TRUNCATE options are not supported in this build.');
+
   Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
@@ -327,6 +333,120 @@ end;
 function TFluentDDLSerializerMSSQL.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
 begin
   Result := inherited AlterTableDropConstraint(ADef);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR ALTER PROCEDURE ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'CREATE PROCEDURE ' + Quote(ADef.ProcedureName);
+
+  if ADef.Params <> '' then
+    Result := Result + ' ' + ADef.Params;
+
+  Result := Result + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMSSQL.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP PROCEDURE IF EXISTS ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'DROP PROCEDURE ' + Quote(ADef.ProcedureName);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+var
+  LEvent, LTime: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  case ADef.Event of
+    teInsert: LEvent := 'INSERT';
+    teUpdate: LEvent := 'UPDATE';
+    teDelete: LEvent := 'DELETE';
+  else
+    LEvent := 'INSERT';
+  end;
+
+  if ADef.Time = ttBefore then
+    LTime := 'FOR'
+  else
+    LTime := 'AFTER';
+
+  Result := 'CREATE TRIGGER ' + Quote(ADef.TriggerName) + ' ON ' + Quote(ADef.TableName) +
+            ' ' + LTime + ' ' + LEvent + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMSSQL.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP TRIGGER IF EXISTS ' + Quote(ADef.TriggerName)
+  else
+    Result := 'DROP TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerMSSQL.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.Enabled then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ENABLE TRIGGER ' + Quote(ADef.TriggerName)
+  else
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DISABLE TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR ALTER FUNCTION ' + Quote(ADef.FunctionName)
+  else
+    Result := 'CREATE FUNCTION ' + Quote(ADef.FunctionName);
+
+  if ADef.Params <> '' then
+    Result := Result + ' (' + ADef.Params + ')';
+
+  Result := Result + ' RETURNS ' + ADef.Returns + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMSSQL.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
+  else
+    Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
+end;
+
+function TFluentDDLSerializerMSSQL.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'CREATE SCHEMA ' + Quote(ADef.GetSchemaName);
+end;
+
+function TFluentDDLSerializerMSSQL.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'DROP SCHEMA ' + Quote(ADef.GetSchemaName);
 end;
 
 end.

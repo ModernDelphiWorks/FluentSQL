@@ -28,7 +28,8 @@ uses
 type
   TFluentDDLSerializerPostgreSQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -51,6 +52,15 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; override;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; override;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -102,27 +112,21 @@ begin
     Result := '; ' + 'COMMENT ON TABLE ' + Quote(ATable.TableName) + ' IS ' + QuotedStr(ATable.Description);
 end;
 
-function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerPostgreSQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INTEGER';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'TIMESTAMP';
-    dltLongText:
-      Result := 'TEXT';
-    dltBlob:
-      Result := 'BYTEA';
-    dltGuid:
-      Result := 'UUID';
+    dltInteger: Result := 'INTEGER';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BOOLEAN';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'TIMESTAMP';
+    dltLongText: Result := 'TEXT';
+    dltBlob: Result := 'BYTEA';
+    dltGuid: Result := 'UUID';
+    dltNumeric: Result := MapNumeric('NUMERIC', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -200,7 +204,7 @@ begin
   LParts := TStringList.Create;
   try
     if ADef.TypeChanged then
-      LParts.Add('ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg));
+      LParts.Add('ALTER COLUMN ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale));
 
     if ADef.NullabilityChanged then
     begin
@@ -267,14 +271,29 @@ begin
 end;
 
 function TFluentDDLSerializerPostgreSQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
-  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
-  if ADef.GetRestartIdentity then
-    Result := Result + ' RESTART IDENTITY';
-  if ADef.GetCascade then
+
+  Result := 'TRUNCATE TABLE ';
+  for LI := 0 to Length(ADef.TableNames) - 1 do
+  begin
+    if LI > 0 then Result := Result + ', ';
+    Result := Result + Quote(ADef.TableNames[LI]);
+  end;
+
+  if ADef.RestartIdentity then
+    Result := Result + ' RESTART IDENTITY'
+  else if ADef.ContinueIdentity then
+    Result := Result + ' CONTINUE IDENTITY';
+
+  if ADef.Cascade then
     Result := Result + ' CASCADE';
+
+  if ADef.PartitionName <> '' then
+    raise ENotSupportedException.Create('DDL PostgreSQL: PARTITION clause is not supported for TRUNCATE.');
 end;
 
 function TFluentDDLSerializerPostgreSQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;
@@ -322,6 +341,113 @@ end;
 function TFluentDDLSerializerPostgreSQL.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
 begin
   Result := inherited AlterTableDropConstraint(ADef);
+end;
+
+function TFluentDDLSerializerPostgreSQL.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR REPLACE PROCEDURE ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'CREATE PROCEDURE ' + Quote(ADef.ProcedureName);
+
+  Result := Result + '(' + ADef.Params + ') LANGUAGE plpgsql AS $$ ' + ADef.Body + ' $$';
+end;
+
+function TFluentDDLSerializerPostgreSQL.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP PROCEDURE IF EXISTS ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'DROP PROCEDURE ' + Quote(ADef.ProcedureName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+var
+  LTime, LEvent: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LTime := 'AFTER';
+  if ADef.Time = ttBefore then LTime := 'BEFORE';
+
+  case ADef.Event of
+    teInsert: LEvent := 'INSERT';
+    teUpdate: LEvent := 'UPDATE';
+    teDelete: LEvent := 'DELETE';
+  else
+    LEvent := 'INSERT';
+  end;
+
+  Result := 'CREATE TRIGGER ' + Quote(ADef.TriggerName) + ' ' + LTime + ' ' + LEvent +
+            ' ON ' + Quote(ADef.TableName) + ' FOR EACH ROW ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerPostgreSQL.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP TRIGGER IF EXISTS ' + Quote(ADef.TriggerName) + ' ON ' + Quote(ADef.TableName)
+  else
+    Result := 'DROP TRIGGER ' + Quote(ADef.TriggerName) + ' ON ' + Quote(ADef.TableName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.Enabled then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ENABLE TRIGGER ' + Quote(ADef.TriggerName)
+  else
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DISABLE TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR REPLACE FUNCTION ' + Quote(ADef.FunctionName)
+  else
+    Result := 'CREATE FUNCTION ' + Quote(ADef.FunctionName);
+
+  Result := Result + '(' + ADef.Params + ') RETURNS ' + ADef.Returns +
+            ' LANGUAGE plpgsql AS $$ ' + ADef.Body + ' $$';
+end;
+
+function TFluentDDLSerializerPostgreSQL.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
+  else
+    Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'CREATE SCHEMA ' + Quote(ADef.GetSchemaName);
+end;
+
+function TFluentDDLSerializerPostgreSQL.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'DROP SCHEMA ' + Quote(ADef.GetSchemaName);
 end;
 
 end.

@@ -21,6 +21,7 @@ unit FluentSQL.Interfaces;
 interface
 
 uses
+  System.Classes,
   FluentSQL.Cache.Interfaces;
 
 type
@@ -43,6 +44,13 @@ type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
+  IFluentSQLMerge = interface;
+  IFluentSQLMergeDef = interface;
+  IFluentSQLMergeMatchClauseDef = interface;
+  IFluentSQLSchemaDef = interface;
+  IFluentSQLSchemaBuilder = interface;
+  IFluentSQLNameValuePairs = interface;
+  IFluentSQLNames = interface;
 
   IFluentSQLParam = interface
     ['{3320078D-5B6A-4A8E-8C79-D8763B8F8942}']
@@ -293,6 +301,7 @@ type
     function Month(const AValue: String): IFluentSQL;
     function Year(const AValue: String): IFluentSQL;
     function Concat(const AValue: array of String): IFluentSQL;
+    function Merge: IFluentSQLMerge;
     /// <summary>ESP-016 / ADR-016: append SQL only when serializing for ADialect; other engines omit. Not universal SQL.</summary>
     function ForDialectOnly(const ADialect: TFluentSQLDriver; const ASqlFragment: string): IFluentSQL; overload;
     /// <summary>ESP-016: same as string overload; scalars bind via IFluentSQLParams (placeholders :pN in AST dialect).</summary>
@@ -354,6 +363,31 @@ type
     procedure _SetDirection(const value: TOrderByDirection);
     //
     property Direction: TOrderByDirection read _GetDirection write _SetDirection;
+  end;
+
+
+  IFluentSQLMergeDef = interface(IFluentSQLSection)
+    ['{E1D2E3F4-A5B6-4C7D-8E9F-0A2B3C4D5E6F}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTargetTable: string;
+    function GetTargetAlias: string;
+    function GetSourceTable: string;
+    function GetSourceAlias: string;
+    function GetSourceQuery: IFluentSQL;
+    function GetOnCondition: string;
+    function GetMatchedClauses: TInterfaceList; // List of IFluentSQLMergeMatchClauseDef
+    function Serialize: string;
+  end;
+
+  IFluentSQLMergeMatchClauseType = (mctMatched, mctNotMatched);
+  IFluentSQLMergeActionType = (matUpdate, matDelete, matInsert);
+
+  IFluentSQLMergeMatchClauseDef = interface
+    ['{F1A2B3C4-D5E6-4F7A-8B9C-0D1E2F3A4B5C}']
+    function GetClauseType: IFluentSQLMergeMatchClauseType;
+    function GetCondition: string;
+    function GetActionType: IFluentSQLMergeActionType;
+    function GetValues: IFluentSQLNameValuePairs; // For Update/Insert
   end;
 
   IFluentSQLOrderBy = interface(IFluentSQLSection)
@@ -543,6 +577,8 @@ type
     function GroupBy: IFluentSQLGroupBy;
     function Having: IFluentSQLHaving;
     function OrderBy: IFluentSQLOrderBy;
+    function Merge: IFluentSQLMergeDef;
+    procedure _SetMerge(const Value: IFluentSQLMergeDef);
     property ASTColumns: IFluentSQLNames read _GetASTColumns write _SetASTColumns;
     property ASTSection: IFluentSQLSection read _GetASTSection write _SetASTSection;
     property ASTName: IFluentSQLName read _GetASTName write _SetASTName;
@@ -556,6 +592,8 @@ type
   IFluentSQLSerialize = interface
     ['{8F7A3C1F-2704-401F-B1DF-D334EEFFC8B7}']
     function AsString(const AAST: IFluentSQLAST): String;
+    function Merge(const ADef: IFluentSQLMergeDef): string;
+    function QuotedName(const AName: string): string;
   end;
 
   TFluentSQLOperatorCompare = (fcEqual, fcNotEqual,
@@ -677,6 +715,21 @@ type
   IFluentDDLDropViewBuilder = interface;
   IFluentDDLCreateSequenceBuilder = interface;
   IFluentDDLDropSequenceBuilder = interface;
+  IFluentDDLProcedureBuilder = interface;
+  IFluentDDLDropProcedureBuilder = interface;
+  IFluentDDLFunctionBuilder = interface;
+  IFluentDDLDropFunctionBuilder = interface;
+  IFluentDDLTriggerBuilder = interface;
+  IFluentDDLDropTriggerBuilder = interface;
+  IFluentDDLTriggerManagementBuilder = interface;
+
+  IFluentDDLProcedureDef = interface;
+  IFluentDDLDropProcedureDef = interface;
+  IFluentDDLFunctionDef = interface;
+  IFluentDDLDropFunctionDef = interface;
+  IFluentDDLTriggerDef = interface;
+  IFluentDDLDropTriggerDef = interface;
+  IFluentDDLTriggerManagementDef = interface;
 
   IFluentDDLSerialize = interface
     ['{84D6A23D-B5F1-4F2E-A9C1-D3E4F5A6B7C8}']
@@ -696,6 +749,31 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string;
+  end;
+
+
+  IFluentSQLSchemaDef = interface
+    ['{7A8B9C0D-1E2F-3A4B-5C6D-7E8F9A0B1C2D}']
+    function GetDialect: TFluentSQLDriver;
+    function GetSchemaName: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property SchemaName: string read GetSchemaName;
+  end;
+
+  IFluentSQLSchemaBuilder = interface
+    ['{8A9B0C1D-2E3F-4A5B-6C7D-8E9F0A1B2C3D}']
+    function Create: IFluentSQLSchemaBuilder;
+    function Drop: IFluentSQLSchemaBuilder;
+    function AsString: string;
   end;
 
 
@@ -734,6 +812,35 @@ type
     function Ceil(const AValue: String): String;
     function Modulus(const AValue, ADivisor: String): String;
     function Abs(const AValue: String): String;
+    // Schema
+    function Schema(const AName: string): IFluentSQLSchemaBuilder;
+    // Merge (ESP-076)
+    function Merge: IFluentSQLMerge;
+  end;
+
+  IFluentSQLMergeWhenMatched = interface
+    ['{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5E}']
+    function Update: IFluentSQLMerge;
+    function Delete: IFluentSQLMerge;
+  end;
+
+  IFluentSQLMergeWhenNotMatched = interface
+    ['{B1A2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5F}']
+    function Insert: IFluentSQLMerge;
+  end;
+
+  IFluentSQLMerge = interface
+    ['{C1D2E3F4-A5B6-4C7D-8E9F-0A1B2C3D4E5F}']
+    function Into(const ATableName: string): IFluentSQLMerge; overload;
+    function Into(const ATableName, AAlias: string): IFluentSQLMerge; overload;
+    function Using(const ATableName: string): IFluentSQLMerge; overload;
+    function Using(const ATableName, AAlias: string): IFluentSQLMerge; overload;
+    function Using(const AQuery: IFluentSQL; const AAlias: string): IFluentSQLMerge; overload;
+    function On(const ACondition: string): IFluentSQLMerge; overload;
+    function On(const ACondition: array of const): IFluentSQLMerge; overload;
+    function WhenMatched: IFluentSQLMergeWhenMatched;
+    function WhenNotMatched: IFluentSQLMergeWhenNotMatched;
+    function AsString: string;
   end;
 
   /// <summary>ESP-061: scope of identity generation.</summary>
@@ -749,7 +856,9 @@ type
     dltDateTime,
     dltLongText,
     dltBlob,
-    dltGuid
+    dltGuid,
+    dltNumeric,
+    dltDecimal
   );
 
   /// <summary>ESP-055: types of constraints for table-level definitions.</summary>
@@ -759,6 +868,9 @@ type
     dctCheck,
     dctForeignKey
   );
+
+  /// <summary>ESP-072: referential actions for Foreign Keys.</summary>
+  TDDLReferentialAction = (raNoAction, raCascade, raSetNull, raSetDefault, raRestrict);
 
   /// <summary>ESP-055: represents a composite or named constraint at the table level.</summary>
   IFluentDDLTableConstraint = interface
@@ -770,8 +882,12 @@ type
     function GetCheckCondition: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
     property Name: string read GetName;
     property ConstraintType: TDDLConstraintType read GetConstraintType;
+    property OnDelete: TDDLReferentialAction read GetOnDelete;
+    property OnUpdate: TDDLReferentialAction read GetOnUpdate;
   end;
 
   IFluentDDLColumn = interface
@@ -780,6 +896,8 @@ type
     function GetLogicalType: TDDLLogicalType;
     /// <summary>For <c>dltVarChar</c>: max length; otherwise 0.</summary>
     function GetTypeArg: Integer;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     function GetNotNull: Boolean;
     function GetIsPrimaryKey: Boolean;
     function GetIsUnique: Boolean;
@@ -790,12 +908,16 @@ type
     function GetIdentityScope: TDDLIdentityScope;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
     function GetDescription: string;
     /// <summary>ESP-055: optional explicit name for inline constraints (PK, UNIQUE, CHECK).</summary>
     function GetConstraintName: string;
     property Name: string read GetName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
+    property Precision: Integer read GetPrecision;
+    property Scale: Integer read GetScale;
     property NotNull: Boolean read GetNotNull;
     property IsPrimaryKey: Boolean read GetIsPrimaryKey;
     property IsUnique: Boolean read GetIsUnique;
@@ -806,6 +928,8 @@ type
     property IdentityScope: TDDLIdentityScope read GetIdentityScope;
     property ReferenceTable: string read GetReferenceTable;
     property ReferenceColumn: string read GetReferenceColumn;
+    property OnDelete: TDDLReferentialAction read GetOnDelete;
+    property OnUpdate: TDDLReferentialAction read GetOnUpdate;
     property Description: string read GetDescription;
     property ConstraintName: string read GetConstraintName;
   end;
@@ -841,6 +965,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function ColumnGuid(const AName: string): IFluentDDLBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLBuilder; overload;
@@ -853,6 +979,9 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function ForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLBuilder;
     function Capped(ASize: Int64; AMaxDocs: Integer = 0): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
@@ -901,6 +1030,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
@@ -911,6 +1042,8 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
     function AddUnique(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
@@ -1007,6 +1140,8 @@ type
     function GetColumnName: string;
     function GetLogicalType: TDDLLogicalType;
     function GetTypeArg: Integer;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     function GetNotNull: Boolean;
     function GetTypeChanged: Boolean;
     function GetNullabilityChanged: Boolean;
@@ -1021,6 +1156,8 @@ type
     property ColumnName: string read GetColumnName;
     property LogicalType: TDDLLogicalType read GetLogicalType;
     property TypeArg: Integer read GetTypeArg;
+    property Precision: Integer read GetPrecision;
+    property Scale: Integer read GetScale;
     property NotNull: Boolean read GetNotNull;
     property TypeChanged: Boolean read GetTypeChanged;
     property NullabilityChanged: Boolean read GetNullabilityChanged;
@@ -1043,6 +1180,8 @@ type
     function TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeNumeric(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDecimal(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
     function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
@@ -1112,19 +1251,27 @@ type
     ['{C6E8F1A2-3B4D-5E6F-A7B8-9C0D1E2F3A40}']
     function GetDialect: TFluentSQLDriver;
     function GetTableName: string;
+    function GetTableNames: TArray<string>;
     function GetRestartIdentity: Boolean;
+    function GetContinueIdentity: Boolean;
     function GetCascade: Boolean;
+    function GetPartitionName: string;
     property Dialect: TFluentSQLDriver read GetDialect;
     property TableName: string read GetTableName;
+    property TableNames: TArray<string> read GetTableNames;
     property RestartIdentity: Boolean read GetRestartIdentity;
+    property ContinueIdentity: Boolean read GetContinueIdentity;
     property Cascade: Boolean read GetCascade;
+    property PartitionName: string read GetPartitionName;
   end;
 
   /// <summary>ESP-029: fluent builder for TRUNCATE TABLE SQL text (one command per AsString).</summary>
   IFluentDDLTruncateTableBuilder = interface(IFluentDDLTruncateTableDef)
     ['{D7F9A2B3-4C5E-6F70-B8C9-0D1E2F3A4B51}']
     function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function ContinueIdentity: IFluentDDLTruncateTableBuilder;
     function Cascade: IFluentDDLTruncateTableBuilder;
+    function Partition(const AName: string): IFluentDDLTruncateTableBuilder;
     function AsString: string;
   end;
 
@@ -1201,6 +1348,168 @@ type
   end;
 
 
+  /// <summary>ESP-071 / ADR-071: read-only view of CREATE FUNCTION for serializers.</summary>
+  IFluentDDLFunctionDef = interface
+    ['{84EA2B3C-9F1D-4C5A-8B6E-7F0A1B2C3D4E}']
+    function GetDialect: TFluentSQLDriver;
+    function GetFunctionName: string;
+    function GetParams: string;
+    function GetReturns: string;
+    function GetBody: string;
+    function GetOrReplace: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property FunctionName: string read GetFunctionName;
+    property Params: string read GetParams;
+    property Returns: string read GetReturns;
+    property Body: string read GetBody;
+    property OrReplace: Boolean read GetOrReplace;
+  end;
+
+  /// <summary>ESP-071: fluent builder for CREATE FUNCTION SQL text.</summary>
+  IFluentDDLFunctionBuilder = interface(IFluentDDLFunctionDef)
+    ['{95FB3C4D-A02E-5D6B-9C7F-8A1B2C3D4E5F}']
+    function Params(const AValue: string): IFluentDDLFunctionBuilder;
+    function Returns(const AValue: string): IFluentDDLFunctionBuilder;
+    function Body(const AValue: string): IFluentDDLFunctionBuilder;
+    function OrReplace: IFluentDDLFunctionBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-071: read-only view of DROP FUNCTION for serializers.</summary>
+  IFluentDDLDropFunctionDef = interface
+    ['{A60C4D5E-B13F-6E7C-AD80-9B2C3D4E5F6A}']
+    function GetDialect: TFluentSQLDriver;
+    function GetFunctionName: string;
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property FunctionName: string read GetFunctionName;
+    property IfExists: Boolean read GetIfExists;
+  end;
+
+  /// <summary>ESP-071: fluent builder for DROP FUNCTION SQL text.</summary>
+  IFluentDDLDropFunctionBuilder = interface(IFluentDDLDropFunctionDef)
+    ['{B71D5E6F-C240-7F8D-BE91-AC3D4E5F6A7B}']
+    function IfExists: IFluentDDLDropFunctionBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-070 / ADR-070: read-only view of CREATE PROCEDURE for serializers.</summary>
+  IFluentDDLProcedureDef = interface
+    ['{8A9048E1-2C3D-4B5A-961F-0E1A2B3D4C5E}']
+    function GetDialect: TFluentSQLDriver;
+    function GetProcedureName: string;
+    function GetParams: string;
+    function GetBody: string;
+    function GetOrReplace: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property ProcedureName: string read GetProcedureName;
+    property Params: string read GetParams;
+    property Body: string read GetBody;
+    property OrReplace: Boolean read GetOrReplace;
+  end;
+
+  /// <summary>ESP-070: fluent builder for CREATE PROCEDURE SQL text.</summary>
+  IFluentDDLProcedureBuilder = interface(IFluentDDLProcedureDef)
+    ['{9B0159F2-3D4E-5C6B-A720-1F2B3C4D5E6F}']
+    function Params(const AValue: string): IFluentDDLProcedureBuilder;
+    function Body(const AValue: string): IFluentDDLProcedureBuilder;
+    function OrReplace: IFluentDDLProcedureBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-070: read-only view of DROP PROCEDURE for serializers.</summary>
+  IFluentDDLDropProcedureDef = interface
+    ['{A0126A03-4D5F-6D7C-B831-2E3F4A5B6C7D}']
+    function GetDialect: TFluentSQLDriver;
+    function GetProcedureName: string;
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property ProcedureName: string read GetProcedureName;
+    property IfExists: Boolean read GetIfExists;
+  end;
+
+  /// <summary>ESP-070: fluent builder for DROP PROCEDURE SQL text.</summary>
+  IFluentDDLDropProcedureBuilder = interface(IFluentDDLDropProcedureDef)
+    ['{B1237B14-5E60-7E8D-C942-3F405B6C7D8E}']
+    function IfExists: IFluentDDLDropProcedureBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-070: trigger event kinds.</summary>
+  TTriggerEvent = (teInsert, teUpdate, teDelete);
+  /// <summary>ESP-070: trigger execution timing.</summary>
+  TTriggerTime = (ttBefore, ttAfter);
+
+  /// <summary>ESP-070 / ADR-070: read-only view of CREATE TRIGGER for serializers.</summary>
+  IFluentDDLTriggerDef = interface
+    ['{C2348C25-6F71-8F9E-DA53-40516C7D8E9F}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetEvent: TTriggerEvent;
+    function GetTime: TTriggerTime;
+    function GetBody: string;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TriggerName: string read GetTriggerName;
+    property TableName: string read GetTableName;
+    property Event: TTriggerEvent read GetEvent;
+    property Time: TTriggerTime read GetTime;
+    property Body: string read GetBody;
+  end;
+
+  /// <summary>ESP-070: fluent builder for CREATE TRIGGER SQL text.</summary>
+  IFluentDDLTriggerBuilder = interface(IFluentDDLTriggerDef)
+    ['{D3459D36-7082-9F0F-EB64-51627D8E9F00}']
+    function Table(const AValue: string): IFluentDDLTriggerBuilder;
+    function Before: IFluentDDLTriggerBuilder;
+    function After: IFluentDDLTriggerBuilder;
+    function OnInsert: IFluentDDLTriggerBuilder;
+    function OnUpdate: IFluentDDLTriggerBuilder;
+    function OnDelete: IFluentDDLTriggerBuilder;
+    function Body(const AValue: string): IFluentDDLTriggerBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-070: read-only view of DROP TRIGGER for serializers.</summary>
+  IFluentDDLDropTriggerDef = interface
+    ['{E4560E47-8193-0F10-FC75-62738E9F0011}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetIfExists: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TriggerName: string read GetTriggerName;
+    property TableName: string read GetTableName;
+    property IfExists: Boolean read GetIfExists;
+  end;
+
+  /// <summary>ESP-070: fluent builder for DROP TRIGGER SQL text.</summary>
+  IFluentDDLDropTriggerBuilder = interface(IFluentDDLDropTriggerDef)
+    ['{F5671F58-9204-1F21-0D86-73849F001122}']
+    function OnTable(const AValue: string): IFluentDDLDropTriggerBuilder;
+    function IfExists: IFluentDDLDropTriggerBuilder;
+    function AsString: string;
+  end;
+
+  /// <summary>ESP-070 / ADR-070: read-only view of TRIGGER ENABLE/DISABLE for serializers.</summary>
+  IFluentDDLTriggerManagementDef = interface
+    ['{06782F69-0315-2032-1E97-849500112233}']
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetEnabled: Boolean;
+    property Dialect: TFluentSQLDriver read GetDialect;
+    property TriggerName: string read GetTriggerName;
+    property TableName: string read GetTableName;
+    property Enabled: Boolean read GetEnabled;
+  end;
+
+  /// <summary>ESP-070: fluent builder for TRIGGER ENABLE/DISABLE SQL text.</summary>
+  IFluentDDLTriggerManagementBuilder = interface(IFluentDDLTriggerManagementDef)
+    ['{17893F7A-1426-3143-2F08-950611223344}']
+    function AsString: string;
+  end;
+
   IFluentDDLTableDrop = interface(IFluentDDLDropBuilder)
     ['{BA76472F-1AD2-4CBA-A528-98AA510E59A8}']
     function Column(const AName: string): IFluentDDLAlterTableDropBuilder;
@@ -1225,6 +1534,8 @@ type
     function Rename: IFluentDDLTableRename; overload;
     function Add: IFluentDDLAlterTableAddBuilder;
     function Alter: IFluentDDLTableAlter;
+    function EnableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function DisableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
   end;
 
   IFluentSchema = interface
@@ -1232,11 +1543,21 @@ type
     function Table(const ATableName: string): IFluentDDLTable;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
-    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder; overload;
+    function TruncateTable(const ATables: array of string): IFluentDDLTruncateTableBuilder; overload;
     function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
     function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
     function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
+    function CreateProcedure(const AName: string): IFluentDDLProcedureBuilder;
+    function DropProcedure(const AName: string): IFluentDDLDropProcedureBuilder;
+    function CreateFunction(const AName: string): IFluentDDLFunctionBuilder;
+    function DropFunction(const AName: string): IFluentDDLDropFunctionBuilder;
+    function CreateTrigger(const AName: string): IFluentDDLTriggerBuilder;
+    function DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
+    function EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function Schema(const AName: string): IFluentSQLSchemaBuilder;
   end;
 
 implementation

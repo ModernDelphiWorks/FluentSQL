@@ -33,7 +33,8 @@ type
   protected
     function MapConstraints(const ACol: IFluentDDLColumn): string; virtual;
     function MapLogicalType(const ACol: IFluentDDLColumn): string; overload; virtual;
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; overload; virtual; abstract;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; overload; virtual; abstract;
     function GetDialect: TFluentSQLDriver; virtual; abstract;
     function Quote(const AName: string): string; virtual;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
@@ -46,6 +47,8 @@ type
     function GetTableComment(const ATable: IFluentDDLTableDef): string; virtual;
     function GetTableConstraintDefinition(const AConstraint: IFluentDDLTableConstraint): string; virtual;
     function GetTableConstraintList(const ADef: IFluentDDLTableDef): string;
+    function ReferentialActionToString(AAction: TDDLReferentialAction): string; virtual;
+    function MapNumeric(const ATypeName: string; const APrecision, AScale: Integer): string; virtual;
   public
     function CreateTable(const ADef: IFluentDDLTableDef): string; virtual;
     function DropTable(const ADef: IFluentDDLDropTableDef): string; virtual;
@@ -63,6 +66,15 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; virtual;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; virtual;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; virtual;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; virtual;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; virtual;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; virtual;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; virtual;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; virtual;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; virtual;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; virtual;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; virtual;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; virtual;
   end;
 
 implementation
@@ -95,12 +107,18 @@ begin
     Result := Result + ' REFERENCES ' + Quote(ACol.ReferenceTable);
     if ACol.ReferenceColumn <> '' then
       Result := Result + '(' + Quote(ACol.ReferenceColumn) + ')';
+
+    if ACol.OnDelete <> raNoAction then
+      Result := Result + ' ON DELETE ' + ReferentialActionToString(ACol.OnDelete);
+
+    if ACol.OnUpdate <> raNoAction then
+      Result := Result + ' ON UPDATE ' + ReferentialActionToString(ACol.OnUpdate);
   end;
 end;
 
 function TFluentDDLSerializeAbstract.MapLogicalType(const ACol: IFluentDDLColumn): string;
 begin
-  Result := MapLogicalType(ACol.LogicalType, ACol.TypeArg);
+  Result := MapLogicalType(ACol.LogicalType, ACol.TypeArg, ACol.Precision, ACol.Scale);
 end;
 
 function TFluentDDLSerializeAbstract.Quote(const AName: string): string;
@@ -252,6 +270,12 @@ begin
       Result := Result + 'FOREIGN KEY (' + Quote(AConstraint.GetColumnName(0)) + ') REFERENCES ' + Quote(AConstraint.GetReferenceTable);
       if AConstraint.GetReferenceColumn <> '' then
         Result := Result + '(' + Quote(AConstraint.GetReferenceColumn) + ')';
+
+      if AConstraint.OnDelete <> raNoAction then
+        Result := Result + ' ON DELETE ' + ReferentialActionToString(AConstraint.OnDelete);
+
+      if AConstraint.OnUpdate <> raNoAction then
+        Result := Result + ' ON UPDATE ' + ReferentialActionToString(AConstraint.OnUpdate);
     end;
   end;
 end;
@@ -316,7 +340,16 @@ end;
 
 function TFluentDDLSerializeAbstract.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
 begin
-  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['TruncateTable', Self.ClassName]);
+  if not Assigned(ADef) then
+    Exit('');
+
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL: multiple tables in a single TRUNCATE are not supported for this dialect (ESP-074).');
+
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL: advanced TRUNCATE options are not supported for this dialect (ESP-074).');
+
+  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
 function TFluentDDLSerializeAbstract.CreateView(const ADef: IFluentDDLCreateViewDef): string;
@@ -351,6 +384,77 @@ begin
   if not Assigned(ADef) or (ADef.ConstraintName = '') then
     Exit('');
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
+end;
+
+function TFluentDDLSerializeAbstract.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateProcedure', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropProcedure', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateTrigger', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropTrigger', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['ManageTrigger', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateFunction', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropFunction', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.ReferentialActionToString(AAction: TDDLReferentialAction): string;
+begin
+  case AAction of
+    raCascade: Result := 'CASCADE';
+    raSetNull: Result := 'SET NULL';
+    raSetDefault: Result := 'SET DEFAULT';
+    raRestrict: Result := 'RESTRICT';
+    raNoAction: Result := 'NO ACTION';
+    else Result := '';
+  end;
+end;
+
+function TFluentDDLSerializeAbstract.MapNumeric(const ATypeName: string; const APrecision,
+  AScale: Integer): string;
+begin
+  if APrecision > 0 then
+  begin
+    if AScale > 0 then
+      Result := ATypeName + '(' + IntToStr(APrecision) + ',' + IntToStr(AScale) + ')'
+    else
+      Result := ATypeName + '(' + IntToStr(APrecision) + ')'
+  end
+  else
+    Result := ATypeName;
+end;
+
+function TFluentDDLSerializeAbstract.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['CreateSchema', Self.ClassName]);
+end;
+
+function TFluentDDLSerializeAbstract.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['DropSchema', Self.ClassName]);
 end;
 
 end.

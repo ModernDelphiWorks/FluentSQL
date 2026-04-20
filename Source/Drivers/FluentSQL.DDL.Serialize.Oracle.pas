@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerOracle = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -81,7 +82,8 @@ begin
   end;
 end;
 
-function TFluentDDLSerializerOracle.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerOracle.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
     dltInteger:
@@ -102,6 +104,8 @@ begin
       Result := 'BLOB';
     dltGuid:
       Result := 'RAW(16)';
+    dltNumeric: Result := MapNumeric('NUMBER', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -157,7 +161,7 @@ begin
 
   LParts := Quote(ADef.ColumnName);
   if ADef.TypeChanged then
-    LParts := LParts + ' ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    LParts := LParts + ' ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale);
 
   if ADef.NullabilityChanged then
   begin
@@ -202,6 +206,11 @@ function TFluentDDLSerializerOracle.TruncateTable(const ADef: IFluentDDLTruncate
 begin
   if not Assigned(ADef) then
     Exit('');
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL Oracle: multiple tables in a single TRUNCATE are not supported.');
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL Oracle: advanced TRUNCATE options are not supported.');
+
   Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 

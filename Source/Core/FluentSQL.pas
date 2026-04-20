@@ -34,7 +34,8 @@ uses
   FluentSQL.Register,
   FluentSQL.Params,
   FluentSQL.SerializeMongoDB,
-  FluentSQL.Cache.Interfaces;
+  FluentSQL.Cache.Interfaces,
+  FluentSQL.Merge;
 
 type
   TFluentSQLDriver = FluentSQL.Interfaces.TFluentSQLDriver;
@@ -52,7 +53,8 @@ type
                   secWhere= 5,
                   secGroupBy = 6,
                   secHaving = 7,
-                  secOrderBy = 8);
+                  secOrderBy = 8,
+                  secMerge = 9);
       TSections = set of TSection;
   strict private
     FActiveSection: TSection;
@@ -99,6 +101,7 @@ type
     function Column(const AColumnsName: array of const): IFluentSQL; overload;
     function Column(const ACaseExpression: IFluentSQLCriteriaCase): IFluentSQL; overload;
     function Delete: IFluentSQL;
+    function Merge: IFluentSQLMerge;
     function Desc: IFluentSQL;
     function Distinct: IFluentSQL;
     function IsEmpty: Boolean;
@@ -549,7 +552,8 @@ begin
       FAST.Having.Serialize,
       FAST.OrderBy.Serialize,
       FAST.UnionType,
-      FAST.WithAlias
+      FAST.WithAlias,
+      TUtils.BooleanToSQLFormat(FDatabase, Assigned(FAST.Merge))
     ]);
 
     if Assigned(FAST.UnionQuery) then
@@ -1242,6 +1246,12 @@ begin
   Result := _CreateJoin(jtRIGHT, ATableName);
 end;
 
+function TFluentSQL.Merge: IFluentSQLMerge;
+begin
+  _SetSection(secMerge);
+  Result := TFluentSQLMerge.Create(FAST);
+end;
+
 function TFluentSQL.OrderBy(const AColumnName: String): IFluentSQL;
 begin
   _SetSection(secOrderBy);
@@ -1277,6 +1287,7 @@ begin
     secGroupBy: _DefineSectionGroupBy;
     secHaving:  _DefineSectionHaving;
     secOrderBy: _DefineSectionOrderBy;
+    secMerge:   ; // MERGE is handled by its own builder but we must allow the section
   else
       raise Exception.Create('TCriteria.SetSection: Unknown section');
   end;

@@ -42,17 +42,24 @@ type
     FIdentityScope: TDDLIdentityScope;
     FReferenceTable: string;
     FReferenceColumn: string;
+    FOnDelete: TDDLReferentialAction;
+    FOnUpdate: TDDLReferentialAction;
     FDescription: string;
     FConstraintName: string;
+    FPrecision: Integer;
+    FScale: Integer;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
   public
-    constructor Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer = 0);
+    constructor Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer = 0;
+      APrecision: Integer = 0; AScale: Integer = 0);
     function GetName: string;
     function GetLogicalType: TDDLLogicalType;
     function GetTypeArg: Integer;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     function GetNotNull: Boolean;
     function GetIsPrimaryKey: Boolean;
     function GetIsUnique: Boolean;
@@ -63,6 +70,8 @@ type
     function GetIdentityScope: TDDLIdentityScope;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
     function GetDescription: string;
     function GetConstraintName: string;
     procedure SetNotNull(AValue: Boolean);
@@ -73,6 +82,8 @@ type
     procedure SetComputedBy(const AExpr: string);
     procedure SetIdentity(AValue: Boolean; AScope: TDDLIdentityScope = disAlways);
     procedure SetReferences(const ATableName, AColumnName: string);
+    procedure SetOnDelete(AAction: TDDLReferentialAction);
+    procedure SetOnUpdate(AAction: TDDLReferentialAction);
     procedure SetDescription(const AText: string);
   end;
 
@@ -85,6 +96,8 @@ type
     FCheckCondition: string;
     FReferenceTable: string;
     FReferenceColumn: string;
+    FOnDelete: TDDLReferentialAction;
+    FOnUpdate: TDDLReferentialAction;
   protected
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -100,6 +113,10 @@ type
     function GetCheckCondition: string;
     function GetReferenceTable: string;
     function GetReferenceColumn: string;
+    function GetOnDelete: TDDLReferentialAction;
+    function GetOnUpdate: TDDLReferentialAction;
+    procedure SetOnDelete(AAction: TDDLReferentialAction);
+    procedure SetOnUpdate(AAction: TDDLReferentialAction);
   end;
 
   TFluentDDLBuilder = class(TInterfacedObject, IFluentDDLBuilder, IFluentDDLTableDef)
@@ -112,7 +129,8 @@ type
     FIsCapped: Boolean;
     FCappedSize: Int64;
     FCappedMax: Integer;
-    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
+    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+      APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
     procedure _CheckPKDuplicity;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -138,6 +156,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLBuilder;
     function ColumnBlob(const AName: string): IFluentDDLBuilder;
     function ColumnGuid(const AName: string): IFluentDDLBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLBuilder;
     function NotNull: IFluentDDLBuilder;
     function PrimaryKey: IFluentDDLBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLBuilder; overload;
@@ -150,6 +170,9 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLBuilder;
+    function ForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string = ''): IFluentDDLBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLBuilder;
     function Capped(ASize: Int64; AMaxDocs: Integer = 0): IFluentDDLBuilder;
     function Description(const AText: string): IFluentDDLBuilder;
     function AsString: string;
@@ -180,7 +203,8 @@ type
     FConstraint: TFluentDDLTableConstraint;
     FHasColumn: Boolean;
     FHasConstraint: Boolean;
-    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
+    function _AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+      APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
     destructor Destroy; override;
@@ -199,6 +223,8 @@ type
     function ColumnLongText(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnBlob(const AName: string): IFluentDDLAlterTableAddBuilder;
     function ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
+    function ColumnNumeric(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
+    function ColumnDecimal(const AName: string; APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAddBuilder;
     function NotNull: IFluentDDLAlterTableAddBuilder;
     function PrimaryKey: IFluentDDLAlterTableAddBuilder; overload;
     function PrimaryKey(const AName: string): IFluentDDLAlterTableAddBuilder; overload;
@@ -209,6 +235,8 @@ type
     function ComputedBy(const AExpr: string): IFluentDDLAlterTableAddBuilder;
     function Identity(AScope: TDDLIdentityScope = disAlways): IFluentDDLAlterTableAddBuilder;
     function References(const ATableName, AColumnName: string): IFluentDDLAlterTableAddBuilder;
+    function OnDelete(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+    function OnUpdate(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
     function Description(const AText: string): IFluentDDLAlterTableAddBuilder;
     function AsString: string;
     function AddPrimaryKey(const AColumns: array of string; const AName: string = ''): IFluentDDLAlterTableAddBuilder;
@@ -327,19 +355,26 @@ type
   TFluentDDLTruncateTableBuilder = class(TInterfacedObject, IFluentDDLTruncateTableBuilder, IFluentDDLTruncateTableDef)
   strict private
     FDialect: TFluentSQLDriver;
-    FTableName: string;
+    FTableNames: TArray<string>;
     FRestartIdentity: Boolean;
+    FContinueIdentity: Boolean;
     FCascade: Boolean;
+    FPartitionName: string;
   public
-    constructor Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+    constructor Create(const ADialect: TFluentSQLDriver; const ATables: array of string);
     { IFluentDDLTruncateTableDef }
     function GetDialect: TFluentSQLDriver;
     function GetTableName: string;
+    function GetTableNames: TArray<string>;
     function GetRestartIdentity: Boolean;
+    function GetContinueIdentity: Boolean;
     function GetCascade: Boolean;
+    function GetPartitionName: string;
     { IFluentDDLTruncateTableBuilder }
     function RestartIdentity: IFluentDDLTruncateTableBuilder;
+    function ContinueIdentity: IFluentDDLTruncateTableBuilder;
     function Cascade: IFluentDDLTruncateTableBuilder;
+    function Partition(const AName: string): IFluentDDLTruncateTableBuilder;
     function AsString: string;
   end;
 
@@ -360,7 +395,10 @@ type
     FIdentity: Boolean;
     FIdentityScope: TDDLIdentityScope;
     FIdentityChanged: Boolean;
-    function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+    FPrecision: Integer;
+    FScale: Integer;
+    function _SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+      APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
   public
     constructor Create(const ADialect: TFluentSQLDriver; const ATableName, AColumnName: string);
     { IFluentDDLAlterTableAlterColumnDef }
@@ -378,6 +416,8 @@ type
     function GetIsIdentity: Boolean;
     function GetIdentityScope: TDDLIdentityScope;
     function GetIdentityChanged: Boolean;
+    function GetPrecision: Integer;
+    function GetScale: Integer;
     { IFluentDDLAlterTableAlterColumnBuilder }
     function TypeInteger: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeSmallInt: IFluentDDLAlterTableAlterColumnBuilder;
@@ -387,6 +427,8 @@ type
     function TypeDateTime: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeBigInt: IFluentDDLAlterTableAlterColumnBuilder;
     function TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeNumeric(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
+    function TypeDecimal(APrecision: Integer = 0; AScale: Integer = 0): IFluentDDLAlterTableAlterColumnBuilder;
     function NotNull: IFluentDDLAlterTableAlterColumnBuilder;
     function Nullable: IFluentDDLAlterTableAlterColumnBuilder;
     function SetDefault(const AValue: string): IFluentDDLAlterTableAlterColumnBuilder;
@@ -459,6 +501,165 @@ type
     function AsString: string;
   end;
 
+  TFluentDDLFunctionBuilder = class(TInterfacedObject, IFluentDDLFunctionBuilder, IFluentDDLFunctionDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FParams: string;
+    FReturns: string;
+    FBody: string;
+    FOrReplace: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLFunctionDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetFunctionName: string;
+    function GetParams: string;
+    function GetReturns: string;
+    function GetBody: string;
+    function GetOrReplace: Boolean;
+    { IFluentDDLFunctionBuilder }
+    function Params(const AValue: string): IFluentDDLFunctionBuilder;
+    function Returns(const AValue: string): IFluentDDLFunctionBuilder;
+    function Body(const AValue: string): IFluentDDLFunctionBuilder;
+    function OrReplace: IFluentDDLFunctionBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLDropFunctionBuilder = class(TInterfacedObject, IFluentDDLDropFunctionBuilder, IFluentDDLDropFunctionDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLDropFunctionDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetFunctionName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropFunctionBuilder }
+    function IfExists: IFluentDDLDropFunctionBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLProcedureBuilder = class(TInterfacedObject, IFluentDDLProcedureBuilder, IFluentDDLProcedureDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FParams: string;
+    FBody: string;
+    FOrReplace: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLProcedureDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetProcedureName: string;
+    function GetParams: string;
+    function GetBody: string;
+    function GetOrReplace: Boolean;
+    { IFluentDDLProcedureBuilder }
+    function Params(const AValue: string): IFluentDDLProcedureBuilder;
+    function Body(const AValue: string): IFluentDDLProcedureBuilder;
+    function OrReplace: IFluentDDLProcedureBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLDropProcedureBuilder = class(TInterfacedObject, IFluentDDLDropProcedureBuilder, IFluentDDLDropProcedureDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLDropProcedureDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetProcedureName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropProcedureBuilder }
+    function IfExists: IFluentDDLDropProcedureBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLTriggerBuilder = class(TInterfacedObject, IFluentDDLTriggerBuilder, IFluentDDLTriggerDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FTableName: string;
+    FEvent: TTriggerEvent;
+    FTime: TTriggerTime;
+    FBody: string;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLTriggerDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetEvent: TTriggerEvent;
+    function GetTime: TTriggerTime;
+    function GetBody: string;
+    { IFluentDDLTriggerBuilder }
+    function Table(const AValue: string): IFluentDDLTriggerBuilder;
+    function Before: IFluentDDLTriggerBuilder;
+    function After: IFluentDDLTriggerBuilder;
+    function OnInsert: IFluentDDLTriggerBuilder;
+    function OnUpdate: IFluentDDLTriggerBuilder;
+    function OnDelete: IFluentDDLTriggerBuilder;
+    function Body(const AValue: string): IFluentDDLTriggerBuilder;
+    function AsString: string;
+  end;
+
+  TFluentSQLSchemaBuilder = class(TInterfacedObject, IFluentSQLSchemaBuilder, IFluentSQLSchemaDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FSchemaName: string;
+    FIsDrop: Boolean;
+    function DoCreate: IFluentSQLSchemaBuilder;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    function IFluentSQLSchemaBuilder.Create = DoCreate;
+    function Drop: IFluentSQLSchemaBuilder;
+    function AsString: string;
+    { IFluentSQLSchemaDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetSchemaName: string;
+  end;
+
+  TFluentDDLDropTriggerBuilder = class(TInterfacedObject, IFluentDDLDropTriggerBuilder, IFluentDDLDropTriggerDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FTableName: string;
+    FIfExists: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const AName: string);
+    { IFluentDDLDropTriggerDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetIfExists: Boolean;
+    { IFluentDDLDropTriggerBuilder }
+    function OnTable(const AValue: string): IFluentDDLDropTriggerBuilder;
+    function IfExists: IFluentDDLDropTriggerBuilder;
+    function AsString: string;
+  end;
+
+  TFluentDDLTriggerManagementBuilder = class(TInterfacedObject, IFluentDDLTriggerManagementBuilder, IFluentDDLTriggerManagementDef)
+  strict private
+    FDialect: TFluentSQLDriver;
+    FName: string;
+    FTableName: string;
+    FEnabled: Boolean;
+  public
+    constructor Create(const ADialect: TFluentSQLDriver; const ATableName, ATriggerName: string; AEnabled: Boolean);
+    { IFluentDDLTriggerManagementDef }
+    function GetDialect: TFluentSQLDriver;
+    function GetTriggerName: string;
+    function GetTableName: string;
+    function GetEnabled: Boolean;
+    { IFluentDDLTriggerManagementBuilder }
+    function AsString: string;
+  end;
+
   TFluentDDLTableDrop = class(TInterfacedObject, IFluentDDLTableDrop, IFluentDDLDropBuilder, IFluentDDLDropTableDef)
   strict private
     FDialect: TFluentSQLDriver;
@@ -506,6 +707,8 @@ type
     function Rename: IFluentDDLTableRename; overload;
     function Add: IFluentDDLAlterTableAddBuilder;
     function Alter: IFluentDDLTableAlter;
+    function EnableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function DisableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
   end;
 
   TFluentSchema = class(TInterfacedObject, IFluentSchema)
@@ -516,11 +719,21 @@ type
     function Table(const ATableName: string): IFluentDDLTable;
     function CreateIndex(const AIndexName, ATableName: string): IFluentDDLCreateIndexBuilder;
     function DropIndex(const AIndexName: string): IFluentDDLDropIndexBuilder;
-    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
+    function TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder; overload;
+    function TruncateTable(const ATables: array of string): IFluentDDLTruncateTableBuilder; overload;
     function CreateView(const AName: string): IFluentDDLCreateViewBuilder;
     function DropView(const AName: string): IFluentDDLDropViewBuilder;
     function CreateSequence(const AName: string): IFluentDDLCreateSequenceBuilder;
     function DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
+    function CreateProcedure(const AName: string): IFluentDDLProcedureBuilder;
+    function DropProcedure(const AName: string): IFluentDDLDropProcedureBuilder;
+    function CreateFunction(const AName: string): IFluentDDLFunctionBuilder;
+    function DropFunction(const AName: string): IFluentDDLDropFunctionBuilder;
+    function CreateTrigger(const AName: string): IFluentDDLTriggerBuilder;
+    function DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
+    function EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+    function Schema(const AName: string): IFluentSQLSchemaBuilder;
   end;
 
 
@@ -535,12 +748,15 @@ const
 
 { TFluentDDLColumn }
 
-constructor TFluentDDLColumn.Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer);
+constructor TFluentDDLColumn.Create(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer);
 begin
   inherited Create;
   FName := AName;
   FLogicalType := ALogicalType;
   FTypeArg := ATypeArg;
+  FPrecision := APrecision;
+  FScale := AScale;
   FIdentityScope := disAlways;
 end;
 
@@ -594,6 +810,16 @@ function TFluentDDLColumn.GetTypeArg: Integer;
 begin
   Result := FTypeArg;
 end;
+ 
+function TFluentDDLColumn.GetPrecision: Integer;
+begin
+  Result := FPrecision;
+end;
+ 
+function TFluentDDLColumn.GetScale: Integer;
+begin
+  Result := FScale;
+end;
 
 function TFluentDDLColumn.GetNotNull: Boolean;
 begin
@@ -628,6 +854,16 @@ end;
 function TFluentDDLColumn.GetReferenceColumn: string;
 begin
   Result := FReferenceColumn;
+end;
+
+function TFluentDDLColumn.GetOnDelete: TDDLReferentialAction;
+begin
+  Result := FOnDelete;
+end;
+
+function TFluentDDLColumn.GetOnUpdate: TDDLReferentialAction;
+begin
+  Result := FOnUpdate;
 end;
 
 function TFluentDDLColumn.GetDescription: string;
@@ -749,6 +985,30 @@ begin
   Result := FReferenceColumn;
 end;
 
+function TFluentDDLTableConstraint.GetOnDelete: TDDLReferentialAction;
+begin
+  Result := FOnDelete;
+end;
+
+function TFluentDDLTableConstraint.GetOnUpdate: TDDLReferentialAction;
+begin
+  Result := FOnUpdate;
+end;
+
+procedure TFluentDDLTableConstraint.SetOnDelete(AAction: TDDLReferentialAction);
+begin
+  if FConstraintType <> dctForeignKey then
+    raise EArgumentException.Create('DDL: .OnDelete can only be used on Foreign Key constraints.');
+  FOnDelete := AAction;
+end;
+
+procedure TFluentDDLTableConstraint.SetOnUpdate(AAction: TDDLReferentialAction);
+begin
+  if FConstraintType <> dctForeignKey then
+    raise EArgumentException.Create('DDL: .OnUpdate can only be used on Foreign Key constraints.');
+  FOnUpdate := AAction;
+end;
+
 function TFluentDDLTableConstraint.GetColumnCount: Integer;
 begin
   Result := Length(FColumns);
@@ -781,6 +1041,20 @@ procedure TFluentDDLColumn.SetReferences(const ATableName, AColumnName: string);
 begin
   FReferenceTable := ATableName;
   FReferenceColumn := AColumnName;
+end;
+
+procedure TFluentDDLColumn.SetOnDelete(AAction: TDDLReferentialAction);
+begin
+  if FReferenceTable = '' then
+    raise EArgumentException.Create('DDL: .OnDelete requires a prior .References call.');
+  FOnDelete := AAction;
+end;
+
+procedure TFluentDDLColumn.SetOnUpdate(AAction: TDDLReferentialAction);
+begin
+  if FReferenceTable = '' then
+    raise EArgumentException.Create('DDL: .OnUpdate requires a prior .References call.');
+  FOnUpdate := AAction;
 end;
 
 procedure TFluentDDLColumn.SetDescription(const AText: string);
@@ -870,9 +1144,10 @@ begin
       raise EArgumentException.Create('DDL: Table already has a Primary Key defined (table constraint).');
 end;
 
-function TFluentDDLBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLBuilder;
+function TFluentDDLBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer): IFluentDDLBuilder;
 begin
-  FColumns.Add(TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg));
+  FColumns.Add(TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg, APrecision, AScale));
   Result := Self;
 end;
 
@@ -921,6 +1196,16 @@ end;
 function TFluentDDLBuilder.ColumnGuid(const AName: string): IFluentDDLBuilder;
 begin
   Result := _AddColumn(AName, dltGuid, 0);
+end;
+ 
+function TFluentDDLBuilder.ColumnNumeric(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLBuilder;
+begin
+  Result := _AddColumn(AName, dltNumeric, 0, APrecision, AScale);
+end;
+ 
+function TFluentDDLBuilder.ColumnDecimal(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLBuilder;
+begin
+  Result := _AddColumn(AName, dltDecimal, 0, APrecision, AScale);
 end;
 
 function TFluentDDLBuilder.NotNull: IFluentDDLBuilder;
@@ -1011,6 +1296,30 @@ function TFluentDDLBuilder.References(const ATableName, AColumnName: string): IF
 begin
   if FColumns.Count > 0 then
     FColumns.Last.SetReferences(ATableName, AColumnName);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.ForeignKey(const AColumn, ARefTable, ARefColumn: string; const AName: string): IFluentDDLBuilder;
+begin
+  FTableConstraints.Add(TFluentDDLTableConstraint.Create(AName, dctForeignKey, AColumn, ARefTable, ARefColumn));
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.OnDelete(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+begin
+  if FTableConstraints.Count > 0 then
+    FTableConstraints.Last.SetOnDelete(AAction)
+  else if FColumns.Count > 0 then
+    FColumns.Last.SetOnDelete(AAction);
+  Result := Self;
+end;
+
+function TFluentDDLBuilder.OnUpdate(AAction: TDDLReferentialAction): IFluentDDLBuilder;
+begin
+  if FTableConstraints.Count > 0 then
+    FTableConstraints.Last.SetOnUpdate(AAction)
+  else if FColumns.Count > 0 then
+    FColumns.Last.SetOnUpdate(AAction);
   Result := Self;
 end;
 
@@ -1138,14 +1447,15 @@ begin
     Result := nil;
 end;
 
-function TFluentDDLAlterTableAddBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAddBuilder;
+function TFluentDDLAlterTableAddBuilder._AddColumn(const AName: string; ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAddBuilder;
 begin
   if FHasColumn or FHasConstraint then
     raise EArgumentException.Create(
       'DDL ALTER TABLE ADD: only one logical operation per AsString in this build (ESP-019/ESP-057).');
   if Trim(AName) = '' then
     raise EArgumentException.Create('DDL: column name is required');
-  FColumn := TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg);
+  FColumn := TFluentDDLColumn.Create(AName, ALogicalType, ATypeArg, APrecision, AScale);
   FHasColumn := True;
   Result := Self;
 end;
@@ -1195,6 +1505,16 @@ end;
 function TFluentDDLAlterTableAddBuilder.ColumnGuid(const AName: string): IFluentDDLAlterTableAddBuilder;
 begin
   Result := _AddColumn(AName, dltGuid, 0);
+end;
+ 
+function TFluentDDLAlterTableAddBuilder.ColumnNumeric(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltNumeric, 0, APrecision, AScale);
+end;
+ 
+function TFluentDDLAlterTableAddBuilder.ColumnDecimal(const AName: string; APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAddBuilder;
+begin
+  Result := _AddColumn(AName, dltDecimal, 0, APrecision, AScale);
 end;
 
 function TFluentDDLAlterTableAddBuilder.NotNull: IFluentDDLAlterTableAddBuilder;
@@ -1264,6 +1584,24 @@ function TFluentDDLAlterTableAddBuilder.References(const ATableName, AColumnName
 begin
   if FHasColumn then
     FColumn.SetReferences(ATableName, AColumnName);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.OnDelete(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasConstraint then
+    FConstraint.SetOnDelete(AAction)
+  else if FHasColumn then
+    FColumn.SetOnDelete(AAction);
+  Result := Self;
+end;
+
+function TFluentDDLAlterTableAddBuilder.OnUpdate(AAction: TDDLReferentialAction): IFluentDDLAlterTableAddBuilder;
+begin
+  if FHasConstraint then
+    FConstraint.SetOnUpdate(AAction)
+  else if FHasColumn then
+    FColumn.SetOnUpdate(AAction);
   Result := Self;
 end;
 
@@ -1604,10 +1942,23 @@ begin
   Result := FIdentityChanged;
 end;
 
-function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+function TFluentDDLAlterTableAlterColumnBuilder.GetPrecision: Integer;
+begin
+  Result := FPrecision;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder.GetScale: Integer;
+begin
+  Result := FScale;
+end;
+
+function TFluentDDLAlterTableAlterColumnBuilder._SetType(ALogicalType: TDDLLogicalType; ATypeArg: Integer;
+  APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAlterColumnBuilder;
 begin
   FLogicalType := ALogicalType;
   FTypeArg := ATypeArg;
+  FPrecision := APrecision;
+  FScale := AScale;
   FTypeChanged := True;
   Result := Self;
 end;
@@ -1654,6 +2005,16 @@ end;
 function TFluentDDLAlterTableAlterColumnBuilder.TypeGuid: IFluentDDLAlterTableAlterColumnBuilder;
 begin
   Result := _SetType(dltGuid, 0);
+end;
+ 
+function TFluentDDLAlterTableAlterColumnBuilder.TypeNumeric(APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltNumeric, 0, APrecision, AScale);
+end;
+ 
+function TFluentDDLAlterTableAlterColumnBuilder.TypeDecimal(APrecision: Integer; AScale: Integer): IFluentDDLAlterTableAlterColumnBuilder;
+begin
+  Result := _SetType(dltDecimal, 0, APrecision, AScale);
 end;
 
 function TFluentDDLAlterTableAlterColumnBuilder.NotNull: IFluentDDLAlterTableAlterColumnBuilder;
@@ -1880,13 +2241,19 @@ end;
 
 { TFluentDDLTruncateTableBuilder }
 
-constructor TFluentDDLTruncateTableBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
+constructor TFluentDDLTruncateTableBuilder.Create(const ADialect: TFluentSQLDriver; const ATables: array of string);
+var
+  LI: Integer;
 begin
   inherited Create;
   FDialect := ADialect;
-  FTableName := ATableName;
+  SetLength(FTableNames, Length(ATables));
+  for LI := 0 to Length(ATables) - 1 do
+    FTableNames[LI] := ATables[LI];
   FRestartIdentity := False;
+  FContinueIdentity := False;
   FCascade := False;
+  FPartitionName := '';
 end;
 
 function TFluentDDLTruncateTableBuilder.GetDialect: TFluentSQLDriver;
@@ -1896,7 +2263,15 @@ end;
 
 function TFluentDDLTruncateTableBuilder.GetTableName: string;
 begin
-  Result := FTableName;
+  if Length(FTableNames) > 0 then
+    Result := FTableNames[0]
+  else
+    Result := '';
+end;
+
+function TFluentDDLTruncateTableBuilder.GetTableNames: TArray<string>;
+begin
+  Result := FTableNames;
 end;
 
 function TFluentDDLTruncateTableBuilder.GetRestartIdentity: Boolean;
@@ -1904,14 +2279,32 @@ begin
   Result := FRestartIdentity;
 end;
 
+function TFluentDDLTruncateTableBuilder.GetContinueIdentity: Boolean;
+begin
+  Result := FContinueIdentity;
+end;
+
 function TFluentDDLTruncateTableBuilder.GetCascade: Boolean;
 begin
   Result := FCascade;
 end;
 
+function TFluentDDLTruncateTableBuilder.GetPartitionName: string;
+begin
+  Result := FPartitionName;
+end;
+
 function TFluentDDLTruncateTableBuilder.RestartIdentity: IFluentDDLTruncateTableBuilder;
 begin
   FRestartIdentity := True;
+  FContinueIdentity := False;
+  Result := Self;
+end;
+
+function TFluentDDLTruncateTableBuilder.ContinueIdentity: IFluentDDLTruncateTableBuilder;
+begin
+  FContinueIdentity := True;
+  FRestartIdentity := False;
   Result := Self;
 end;
 
@@ -1921,12 +2314,23 @@ begin
   Result := Self;
 end;
 
+function TFluentDDLTruncateTableBuilder.Partition(const AName: string): IFluentDDLTruncateTableBuilder;
+begin
+  FPartitionName := AName;
+  Result := Self;
+end;
+
 function TFluentDDLTruncateTableBuilder.AsString: string;
 var
+  LI: Integer;
   LSerializer: TFluentDDLSerialize;
 begin
-  if Trim(FTableName) = '' then
-    raise EArgumentException.Create('DDL: table name is required');
+  if Length(FTableNames) = 0 then
+    raise EArgumentException.Create('DDL: at least one table name is required');
+
+  for LI := 0 to Length(FTableNames) - 1 do
+    if Trim(FTableNames[LI]) = '' then
+      raise EArgumentException.Create('DDL: table name cannot be empty or blank');
 
   LSerializer := TFluentDDLSerialize.Create;
   try
@@ -2122,6 +2526,458 @@ begin
   end;
 end;
 
+{ TFluentDDLProcedureBuilder }
+
+{ TFluentDDLFunctionBuilder }
+
+constructor TFluentDDLFunctionBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FOrReplace := False;
+end;
+
+function TFluentDDLFunctionBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLFunctionBuilder.GetFunctionName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLFunctionBuilder.GetParams: string;
+begin
+  Result := FParams;
+end;
+
+function TFluentDDLFunctionBuilder.GetReturns: string;
+begin
+  Result := FReturns;
+end;
+
+function TFluentDDLFunctionBuilder.GetBody: string;
+begin
+  Result := FBody;
+end;
+
+function TFluentDDLFunctionBuilder.GetOrReplace: Boolean;
+begin
+  Result := FOrReplace;
+end;
+
+function TFluentDDLFunctionBuilder.Params(const AValue: string): IFluentDDLFunctionBuilder;
+begin
+  FParams := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLFunctionBuilder.Returns(const AValue: string): IFluentDDLFunctionBuilder;
+begin
+  FReturns := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLFunctionBuilder.Body(const AValue: string): IFluentDDLFunctionBuilder;
+begin
+  FBody := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLFunctionBuilder.OrReplace: IFluentDDLFunctionBuilder;
+begin
+  FOrReplace := True;
+  Result := Self;
+end;
+
+function TFluentDDLFunctionBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: function name is required');
+  if Trim(FReturns) = '' then
+    raise EArgumentException.Create('DDL: function returns type is required');
+  if Trim(FBody) = '' then
+    raise EArgumentException.Create('DDL: function body is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateFunction(Self as IFluentDDLFunctionDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropFunctionBuilder }
+
+constructor TFluentDDLDropFunctionBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropFunctionBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropFunctionBuilder.GetFunctionName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLDropFunctionBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropFunctionBuilder.IfExists: IFluentDDLDropFunctionBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropFunctionBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: function name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropFunction(Self as IFluentDDLDropFunctionDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLProcedureBuilder }
+
+constructor TFluentDDLProcedureBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FOrReplace := False;
+end;
+
+function TFluentDDLProcedureBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLProcedureBuilder.GetProcedureName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLProcedureBuilder.GetParams: string;
+begin
+  Result := FParams;
+end;
+
+function TFluentDDLProcedureBuilder.GetBody: string;
+begin
+  Result := FBody;
+end;
+
+function TFluentDDLProcedureBuilder.GetOrReplace: Boolean;
+begin
+  Result := FOrReplace;
+end;
+
+function TFluentDDLProcedureBuilder.Params(const AValue: string): IFluentDDLProcedureBuilder;
+begin
+  FParams := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLProcedureBuilder.Body(const AValue: string): IFluentDDLProcedureBuilder;
+begin
+  FBody := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLProcedureBuilder.OrReplace: IFluentDDLProcedureBuilder;
+begin
+  FOrReplace := True;
+  Result := Self;
+end;
+
+function TFluentDDLProcedureBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: procedure name is required');
+  if Trim(FBody) = '' then
+    raise EArgumentException.Create('DDL: procedure body is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateProcedure(Self as IFluentDDLProcedureDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropProcedureBuilder }
+
+constructor TFluentDDLDropProcedureBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropProcedureBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropProcedureBuilder.GetProcedureName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLDropProcedureBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropProcedureBuilder.IfExists: IFluentDDLDropProcedureBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropProcedureBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: procedure name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropProcedure(Self as IFluentDDLDropProcedureDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLTriggerBuilder }
+
+constructor TFluentDDLTriggerBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FEvent := teInsert;
+  FTime := ttAfter;
+end;
+
+function TFluentDDLTriggerBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLTriggerBuilder.GetTriggerName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLTriggerBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLTriggerBuilder.GetEvent: TTriggerEvent;
+begin
+  Result := FEvent;
+end;
+
+function TFluentDDLTriggerBuilder.GetTime: TTriggerTime;
+begin
+  Result := FTime;
+end;
+
+function TFluentDDLTriggerBuilder.GetBody: string;
+begin
+  Result := FBody;
+end;
+
+function TFluentDDLTriggerBuilder.Table(const AValue: string): IFluentDDLTriggerBuilder;
+begin
+  FTableName := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.Before: IFluentDDLTriggerBuilder;
+begin
+  FTime := ttBefore;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.After: IFluentDDLTriggerBuilder;
+begin
+  FTime := ttAfter;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.OnInsert: IFluentDDLTriggerBuilder;
+begin
+  FEvent := teInsert;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.OnUpdate: IFluentDDLTriggerBuilder;
+begin
+  FEvent := teUpdate;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.OnDelete: IFluentDDLTriggerBuilder;
+begin
+  FEvent := teDelete;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.Body(const AValue: string): IFluentDDLTriggerBuilder;
+begin
+  FBody := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLTriggerBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: trigger name is required');
+  if Trim(FTableName) = '' then
+    raise EArgumentException.Create('DDL: trigger table name is required');
+  if Trim(FBody) = '' then
+    raise EArgumentException.Create('DDL: trigger body is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.CreateTrigger(Self as IFluentDDLTriggerDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLDropTriggerBuilder }
+
+constructor TFluentDDLDropTriggerBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FName := AName;
+  FIfExists := False;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetTriggerName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLDropTriggerBuilder.GetIfExists: Boolean;
+begin
+  Result := FIfExists;
+end;
+
+function TFluentDDLDropTriggerBuilder.OnTable(const AValue: string): IFluentDDLDropTriggerBuilder;
+begin
+  FTableName := AValue;
+  Result := Self;
+end;
+
+function TFluentDDLDropTriggerBuilder.IfExists: IFluentDDLDropTriggerBuilder;
+begin
+  FIfExists := True;
+  Result := Self;
+end;
+
+function TFluentDDLDropTriggerBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: trigger name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.DropTrigger(Self as IFluentDDLDropTriggerDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+{ TFluentDDLTriggerManagementBuilder }
+
+constructor TFluentDDLTriggerManagementBuilder.Create(const ADialect: TFluentSQLDriver; const ATableName, ATriggerName: string; AEnabled: Boolean);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FTableName := ATableName;
+  FName := ATriggerName;
+  FEnabled := AEnabled;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetTriggerName: string;
+begin
+  Result := FName;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetTableName: string;
+begin
+  Result := FTableName;
+end;
+
+function TFluentDDLTriggerManagementBuilder.GetEnabled: Boolean;
+begin
+  Result := FEnabled;
+end;
+
+function TFluentDDLTriggerManagementBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  if Trim(FName) = '' then
+    raise EArgumentException.Create('DDL: trigger name is required');
+
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    Result := LSerializer.ManageTrigger(Self as IFluentDDLTriggerManagementDef);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
 { TFluentDDLTableDrop }
 
 constructor TFluentDDLTableDrop.Create(const ADialect: TFluentSQLDriver; const ATableName: string);
@@ -2235,6 +3091,16 @@ begin
   Result := TFluentDDLTableAlter.Create(FDialect, FTableName);
 end;
 
+function TFluentDDLTable.EnableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, FTableName, ATriggerName, True);
+end;
+
+function TFluentDDLTable.DisableTrigger(const ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, FTableName, ATriggerName, False);
+end;
+
 { TFluentSchema }
 
 constructor TFluentSchema.Create(const ADialect: TFluentSQLDriver);
@@ -2259,7 +3125,12 @@ end;
 
 function TFluentSchema.TruncateTable(const ATableName: string): IFluentDDLTruncateTableBuilder;
 begin
-  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, ATableName);
+  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, [ATableName]);
+end;
+
+function TFluentSchema.TruncateTable(const ATables: array of string): IFluentDDLTruncateTableBuilder;
+begin
+  Result := TFluentDDLTruncateTableBuilder.Create(FDialect, ATables);
 end;
 
 function TFluentSchema.CreateView(const AName: string): IFluentDDLCreateViewBuilder;
@@ -2280,6 +3151,98 @@ end;
 function TFluentSchema.DropSequence(const AName: string): IFluentDDLDropSequenceBuilder;
 begin
   Result := TFluentDDLDropSequenceBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.CreateProcedure(const AName: string): IFluentDDLProcedureBuilder;
+begin
+  Result := TFluentDDLProcedureBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropProcedure(const AName: string): IFluentDDLDropProcedureBuilder;
+begin
+  Result := TFluentDDLDropProcedureBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.CreateFunction(const AName: string): IFluentDDLFunctionBuilder;
+begin
+  Result := TFluentDDLFunctionBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropFunction(const AName: string): IFluentDDLDropFunctionBuilder;
+begin
+  Result := TFluentDDLDropFunctionBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.CreateTrigger(const AName: string): IFluentDDLTriggerBuilder;
+begin
+  Result := TFluentDDLTriggerBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.DropTrigger(const AName: string): IFluentDDLDropTriggerBuilder;
+begin
+  Result := TFluentDDLDropTriggerBuilder.Create(FDialect, AName);
+end;
+
+function TFluentSchema.EnableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, ATableName, ATriggerName, True);
+end;
+
+function TFluentSchema.DisableTrigger(const ATableName, ATriggerName: string): IFluentDDLTriggerManagementBuilder;
+begin
+  Result := TFluentDDLTriggerManagementBuilder.Create(FDialect, ATableName, ATriggerName, False);
+end;
+
+function TFluentSchema.Schema(const AName: string): IFluentSQLSchemaBuilder;
+begin
+  Result := TFluentSQLSchemaBuilder.Create(FDialect, AName);
+end;
+
+{ TFluentSQLSchemaBuilder }
+
+constructor TFluentSQLSchemaBuilder.Create(const ADialect: TFluentSQLDriver; const AName: string);
+begin
+  inherited Create;
+  FDialect := ADialect;
+  FSchemaName := AName;
+  FIsDrop := False;
+end;
+
+function TFluentSQLSchemaBuilder.DoCreate: IFluentSQLSchemaBuilder;
+begin
+  FIsDrop := False;
+  Result := Self;
+end;
+
+function TFluentSQLSchemaBuilder.Drop: IFluentSQLSchemaBuilder;
+begin
+  FIsDrop := True;
+  Result := Self;
+end;
+
+function TFluentSQLSchemaBuilder.AsString: string;
+var
+  LSerializer: TFluentDDLSerialize;
+begin
+  LSerializer := TFluentDDLSerialize.Create;
+  try
+    if FIsDrop then
+      Result := LSerializer.DropSchema(Self)
+    else
+      Result := LSerializer.CreateSchema(Self);
+  finally
+    LSerializer.Free;
+  end;
+end;
+
+function TFluentSQLSchemaBuilder.GetDialect: TFluentSQLDriver;
+begin
+  Result := FDialect;
+end;
+
+function TFluentSQLSchemaBuilder.GetSchemaName: string;
+begin
+  Result := FSchemaName;
 end;
 
 end.
