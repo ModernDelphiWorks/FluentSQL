@@ -44,3 +44,4 @@ O arquivo [ROADMAP.md](https://github.com/ModernDelphiWorks/FluentSQL/blob/main/
 - **v1.3.0:** suporte a Renomear Tabela e refinamento do ponto de entrada `Schema`.
 - **v1.4.0:** MongoDB Aggregations & Joins, MongoDB DDL, Views, Sequences, Identity e Comments.
 - **v1.5.0:** suporte a DDL Schemas (logical namespaces) e esqueleto inicial para DML MERGE.
+- **v1.5.1:** suporte completo a DML MERGE (MSSQL), paridade de Funções Escalares e reestruturação da suíte de testes.
