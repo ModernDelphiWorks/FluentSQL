@@ -18,7 +18,8 @@ A API do MERGE segue o padrão SQL ANSI:
 var
   LMerge: string;
 begin
-  LMerge := Merge(dbnMSSQL)
+  LMerge := Query(dbnMSSQL)
+    .Merge
     .Into('TargetTable', 'T')
     .Using('SourceTable', 'S')
     .On('T.ID = S.ID')

@@ -10,7 +10,7 @@ Documentation aligned with release **v1.5.0** (2026-04-20), featuring DDL Schema
 | Item | Descrição |
 |------|-----------|
 | **Query Factory (DML)** | **`Query(dbnFirebird)`** (unit `FluentSQL`) é o ponto de entrada principal para consultas. As fábricas legadas `CreateFluentSQL` e `TCQ` encontram-se obsoletas. |
-| **Merge Factory (DML)** | **`Merge(dbnMSSQL)`** (unit `FluentSQL`) devolve **`IFluentSQLMerge`**, ponto de entrada para operações MERGE. |
+| **Merge (DML)** | **`Query(dbnMSSQL).Merge`** (unit `FluentSQL`) devolve **`IFluentSQLMerge`**, ponto de entrada para operações MERGE. |
 | **Schema Factory (DDL)** | **`Schema(dbnPostgreSQL)`** (unit `FluentSQL`) devolve **`IFluentSchema`**, ponto de entrada centralizado para todas as operações DDL. |
 | DDL (`CREATE SCHEMA`) | **`Schema(dbnPostgreSQL).Create`** (sem arg) devolve **`IFluentSQLSchemaDef`**; gera `CREATE SCHEMA`. Ver [DDL — Schemas](../guides/ddl-schemas.md). |
 | DDL (`DROP SCHEMA`) | **`Schema(dbnPostgreSQL).Drop`** (sem arg) devolve **`IFluentSQLSchemaDef`**; gera `DROP SCHEMA`. Ver [DDL — Schemas](../guides/ddl-schemas.md). |
