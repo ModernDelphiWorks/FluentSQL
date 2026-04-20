@@ -7,7 +7,11 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-04-20
+
 ### Added
+- **DDL — Schema Support (ESP-075, issue [#142]):** `CREATE SCHEMA` and `DROP SCHEMA` support for PostgreSQL, MSSQL, and MySQL (mapped to DATABASE per ADR-075).
+- **DML — MERGE Skeleton (ESP-076, issue [#142]):** Fluent API for `MERGE INTO ... USING ... ON ... WHEN MATCHED/NOT MATCHED`. Initial serialization for MSSQL.
 - **DDL — Advanced Truncate Support (ESP-074, issue [#136]):**
   - Support for multi-table truncation in a single atomic command across all supported dialects.
   - PostgreSQL: added `RESTART IDENTITY`, `CONTINUE IDENTITY`, and `CASCADE` support.

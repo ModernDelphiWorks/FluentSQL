@@ -46,6 +46,27 @@ begin
 end;
 ```
 
+## Comando MERGE (v1.5.0+)
+
+Utilize o builder de **MERGE** para operações de sincronização (atualmente em estágio de esqueleto):
+
+```pascal
+uses FluentSQL;
+
+var
+  LMerge: string;
+begin
+  LMerge := Query(dbnMSSQL)
+    .Merge
+    .Into('Target', 'T')
+    .Using('Source', 'S')
+    .On('T.ID = S.ID')
+    .WhenMatched.Update
+    .WhenNotMatched.Insert
+    .AsString;
+end;
+```
+
 ## SQL e parâmetros
 
 - Use `.AsString` para obter o texto SQL gerado.
