@@ -34,6 +34,17 @@ type
     function Month(const AValue: String): String; override;
     function Year(const AValue: String): String; override;
     function Concat(const AValue: array of String): String; override;
+    function Trim(const AValue: String): String; override;
+    function LTrim(const AValue: String): String; override;
+    function RTrim(const AValue: String): String; override;
+    function Coalesce(const AValues: array of String): String; override;
+    function CurrentDate: String; override;
+    function CurrentTimestamp: String; override;
+    function Modulus(const AValue, ADivisor: String): String; override;
+    function Round(const AValue: String; const ADecimals: Integer): String; override;
+    function Floor(const AValue: String): String; override;
+    function Ceil(const AValue: String): String; override;
+    function Abs(const AValue: String): String; override;
   end;
 
 implementation
@@ -81,15 +92,6 @@ begin
   Result := 'YEAR(' + AValue + ')';
 end;
 
-function TFluentSQLFunctionsMSSQL.Date(const AVAlue, AFormat: String): String;
-begin
-  Result := FormatDateTime(AFormat, StrToDateTime(AValue));
-end;
-
-function TFluentSQLFunctionsMSSQL.Date(const AVAlue: String): String;
-begin
-  Result := AValue;
-end;
 
 function TFluentSQLFunctionsMSSQL.Day(const AValue: String): String;
 begin
@@ -99,6 +101,80 @@ end;
 function TFluentSQLFunctionsMSSQL.Month(const AValue: String): String;
 begin
   Result := 'MONTH(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Date(const AVAlue, AFormat: String): String;
+begin
+  Result := 'FORMAT(' + AValue + ', ' + AFormat + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Date(const AVAlue: String): String;
+begin
+  Result := 'CAST(' + AValue + ' AS DATE)';
+end;
+
+function TFluentSQLFunctionsMSSQL.Trim(const AValue: String): String;
+begin
+  Result := 'TRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.LTrim(const AValue: String): String;
+begin
+  Result := 'LTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.RTrim(const AValue: String): String;
+begin
+  Result := 'RTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Coalesce(const AValues: array of String): String;
+var
+  LFor: Integer;
+begin
+  Result := 'COALESCE(';
+  for LFor := Low(AValues) to High(AValues) do
+  begin
+    Result := Result + AValues[LFor];
+    if LFor < High(AValues) then
+      Result := Result + ', ';
+  end;
+  Result := Result + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.CurrentDate: String;
+begin
+  Result := 'CAST(GETDATE() AS DATE)';
+end;
+
+function TFluentSQLFunctionsMSSQL.CurrentTimestamp: String;
+begin
+  Result := 'GETDATE()';
+end;
+
+function TFluentSQLFunctionsMSSQL.Modulus(const AValue, ADivisor: String): String;
+begin
+  Result := '(' + AValue + ' % ' + ADivisor + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Round(const AValue: String; const ADecimals: Integer): String;
+begin
+  Result := 'ROUND(' + AValue + ', ' + IntToStr(ADecimals) + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Floor(const AValue: String): String;
+begin
+  Result := 'FLOOR(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Ceil(const AValue: String): String;
+begin
+  Result := 'CEILING(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsMSSQL.Abs(const AValue: String): String;
+begin
+  Result := 'ABS(' + AValue + ')';
 end;
 
 end.

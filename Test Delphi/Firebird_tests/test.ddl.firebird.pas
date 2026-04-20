@@ -81,6 +81,10 @@ type
     procedure TestGuidType_Firebird;
     [Test]
     procedure TestLongTextAndBlob_Firebird;
+    [Test]
+    procedure TestComments_Firebird_GeneratesExpected;
+    [Test]
+    procedure TestCreateFunction_Firebird_GeneratesExpected;
   end;
 
 implementation
@@ -470,6 +474,37 @@ begin
 
   Assert.IsTrue(Pos('BLOB SUB_TYPE 1', LFirebirdSql) > 0);
   Assert.IsTrue(Pos('BLOB SUB_TYPE 0', LFirebirdSql) > 0);
+end;
+
+procedure TTestDDLFirebird.TestComments_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('Users')
+    .Description('Application users table')
+    .ColumnInteger('ID').PrimaryKey.Description('Internal ID')
+    .AsString;
+    
+  Assert.AreEqual(
+    'CREATE TABLE "Users" ("ID" INTEGER PRIMARY KEY); ' +
+    'COMMENT ON TABLE "Users" IS ''Application users table''; ' +
+    'COMMENT ON COLUMN "Users"."ID" IS ''Internal ID''',
+    LSql);
+end;
+
+procedure TTestDDLFirebird.TestCreateFunction_Firebird_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnFirebird)
+    .CreateFunction('FN_CALC_DISCOUNT')
+    .Params('P_PRICE NUMERIC(15,2), P_PERCENT INT')
+    .Returns('NUMERIC(15,2)')
+    .Body('BEGIN RETURN P_PRICE * (P_PERCENT / 100.0); END;')
+    .OrReplace
+    .AsString;
+
+  Assert.AreEqual('CREATE OR ALTER FUNCTION "FN_CALC_DISCOUNT" (P_PRICE NUMERIC(15,2), P_PERCENT INT) RETURNS NUMERIC(15,2) AS BEGIN RETURN P_PRICE * (P_PERCENT / 100.0); END;', LSql);
 end;
 
 initialization

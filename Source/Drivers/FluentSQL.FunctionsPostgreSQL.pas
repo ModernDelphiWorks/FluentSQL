@@ -34,6 +34,17 @@ type
     function Month(const AValue: String): String; override;
     function Year(const AValue: String): String; override;
     function Concat(const AValue: array of String): String; override;
+    function Trim(const AValue: String): String; override;
+    function LTrim(const AValue: String): String; override;
+    function RTrim(const AValue: String): String; override;
+    function Coalesce(const AValues: array of String): String; override;
+    function CurrentDate: String; override;
+    function CurrentTimestamp: String; override;
+    function Modulus(const AValue, ADivisor: String): String; override;
+    function Round(const AValue: String; const ADecimals: Integer): String; override;
+    function Floor(const AValue: String): String; override;
+    function Ceil(const AValue: String): String; override;
+    function Abs(const AValue: String): String; override;
   end;
 
 implementation
@@ -96,6 +107,70 @@ end;
 function TFluentSQLFunctionsPostgreSQL.Year(const AValue: String): String;
 begin
   Result := 'EXTRACT(YEAR FROM ' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Trim(const AValue: String): String;
+begin
+  Result := 'TRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.LTrim(const AValue: String): String;
+begin
+  Result := 'LTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.RTrim(const AValue: String): String;
+begin
+  Result := 'RTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Coalesce(const AValues: array of String): String;
+var
+  LFor: Integer;
+begin
+  Result := 'COALESCE(';
+  for LFor := Low(AValues) to High(AValues) do
+  begin
+    Result := Result + AValues[LFor];
+    if LFor < High(AValues) then
+      Result := Result + ', ';
+  end;
+  Result := Result + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.CurrentDate: String;
+begin
+  Result := 'CURRENT_DATE';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.CurrentTimestamp: String;
+begin
+  Result := 'CURRENT_TIMESTAMP';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Modulus(const AValue, ADivisor: String): String;
+begin
+  Result := 'MOD(' + AValue + ', ' + ADivisor + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Round(const AValue: String; const ADecimals: Integer): String;
+begin
+  Result := 'ROUND(' + AValue + ', ' + IntToStr(ADecimals) + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Floor(const AValue: String): String;
+begin
+  Result := 'FLOOR(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Ceil(const AValue: String): String;
+begin
+  Result := 'CEIL(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsPostgreSQL.Abs(const AValue: String): String;
+begin
+  Result := 'ABS(' + AValue + ')';
 end;
 
 end.

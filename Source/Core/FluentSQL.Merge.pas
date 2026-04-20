@@ -34,8 +34,9 @@ type
     FActionType: IFluentSQLMergeActionType;
     FValues: IFluentSQLNameValuePairs;
     FParent: IFluentSQLMerge;
+    FAST: IFluentSQLAST;
   public
-    constructor Create(AParent: IFluentSQLMerge; AType: IFluentSQLMergeMatchClauseType);
+    constructor Create(AParent: IFluentSQLMerge; const AAST: IFluentSQLAST; AType: IFluentSQLMergeMatchClauseType);
     destructor Destroy; override;
     { IFluentSQLMergeMatchClauseDef }
     function GetClauseType: IFluentSQLMergeMatchClauseType;
@@ -43,10 +44,12 @@ type
     function GetActionType: IFluentSQLMergeActionType;
     function GetValues: IFluentSQLNameValuePairs;
     { IFluentSQLMergeWhenMatched }
-    function Update: IFluentSQLMerge;
+    function Update(const AValues: array of const): IFluentSQLMerge; overload;
+    function Update: IFluentSQLMerge; overload;
     function Delete: IFluentSQLMerge;
     { IFluentSQLMergeWhenNotMatched }
-    function Insert: IFluentSQLMerge;
+    function Insert(const AValues: array of const): IFluentSQLMerge; overload;
+    function Insert: IFluentSQLMerge; overload;
     { DSL helpers }
     procedure SetCondition(const ACondition: string);
   end;
@@ -100,10 +103,11 @@ uses
 
 { TFluentSQLMergeMatchClause }
 
-constructor TFluentSQLMergeMatchClause.Create(AParent: IFluentSQLMerge; AType: IFluentSQLMergeMatchClauseType);
+constructor TFluentSQLMergeMatchClause.Create(AParent: IFluentSQLMerge; const AAST: IFluentSQLAST; AType: IFluentSQLMergeMatchClauseType);
 begin
   inherited Create;
   FParent := AParent;
+  FAST := AAST;
   FClauseType := AType;
   FValues := TFluentSQLNameValuePairs.Create;
 end;
@@ -140,6 +144,12 @@ begin
   Result := FValues;
 end;
 
+function TFluentSQLMergeMatchClause.Insert(const AValues: array of const): IFluentSQLMerge;
+begin
+  TUtils.SqlArrayOfConstToNameValuePairs(AValues, FValues, FAST.Params);
+  Result := Insert;
+end;
+
 function TFluentSQLMergeMatchClause.Insert: IFluentSQLMerge;
 begin
   FActionType := matInsert;
@@ -149,6 +159,12 @@ end;
 procedure TFluentSQLMergeMatchClause.SetCondition(const ACondition: string);
 begin
   FCondition := ACondition;
+end;
+
+function TFluentSQLMergeMatchClause.Update(const AValues: array of const): IFluentSQLMerge;
+begin
+  TUtils.SqlArrayOfConstToNameValuePairs(AValues, FValues, FAST.Params);
+  Result := Update;
 end;
 
 function TFluentSQLMergeMatchClause.Update: IFluentSQLMerge;
@@ -308,7 +324,7 @@ function TFluentSQLMerge.WhenMatched: IFluentSQLMergeWhenMatched;
 var
   LClause: TFluentSQLMergeMatchClause;
 begin
-  LClause := TFluentSQLMergeMatchClause.Create(Self, mctMatched);
+  LClause := TFluentSQLMergeMatchClause.Create(Self, FAST, mctMatched);
   FMatchedClauses.Add(LClause);
   Result := LClause;
 end;
@@ -317,7 +333,7 @@ function TFluentSQLMerge.WhenNotMatched: IFluentSQLMergeWhenNotMatched;
 var
   LClause: TFluentSQLMergeMatchClause;
 begin
-  LClause := TFluentSQLMergeMatchClause.Create(Self, mctNotMatched);
+  LClause := TFluentSQLMergeMatchClause.Create(Self, FAST, mctNotMatched);
   FMatchedClauses.Add(LClause);
   Result := LClause;
 end;

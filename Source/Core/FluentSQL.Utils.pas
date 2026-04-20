@@ -47,6 +47,8 @@ type
     class function DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDateTime): String;
     class function GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TGUID): String;
     class function BooleanToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: Boolean): string;
+    class procedure SqlArrayOfConstToNameValuePairs(const AParams: array of const;
+      const APairs: IFluentSQLNameValuePairs; const ASQLParams: IFluentSQLParams);
     class function GetHash(const AString: String): String;
   end;
 
@@ -323,6 +325,36 @@ begin
   // Simplified hash for FPC if System.Hash is not available
   Result := IntToHex(Cardinal(AString.GetHashCode), 8);
   {$endif}
+end;
+
+class procedure TUtils.SqlArrayOfConstToNameValuePairs(const AParams: array of const;
+  const APairs: IFluentSQLNameValuePairs; const ASQLParams: IFluentSQLParams);
+var
+  I: Integer;
+  LName: string;
+  LValue: string;
+begin
+  if not Assigned(APairs) then exit;
+  I := Low(AParams);
+  while I <= High(AParams) do
+  begin
+    LName := _VarRecToString(AParams[I]);
+    Inc(I);
+    if I <= High(AParams) then
+    begin
+      if not _TryVarRecAsParam(AParams[I], ASQLParams, LValue) then
+        LValue := _VarRecToString(AParams[I]);
+      Inc(I);
+    end
+    else
+      LValue := ''; 
+      
+    with APairs.Add do
+    begin
+      Name := LName;
+      Value := LValue;
+    end;
+  end;
 end;
 
 end.

@@ -44,6 +44,18 @@ type
     procedure TestConcatSelect;
     [Test]
     procedure TestConcatWhere;
+    [Test]
+    procedure TestRound;
+    [Test]
+    procedure TestFloor;
+    [Test]
+    procedure TestCeil;
+    [Test]
+    procedure TestAbs;
+    [Test]
+    procedure TestModulus;
+    [Test]
+    procedure TestCurrentTimestamp;
    end;
 
 implementation
@@ -251,6 +263,77 @@ begin
                                       .All
                                       .From('CLIENTES')
                                       .Where.Day('NASCTO').Equal('9')
+                                      .AsString);
+end;
+
+procedure TTestFluentSQLFunctionsMSSQL.TestRound;
+var
+  LAsString: String;
+begin
+  LAsString := 'SELECT ROUND(PRECO, 2) FROM PRODUTOS';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
+                                      .Select
+                                      .Column.Round('PRECO', 2)
+                                      .From('PRODUTOS')
+                                      .AsString);
+end;
+
+procedure TTestFluentSQLFunctionsMSSQL.TestFloor;
+var
+  LAsString: String;
+begin
+  LAsString := 'SELECT FLOOR(PRECO) FROM PRODUTOS';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
+                                      .Select
+                                      .Column.Floor('PRECO')
+                                      .From('PRODUTOS')
+                                      .AsString);
+end;
+
+procedure TTestFluentSQLFunctionsMSSQL.TestCeil;
+var
+  LAsString: String;
+begin
+  LAsString := 'SELECT CEILING(PRECO) FROM PRODUTOS';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
+                                      .Select
+                                      .Column.Ceil('PRECO')
+                                      .From('PRODUTOS')
+                                      .AsString);
+end;
+
+procedure TTestFluentSQLFunctionsMSSQL.TestAbs;
+var
+  LAsString: String;
+begin
+  LAsString := 'SELECT ABS(VALOR) FROM LANCAMENTOS';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
+                                      .Select
+                                      .Column.Abs('VALOR')
+                                      .From('LANCAMENTOS')
+                                      .AsString);
+end;
+
+procedure TTestFluentSQLFunctionsMSSQL.TestModulus;
+var
+  LAsString: String;
+begin
+  LAsString := 'SELECT (VALOR % 2) FROM LANCAMENTOS';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
+                                      .Select
+                                      .Column.Modulus('VALOR', '2')
+                                      .From('LANCAMENTOS')
+                                      .AsString);
+end;
+
+procedure TTestFluentSQLFunctionsMSSQL.TestCurrentTimestamp;
+var
+  LAsString: String;
+begin
+  LAsString := 'SELECT GETDATE()';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
+                                      .Select
+                                      .Column.CurrentTimestamp
                                       .AsString);
 end;
 

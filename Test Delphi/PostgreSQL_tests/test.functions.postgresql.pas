@@ -1,4 +1,4 @@
-unit test.functions.mysql;
+unit test.functions.postgresql;
 
 interface
 
@@ -7,7 +7,7 @@ uses
 
 type
   [TestFixture]
-  TTestFluentSQLFunctionsMySQL = class
+  TTestFluentSQLFunctionsPostgreSQL = class
   public
     [Test]
     procedure TestRound;
@@ -30,78 +30,78 @@ uses
   FluentSQL.Interfaces,
   FluentSQL;
 
-procedure TTestFluentSQLFunctionsMySQL.TestRound;
+procedure TTestFluentSQLFunctionsPostgreSQL.TestRound;
 var
   LAsString: String;
 begin
   LAsString := 'SELECT ROUND(PRECO, 2) FROM PRODUTOS';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnPostgreSQL)
                                       .Select
                                       .Column.Round('PRECO', 2)
                                       .From('PRODUTOS')
                                       .AsString);
 end;
 
-procedure TTestFluentSQLFunctionsMySQL.TestFloor;
+procedure TTestFluentSQLFunctionsPostgreSQL.TestFloor;
 var
   LAsString: String;
 begin
   LAsString := 'SELECT FLOOR(PRECO) FROM PRODUTOS';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnPostgreSQL)
                                       .Select
                                       .Column.Floor('PRECO')
                                       .From('PRODUTOS')
                                       .AsString);
 end;
 
-procedure TTestFluentSQLFunctionsMySQL.TestCeil;
+procedure TTestFluentSQLFunctionsPostgreSQL.TestCeil;
 var
   LAsString: String;
 begin
   LAsString := 'SELECT CEIL(PRECO) FROM PRODUTOS';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnPostgreSQL)
                                       .Select
                                       .Column.Ceil('PRECO')
                                       .From('PRODUTOS')
                                       .AsString);
 end;
 
-procedure TTestFluentSQLFunctionsMySQL.TestAbs;
+procedure TTestFluentSQLFunctionsPostgreSQL.TestAbs;
 var
   LAsString: String;
 begin
   LAsString := 'SELECT ABS(VALOR) FROM LANCAMENTOS';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnPostgreSQL)
                                       .Select
                                       .Column.Abs('VALOR')
                                       .From('LANCAMENTOS')
                                       .AsString);
 end;
 
-procedure TTestFluentSQLFunctionsMySQL.TestModulus;
+procedure TTestFluentSQLFunctionsPostgreSQL.TestModulus;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT (VALOR % 2) FROM LANCAMENTOS';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
+  LAsString := 'SELECT MOD(VALOR, 2) FROM LANCAMENTOS';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnPostgreSQL)
                                       .Select
                                       .Column.Modulus('VALOR', '2')
                                       .From('LANCAMENTOS')
                                       .AsString);
 end;
 
-procedure TTestFluentSQLFunctionsMySQL.TestCurrentTimestamp;
+procedure TTestFluentSQLFunctionsPostgreSQL.TestCurrentTimestamp;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT NOW()';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
+  LAsString := 'SELECT CURRENT_TIMESTAMP';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnPostgreSQL)
                                       .Select
                                       .Column.CurrentTimestamp
                                       .AsString);
 end;
 
 initialization
-  TDUnitX.RegisterTestFixture(TTestFluentSQLFunctionsMySQL);
+  TDUnitX.RegisterTestFixture(TTestFluentSQLFunctionsPostgreSQL);
 
 end.
