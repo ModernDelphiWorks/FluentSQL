@@ -166,7 +166,8 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
-| 2026-04-17 | Release **v1.4.0**: Massive DDL expansion, MongoDB Aggregations/Joins, and Identity support. | `CHANGELOG.md` [1.4.0] |
+| 2026-04-20 | Release **v1.5.1**: Pipeline hygiene, Docusaurus 3 tsconfig fixes, and governance stabilization. | `CHANGELOG.md` [1.5.1] |
+| 2026-04-20 | Release **v1.5.0**: Phase 5 Foundation — DDL Schemas and MERGE DML skeleton. | `CHANGELOG.md` [1.5.0] |
 | 2026-04-17 | Entregue **ESP-071** — DDL: Stored Functions (Create/Drop); validado na rodada 60. |
 | 2026-04-17 | Entregue **ESP-070** — DDL: Stored Procedures and Triggers (Create/Drop/Enable/Disable). |
 | 2026-04-17 | Entregue **ESP-068** — SQL-to-MQL Translation: Joins ($lookup); validado na rodada 57. | `.claude/pipeline/develop-report.md` |
