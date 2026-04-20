@@ -3,29 +3,31 @@ displayed_sidebar: fluentsqlSidebar
 title: Tests
 ---
 
-> **Release alignment:** examples and issue pointers below are reconciled with **`CHANGELOG.md`** and tag **v1.4.0** (2026-04-17).
+> **Release alignment:** examples and issue pointers below are reconciled with **`CHANGELOG.md`** and tag **v1.5.1** (2026-04-20).
 
 ## Estratégia
 
 - **Unitários:** DUnitX, com foco em serialização, construção da AST e regras por dialeto.
 - **Regressão:** cenários adicionados na **v0.2.0** cobrem **parâmetros nos dois lados** de operações de conjunto (Firebird e MySQL), conforme `CHANGELOG.md` e a issue [#11](https://github.com/ModernDelphiWorks/FluentSQL/issues/11).
-- **Parametrização:** o fixture **`Test Delphi/test.core.params.pas`** valida placeholders e `Params` (Firebird `:pN`, MySQL `?`, cenários PostgreSQL no runner Firebird) e está referenciado em `PTestFluentSQLFirebird.dpr` e `TestFluentSQL_MySQL.dpr`. Na **v1.0.3** (**ESP-009**): `IN`/`NOT IN` com listas — [#19](https://github.com/ModernDelphiWorks/FluentSQL/issues/19). Na **v1.0.4** (**ESP-010**): `Where`/`Having`/`Values`/`CASE WHEN` com `array of const` — [#21](https://github.com/ModernDelphiWorks/FluentSQL/issues/21); caveats [#22](https://github.com/ModernDelphiWorks/FluentSQL/issues/22). Na **v1.0.5** (**ESP-011**): `Where(Q.Expression([...]))` e cadeia com `AndOpe` no MySQL — [#23](https://github.com/ModernDelphiWorks/FluentSQL/issues/23); caveats [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24). Na **v1.0.6** (**ESP-012**): `Column` com `array of const` (`TestColumnArrayOfConstFirebird`, `TestColumnArrayOfConstMySQL`) — [#25](https://github.com/ModernDelphiWorks/FluentSQL/issues/25); dívida [#26](https://github.com/ModernDelphiWorks/FluentSQL/issues/26). Na **v1.0.7** (**ESP-013**): `CaseExpr` com `array of const` (`TestCaseExprArrayOfConstFirebird`, `TestCaseExprArrayOfConstMySQL`) — rastreio em `CHANGELOG` **[1.0.7]** (a issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27) no GitHub é **ESP-016**); dívida [#28](https://github.com/ModernDelphiWorks/FluentSQL/issues/28). Na **v1.0.9** (**ESP-015**): INSERT em lote com `AddRow` (`TestInsertBatchTwoRowsFirebird`, `TestInsertBatchTwoRowsMySQL`) — [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24); dívida [#32](https://github.com/ModernDelphiWorks/FluentSQL/issues/32).
-- **MongoDB (DML):** cenários em **`Test Delphi/MongoDB_tests/test.dml.mongodb.pas`** validam a serialização de `find` e `aggregate`. Na **v1.4.0**: suporte a agregações (**ESP-067**) com `SUM`, `COUNT`, `AVG`, `MIN`, `MAX` e `GROUP BY`; suporte a joins (**ESP-068**) via `$lookup` e `$unwind`.
-- **DDL (v1.1.x a v1.4.0):** **`Test Delphi/test.ddl.pas`** e **`Test Delphi/MongoDB_tests/test.ddl.mongodb.pas`**. Inclui `CREATE TABLE`, `DROP TABLE`, `ALTER TABLE` (ADD/DROP/RENAME) e `CREATE/DROP INDEX`. Na **v1.4.0**, o driver MongoDB suporta a serialização de comandos DDL para coleções e índices.
+- **Arquitetura de Testes (v1.5.1):** modularização completa (ESP-079). As unidades de teste foram movidas da raiz de `Test Delphi/` para subpastas por driver, seguindo o padrão `Test Delphi/<DB>_tests/test.<feature>.<driver>.pas`.
+- **Parametrização:** o fixture **`Test Delphi/test.core.params.pas`** (agora modularizado) valida placeholders e `Params`. Na **v1.0.3** (**ESP-009**): `IN`/`NOT IN` com listas. Na **v1.0.4** (**ESP-010**): `array of const` parametrizado. Na **v1.5.1** (**ESP-079**): parametrização total no MERGE DML (`Update` / `Insert`).
+- **MongoDB (DML):** suporte a agregações (**ESP-067**) e joins (**ESP-068**).
+- **DDL (v1.1.x a v1.5.1):** suporte a Schemas (Fase 5). Testes organizados em suas pastas de driver correspondentes.
 
 ## Como executar
 
-No Windows, compile com o `dcc32` do seu RAD Studio os projetos em `Test Delphi/` (ajuste o caminho da instalação). Lista alinhada ao **README** do repositório:
+No Windows, compile com o `dcc32` do seu RAD Studio os projetos em `Test Delphi/<DB>_tests/` (ajuste o caminho da instalação).
 
 | Projeto | Pasta |
 |---------|--------|
-| Suíte principal DUnitX | `Firebird_tests/PTestFluentSQLFirebird.dpr` |
-| Amostra mínima | `Firebird_tests/PTestFluentSQLSample.dpr` |
-| Por dialeto | `MSSQL_tests/TestFluentSQL_MSSQL.dpr`, `MySQL_tests/TestFluentSQL_MySQL.dpr`, `Oracle_tests/TestFluentSQL_Oracle.dpr`, `DB2_tests/TestFluentSQL_DB2.dpr`, `Interbase_tests/TestFluentSQL_Interbase.dpr` |
+| Suíte principal Firebird | `Firebird_tests/PTestFluentSQLFirebird.dpr` |
+| Suíte MSSQL | `MSSQL_tests/TestFluentSQL_MSSQL.dpr` |
+| Suíte MySQL | `MySQL_tests/TestFluentSQL_MySQL.dpr` |
+| Outros dialetos | `PostgreSQL_tests/`, `Oracle_tests/`, `SQLite_tests/`, etc. |
 
-Após compilar, execute o `.exe` gerado com `CI=1` no ambiente se quiser saída estável nos relatórios DUnitX. Nota: em alguns dialetos, o registo em runtime do serializer depende de **defines** de compilação nos `.dpr` (ver [Erros comuns](../troubleshooting/common-errors.md)).
+Após compilar, execute o `.exe` gerado com `CI=1` no ambiente se quiser saída estável nos relatórios DUnitX. Cada driver pode ser testado de forma isolada (RN-002).
 
 ## Cobertura esperada
 
-- Novos recursos devem incluir testes em **múltiplos dialetos** quando possível (diretriz alinhada aos projetos em `Test Delphi/` e ao `ROADMAP.md`; quando existir documentação de convenções em `.claude/references/`, cruze com essa fonte).
+- Novos recursos devem incluir testes em **múltiplos dialetos** quando possível, dentro de suas respectivas pastas de driver em `Test Delphi/`.
 - Para mudanças em **parâmetros + conjunto**, mantenha casos com placeholders na query principal **e** na subquery unida.

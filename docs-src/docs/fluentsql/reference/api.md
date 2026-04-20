@@ -3,14 +3,14 @@ displayed_sidebar: fluentsqlSidebar
 title: API reference
 ---
 
-Documentation aligned with release **v1.5.0** (2026-04-20), featuring DDL Schemas and MERGE DML skeleton. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
+Documentation alinhada ao release **v1.5.1** (2026-04-20), apresentando suporte completo a MERGE DML (MSSQL) e paridade de funções escalares. Detalhes de implementação em `Source/Core/` e `FluentSQL.Interfaces.pas`.
 
 ## Main entry points
 
 | Item | Descrição |
 |------|-----------|
 | **Query Factory (DML)** | **`Query(dbnFirebird)`** (unit `FluentSQL`) é o ponto de entrada principal para consultas. As fábricas legadas `CreateFluentSQL` e `TCQ` encontram-se obsoletas. |
-| **Merge (DML)** | **`Query(dbnMSSQL).Merge`** (unit `FluentSQL`) devolve **`IFluentSQLMerge`**, ponto de entrada para operações MERGE. |
+| **Merge (DML)** | **`Query(dbnMSSQL).Merge`** (unit `FluentSQL`) devolve **`IFluentSQLMerge`**, ponto de entrada para operações MERGE. Suporte a **`.Update(array of const)`** e **`.Insert(array of const)`** para parametrização automática de valores. |
 | **Schema Factory (DDL)** | **`Schema(dbnPostgreSQL)`** (unit `FluentSQL`) devolve **`IFluentSchema`**, ponto de entrada centralizado para todas as operações DDL. |
 | DDL (`CREATE SCHEMA`) | **`Schema(dbnPostgreSQL).Create`** (sem arg) devolve **`IFluentSQLSchemaDef`**; gera `CREATE SCHEMA`. Ver [DDL — Schemas](../guides/ddl-schemas.md). |
 | DDL (`DROP SCHEMA`) | **`Schema(dbnPostgreSQL).Drop`** (sem arg) devolve **`IFluentSQLSchemaDef`**; gera `DROP SCHEMA`. Ver [DDL — Schemas](../guides/ddl-schemas.md). |
