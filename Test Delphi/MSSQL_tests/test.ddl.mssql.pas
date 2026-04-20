@@ -57,6 +57,10 @@ type
     procedure TestIdentity_MSSQL_MapsBothToNative;
     [Test]
     procedure TestGuidType_MSSQL;
+    [Test]
+    procedure TestComments_MSSQL_GeneratesExpected;
+    [Test]
+    procedure TestCreateFunction_MSSQL_GeneratesExpected;
   end;
 
 implementation
@@ -313,6 +317,37 @@ procedure TTestDDLMSSQL.TestGuidType_MSSQL;
 begin
   Assert.AreEqual('CREATE TABLE [T] ([G] UNIQUEIDENTIFIER)', 
     FluentSQL.Schema(dbnMSSQL).Table('T').Create.ColumnGuid('G').AsString);
+end;
+
+procedure TTestDDLMSSQL.TestComments_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('Users')
+    .Description('App users table')
+    .ColumnInteger('ID').Description('Internal ID')
+    .AsString;
+    
+  Assert.AreEqual(
+    'CREATE TABLE [Users] ([ID] INT); ' +
+    'EXEC sp_addextendedproperty @name = N''MS_Description'', @value = N''App users table'', @level0type = N''SCHEMA'', @level0name = N''dbo'', @level1type = N''TABLE'', @level1name = N''Users''; ' +
+    'EXEC sp_addextendedproperty @name = N''MS_Description'', @value = N''Internal ID'', @level0type = N''SCHEMA'', @level0name = N''dbo'', @level1type = N''TABLE'', @level1name = N''Users'', @level2type = N''COLUMN'', @level2name = N''ID''',
+    LSql);
+end;
+
+procedure TTestDDLMSSQL.TestCreateFunction_MSSQL_GeneratesExpected;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Schema(dbnMSSQL)
+    .CreateFunction('FN_CALC_DISCOUNT')
+    .Params('@PRICE DECIMAL(18,2), @PERCENT INT')
+    .Returns('DECIMAL(18,2)')
+    .Body('BEGIN RETURN @PRICE * (@PERCENT / 100.0); END;')
+    .OrReplace
+    .AsString;
+
+  Assert.AreEqual('CREATE OR ALTER FUNCTION [FN_CALC_DISCOUNT] (@PRICE DECIMAL(18,2), @PERCENT INT) RETURNS DECIMAL(18,2) AS BEGIN RETURN @PRICE * (@PERCENT / 100.0); END;', LSql);
 end;
 
 initialization

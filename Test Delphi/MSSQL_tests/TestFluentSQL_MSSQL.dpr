@@ -20,6 +20,7 @@ uses
   test.functions.mssql in 'test.functions.mssql.pas',
   test.select.mssql in 'test.select.mssql.pas',
   test.ddl.mssql in 'test.ddl.mssql.pas',
+  test.merge.mssql in 'test.merge.mssql.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
   FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',
   FluentSQL.Cases in '..\..\Source\Core\FluentSQL.Cases.pas',

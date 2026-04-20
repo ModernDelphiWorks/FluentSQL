@@ -70,8 +70,10 @@ end;
 function TFluentSQLSerializerMSSQL.Merge(const ADef: IFluentSQLMergeDef): string;
 var
   LClauses: TInterfaceList;
-  I: Integer;
+  I, J: Integer;
   LClause: IFluentSQLMergeMatchClauseDef;
+  LPairs: IFluentSQLNameValuePairs;
+  LCols, LVals: string;
 begin
   if not Assigned(ADef) or (ADef.GetTargetTable = '') then
     Exit('');
@@ -98,16 +100,50 @@ begin
     Result := Result + ' WHEN ';
     if LClause.GetClauseType = mctNotMatched then
       Result := Result + 'NOT ';
-    Result := Result + 'MATCHED THEN ';
-    
+    Result := Result + 'MATCHED';
+
+    if LClause.GetCondition <> '' then
+      Result := Result + ' AND ' + LClause.GetCondition;
+
+    Result := Result + ' THEN ';
+
     case LClause.GetActionType of
-      matUpdate: Result := Result + 'UPDATE';
+      matUpdate:
+      begin
+        Result := Result + 'UPDATE SET ';
+        LPairs := LClause.GetValues;
+        for J := 0 to LPairs.Count - 1 do
+        begin
+          if J > 0 then Result := Result + ', ';
+          Result := Result + QuotedName(LPairs[J].Name) + ' = ' + LPairs[J].Value;
+        end;
+      end;
       matDelete: Result := Result + 'DELETE';
-      matInsert: Result := Result + 'INSERT';
+      matInsert:
+      begin
+        Result := Result + 'INSERT';
+        LPairs := LClause.GetValues;
+        if LPairs.Count > 0 then
+        begin
+          LCols := '';
+          LVals := '';
+          for J := 0 to LPairs.Count - 1 do
+          begin
+            if J > 0 then
+            begin
+              LCols := LCols + ', ';
+              LVals := LVals + ', ';
+            end;
+            LCols := LCols + QuotedName(LPairs[J].Name);
+            LVals := LVals + LPairs[J].Value;
+          end;
+          Result := Result + ' (' + LCols + ') VALUES (' + LVals + ')';
+        end;
+      end;
     end;
   end;
 
-  if not Result.EndsWith(';') then
+  if (Result <> '') and (not Result.EndsWith(';')) then
     Result := Result + ';';
 end;
 

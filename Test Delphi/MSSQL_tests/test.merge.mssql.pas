@@ -1,4 +1,4 @@
-unit test.dml.merge;
+unit test.merge.mssql;
 
 interface
 
@@ -13,7 +13,7 @@ uses
 
 type
   [TestFixture]
-  TTestDMLMerge = class
+  TTestMergeMSSQL = class
   public
     [Test]
     procedure TestMerge_BasicSyntax_GeneratesMSSQL;
@@ -21,6 +21,10 @@ type
     procedure TestMerge_WithArrayOfConstCondition_GeneratesExpected;
     [Test]
     procedure TestMerge_WithSourceQuery_GeneratesMSSQL;
+    [Test]
+    procedure TestMerge_UpdateWithValues_GeneratesMSSQL;
+    [Test]
+    procedure TestMerge_InsertWithValues_GeneratesMSSQL;
   end;
 
 implementation
@@ -28,7 +32,7 @@ implementation
 uses
   System.SysUtils;
 
-procedure TTestDMLMerge.TestMerge_BasicSyntax_GeneratesMSSQL;
+procedure TTestMergeMSSQL.TestMerge_BasicSyntax_GeneratesMSSQL;
 var
   LSql: string;
 begin
@@ -51,13 +55,10 @@ begin
   Assert.IsTrue(LSql.EndsWith(';'), 'Should end with semicolon');
 end;
 
-procedure TTestDMLMerge.TestMerge_WithArrayOfConstCondition_GeneratesExpected;
+procedure TTestMergeMSSQL.TestMerge_WithArrayOfConstCondition_GeneratesExpected;
 var
   LSql: string;
 begin
-  // We use values that TUtils will process. 
-  // In this library, SqlArrayOfConstToParameterizedSql often returns the string with values replaced 
-  // or parameters added depending on the implementation.
   LSql := FluentSQL.Query(dbnMSSQL)
     .Merge
       .Into('TARGET')
@@ -70,7 +71,7 @@ begin
   Assert.IsTrue(Pos('ON (ID = :p1)', LSql) > 0, 'Should contain formatted ON condition');
 end;
 
-procedure TTestDMLMerge.TestMerge_WithSourceQuery_GeneratesMSSQL;
+procedure TTestMergeMSSQL.TestMerge_WithSourceQuery_GeneratesMSSQL;
 var
   LSource: IFluentSQL;
   LSql: string;
@@ -90,6 +91,38 @@ begin
   Assert.IsTrue(Pos('USING (SELECT ID, NOME FROM PESSOAS) AS [s]', LSql) > 0, 'Should contain subquery in USING clause');
 end;
 
+procedure TTestMergeMSSQL.TestMerge_UpdateWithValues_GeneratesMSSQL;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Query(dbnMSSQL)
+    .Merge
+      .Into('TARGET', 't')
+      .Using('SOURCE', 's')
+      .On('t.ID = s.ID')
+      .WhenMatched
+        .Update(['NOME', 'TESTE', 'VALOR', 10.5])
+    .AsString;
+  
+  Assert.IsTrue(Pos('WHEN MATCHED THEN UPDATE SET [NOME] = :p1, [VALOR] = :p2', LSql) > 0, 'Should contain UPDATE SET with parameters');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_InsertWithValues_GeneratesMSSQL;
+var
+  LSql: string;
+begin
+  LSql := FluentSQL.Query(dbnMSSQL)
+    .Merge
+      .Into('TARGET', 't')
+      .Using('SOURCE', 's')
+      .On('t.ID = s.ID')
+      .WhenNotMatched
+        .Insert(['ID', 1, 'NOME', 'TESTE'])
+    .AsString;
+  
+  Assert.IsTrue(Pos('WHEN NOT MATCHED THEN INSERT ([ID], [NOME]) VALUES (:p1, :p2)', LSql) > 0, 'Should contain INSERT with parameters');
+end;
+
 initialization
-  TDUnitX.RegisterTestFixture(TTestDMLMerge);
+  TDUnitX.RegisterTestFixture(TTestMergeMSSQL);
 end.

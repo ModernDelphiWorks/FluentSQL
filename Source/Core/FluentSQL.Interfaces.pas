@@ -820,13 +820,15 @@ type
 
   IFluentSQLMergeWhenMatched = interface
     ['{A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5E}']
-    function Update: IFluentSQLMerge;
+    function Update(const AValues: array of const): IFluentSQLMerge; overload;
+    function Update: IFluentSQLMerge; overload;
     function Delete: IFluentSQLMerge;
   end;
 
   IFluentSQLMergeWhenNotMatched = interface
     ['{B1A2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5F}']
-    function Insert: IFluentSQLMerge;
+    function Insert(const AValues: array of const): IFluentSQLMerge; overload;
+    function Insert: IFluentSQLMerge; overload;
   end;
 
   IFluentSQLMerge = interface

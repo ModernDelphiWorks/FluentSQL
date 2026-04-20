@@ -55,7 +55,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES AS CLI';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES').Alias('CLI')
@@ -67,7 +67,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -80,7 +80,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE ID_CLIENTE = 1';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -93,7 +93,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND (ID >= :p1) AND (ID <= :p2)';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -108,7 +108,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND ((ID >= :p1) OR (ID <= :p2))';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
                                       .From('CLIENTES')
@@ -123,7 +123,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT ID_CLIENTE, NOME_CLIENTE FROM CLIENTES';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('ID_CLIENTE')
                                       .Column('NOME_CLIENTE')
@@ -136,7 +136,7 @@ var
   LAsString: String;
 begin
   LAsString := 'SELECT ID_CLIENTE, NOME_CLIENTE, (CASE TIPO_CLIENTE WHEN 0 THEN ''FISICA'' WHEN 1 THEN ''JURIDICA'' ELSE ''PRODUTOR'' END) AS TIPO_PESSOA FROM CLIENTES';
-  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .Column('ID_CLIENTE')
                                       .Column('NOME_CLIENTE')
