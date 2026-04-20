@@ -7,6 +7,12 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-04-20
+
+### Fixed
+- **Pipeline — Documentation Build (Issue #144):** Resolved `tsconfig.json` configuration conflict in `docs-src` related to `baseUrl` and path mapping, ensuring compatibility with Docusaurus 3.
+- **Pipeline — Governance Sync (Issue #144):** Restored pipeline synchronization by resolving drift for ESP-077 (Issue #141) and finalizing governance state.
+
 ## [1.5.0] — 2026-04-20
 
 ### Added
