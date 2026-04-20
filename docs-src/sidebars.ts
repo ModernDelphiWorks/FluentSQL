@@ -35,11 +35,13 @@ const sidebars: SidebarsConfig = {
           items: [
             'fluentsql/guides/construir-select',
             'fluentsql/guides/dml-insert-update-delete',
+            'fluentsql/guides/dml-merge',
             'fluentsql/guides/parametros-e-uniao',
             'fluentsql/guides/extensao-por-dialeto',
             'fluentsql/guides/mongodb-aggregation-joins',
             'fluentsql/guides/mongodb-ddl',
             'fluentsql/guides/cache-distribuido',
+            'fluentsql/guides/ddl-schemas',
             'fluentsql/guides/ddl-create-table',
             'fluentsql/guides/ddl-foreign-keys',
             'fluentsql/guides/ddl-views-sequences',
