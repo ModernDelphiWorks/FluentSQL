@@ -596,7 +596,8 @@ begin
 
   if (Assigned(AAST.GroupBy) and (not AAST.GroupBy.Columns.IsEmpty)) or
      (Assigned(AAST.Having) and (not AAST.Having.Expression.IsEmpty)) or
-     (Assigned(AAST.Joins) and (not AAST.Joins.IsEmpty)) then
+     (Assigned(AAST.Joins) and (not AAST.Joins.IsEmpty)) or
+     (AAST.UnionType <> '') then
     Exit(True);
 
   for LIdx := 0 to AAST.Select.Columns.Count - 1 do
@@ -702,15 +703,13 @@ begin
   Result := Result + '}}';
 end;
 
-function SerializeMongoAggregate(const AAST: IFluentSQLAST): String;
+function SerializeMongoPipeline(const AAST: IFluentSQLAST): String;
 var
-  LCollection: String;
   LPipeline: TStringList;
   LIdx: Integer;
   LSort: String;
   LLimit: Integer;
   LSkip: Integer;
-  LStages: String;
   LJoin: IFluentSQLJoin;
   LTargetTable: String;
   LTargetAlias: String;
@@ -719,11 +718,11 @@ var
   LMainAlias: String;
   LMainTable: String;
   LPreserve: String;
+  LCurrentAST: IFluentSQLAST;
+  LUnionAST: IFluentSQLAST;
+  LUnionPipeline: String;
+  LTargetColl: String;
 begin
-  LCollection := NormalizeFieldName(AAST.Select.TableNames[0].Name);
-  if LCollection = '' then
-    LCollection := Trim(AAST.Select.TableNames[0].Name);
-
   LPipeline := TStringList.Create;
   try
     // 1. $match (WHERE)
@@ -778,6 +777,23 @@ begin
     // 4. $project
     LPipeline.Add('{"$project":' + BuildProjection(AAST, True) + '}');
 
+    // 4.1 $unionWith (Unions) - ESP-069
+    LCurrentAST := AAST;
+    while (LCurrentAST.UnionType <> '') and Assigned(LCurrentAST.UnionQuery) do
+    begin
+      LUnionAST := LCurrentAST.UnionQuery as IFluentSQLAST;
+      LTargetColl := NormalizeFieldName(LUnionAST.Select.TableNames[0].Name);
+      // Recursive call for the union branch pipeline
+      LUnionPipeline := SerializeMongoPipeline(LUnionAST);
+
+      LPipeline.Add('{"$unionWith":{'
+        + '"coll":' + JsonString(LTargetColl) + ','
+        + '"pipeline":' + LUnionPipeline
+        + '}}');
+
+      LCurrentAST := LUnionAST;
+    end;
+
     // 5. $sort
     LSort := BuildSort(AAST);
     if LSort <> '' then
@@ -797,21 +813,34 @@ begin
     if LLimit >= 0 then
       LPipeline.Add('{"$limit":' + IntToStr(LLimit) + '}');
 
-    LStages := '';
+    Result := '[';
     for LIdx := 0 to LPipeline.Count - 1 do
     begin
-      if LIdx > 0 then LStages := LStages + ',';
-      LStages := LStages + LPipeline[LIdx];
+      if LIdx > 0 then Result := Result + ',';
+      Result := Result + LPipeline[LIdx];
     end;
-
-    Result := '{'
-      + JsonString('aggregate') + ':' + JsonString(LCollection) + ','
-      + JsonString('pipeline') + ':[' + LStages + '],'
-      + JsonString('cursor') + ':{}'
-      + '}';
+    Result := Result + ']';
   finally
     LPipeline.Free;
   end;
+end;
+
+function SerializeMongoAggregate(const AAST: IFluentSQLAST): String;
+var
+  LCollection: String;
+  LPipeline: String;
+begin
+  LCollection := NormalizeFieldName(AAST.Select.TableNames[0].Name);
+  if LCollection = '' then
+    LCollection := Trim(AAST.Select.TableNames[0].Name);
+
+  LPipeline := SerializeMongoPipeline(AAST);
+
+  Result := '{'
+    + JsonString('aggregate') + ':' + JsonString(LCollection) + ','
+    + JsonString('pipeline') + ':' + LPipeline + ','
+    + JsonString('cursor') + ':{}'
+    + '}';
 end;
 
 function BuildMongoDocumentFromNameValues(const AAST: IFluentSQLAST;
@@ -1008,8 +1037,8 @@ begin
 
   LCollection := '';
 
-  if (AAST.WithAlias <> '') or (AAST.UnionType <> '') then
-    raise EFluentSQLMongoDBSerialize.Create('MongoDB serializer: CTE (WITH) and UNION/INTERSECT are not supported for dbnMongoDB');
+  if (AAST.WithAlias <> '') or (FindTopLevelToken(AAST.UnionType, 'INTERSECT') > 0) then
+    raise EFluentSQLMongoDBSerialize.Create('MongoDB serializer: CTE (WITH) and INTERSECT/EXCEPT are not supported for dbnMongoDB');
 
   if Assigned(AAST.Insert) and (not AAST.Insert.IsEmpty) then
     Result := SerializeMongoInsert(AAST)

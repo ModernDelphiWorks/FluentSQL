@@ -3,7 +3,7 @@ displayed_sidebar: fluentsqlSidebar
 title: FluentSQL
 ---
 
-**FluentSQL** é uma Fluent API para Delphi e Lazarus que monta consultas SQL (SELECT, INSERT, UPDATE, DELETE) de forma **agnóstica ao SGBD**, com serialização por driver e árvore sintática interna. Desde a **v1.1.0**, o mesmo repositório documenta **builders de texto DDL** para **`CREATE TABLE`**, **`DROP TABLE`** e **`ALTER TABLE ADD COLUMN`**; na **v1.1.1** acrescentam-se **`ALTER TABLE DROP COLUMN`** e **`CREATE [UNIQUE] INDEX`**; na **v1.2.0** introduz-se **Cache Distribuído (Redis)**, **Constraints Avançadas** (Primary Key, NOT NULL, DEFAULT) e **Chaves Estrangeiras**; na **v1.3.0** acrescenta-se o suporte a **Renomear Tabela**; na **v1.4.0** expande-se o suporte a **MongoDB** com **Agregações** e **Joins ($lookup)**.
+**FluentSQL** é uma Fluent API para Delphi e Lazarus que monta consultas SQL (SELECT, INSERT, UPDATE, DELETE) de forma **agnóstica ao SGBD**, com serialização por driver e árvore sintática interna. Desde a **v1.1.0**, o repositório documenta builders DDL; na **v1.4.0** (atual) introduz-se suporte completo a **MongoDB Aggregations & Joins**, **DDL MongoDB** (Capped Collections, TTL), **Views**, **Sequences** e **Identidade Nativa**.
 
 ## Where to start
 
@@ -20,9 +20,13 @@ title: FluentSQL
 - [Parameters and UNION / INTERSECT](guides/parametros-e-uniao.md)
 - [Explicit per-engine extension](guides/extensao-por-dialeto.md)
 - [Cache Distribuído (Redis)](guides/cache-distribuido.md)
-- [Suporte a MongoDB](guides/mongodb-support.md)
+- [MongoDB Aggregations & Joins](guides/mongodb-aggregation-joins.md)
+- [MongoDB DDL Extensions](guides/mongodb-ddl.md)
 - [DDL — CREATE TABLE](guides/ddl-create-table.md)
 - [DDL — Foreign Keys](guides/ddl-foreign-keys.md)
+- [DDL — Views & Sequences](guides/ddl-views-sequences.md)
+- [DDL — Table & Column Comments](guides/ddl-comments.md)
+- [DDL — Advanced Columns (Identity, Computed)](guides/ddl-advanced-columns.md)
 - [DDL — DROP TABLE](guides/ddl-drop-table.md)
 - [DDL — ALTER TABLE ADD COLUMN](guides/ddl-alter-table-add-column.md)
 - [DDL — ALTER TABLE DROP COLUMN](guides/ddl-alter-table-drop-column.md)
@@ -41,5 +45,5 @@ title: FluentSQL
 
 ## Scope
 
-- **Cobre:** construção fluente de SQL, dialetos suportados via `Source/Drivers/`, parâmetros tipados (`IFluentSQLParams`), operações de conjunto (`Union`, `UnionAll`, `Intersect`) com **mescla ordenada de parâmetros** a partir da v0.2.0; na **v1.0.3**, listas em **`InValues` / `NotIn`** com arrays passam a placeholders + `Params`; na **v1.0.4**, sobrecargas com **`array of const`** em `Where`, `Having`, `Values`, `CASE`/`When`, etc., expandem **valores escalares** via placeholders + `Params`; na **v1.0.5**, **`TFluentSQLCriteriaExpression`** ligada a `IFluentSQLParams` e **`Expression(string | array of const)`** no fluente usam o mesmo contrato; na **v1.0.6**, **`Column(array of const)`** na projeção usa o mesmo helper de parametrização; na **v1.0.7**, **`CaseExpr(array of const)`** na expressão discriminante do `CASE` usa o mesmo helper; na **v1.0.8**, driver **MongoDB** com serialização **MQL/JSON** coerente e DML mínimo; na **v1.0.9**, **INSERT em lote** com **`AddRow`**, SQL multi-`VALUES` e Mongo **`insertMany`** quando N > 1; texto DDL para **CREATE** / **DROP** / **ALTER ADD COLUMN** (**v1.1.0**), **ALTER DROP COLUMN** e **CREATE INDEX** (**v1.1.1**); na **v1.2.0**, **Cache Distribuído (Redis)**, **Constraints Avançadas** (Primary Key, NOT NULL, DEFAULT) e **Chaves Estrangeiras**; na **v1.3.0**, **Renomear Tabela**; na **v1.4.0**, suporte completo a **MongoDB Aggregation Framework** (`GroupBy`, `Having`, funções de agregação) e **Joins ($lookup)**.
+- **Cobre:** construção fluente de SQL, dialetos suportados via `Source/Drivers/`; na **v1.4.0**, suporte robusto a **MongoDB Aggregations** (`GROUP BY`, `HAVING`) e **Joins** (`INNER`, `LEFT`) traduzidos para `$lookup`, além de extensões DDL para MongoDB, suporte a **Views**, **Sequences**, **Comments** e **Advanced Identity** em múltiplos dialetos.
 - **Não cobre:** binding em runtime com FireDAC/UniDAC (apenas contratos de SQL + `Params`), nem substituição de camada de acesso a dados.

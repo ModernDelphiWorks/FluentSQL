@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerFirebird = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -51,6 +52,15 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; override;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; override;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -102,27 +112,21 @@ begin
   Result := dbnFirebird;
 end;
 
-function TFluentDDLSerializerFirebird.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerFirebird.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INTEGER';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'TIMESTAMP';
-    dltLongText:
-      Result := 'BLOB SUB_TYPE 1';
-    dltBlob:
-      Result := 'BLOB SUB_TYPE 0';
-    dltGuid:
-      Result := 'CHAR(16) CHARACTER SET OCTETS';
+    dltInteger: Result := 'INTEGER';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BOOLEAN';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'TIMESTAMP';
+    dltLongText: Result := 'BLOB SUB_TYPE 1';
+    dltBlob: Result := 'BLOB SUB_TYPE 0';
+    dltGuid: Result := 'CHAR(16) CHARACTER SET OCTETS';
+    dltNumeric: Result := MapNumeric('NUMERIC', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -206,7 +210,7 @@ begin
      raise ENotSupportedException.Create('DDL Firebird: nullability change is not supported for ALTER COLUMN (ADR-050).');
 
   if ADef.TypeChanged then
-    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg)
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' TYPE ' + MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale)
   else if ADef.DefaultDropped then
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.ColumnName) + ' DROP DEFAULT'
   else if ADef.DefaultSet then
@@ -252,9 +256,11 @@ function TFluentDDLSerializerFirebird.TruncateTable(const ADef: IFluentDDLTrunca
 begin
   if not Assigned(ADef) then
     Exit('');
-  if ADef.GetRestartIdentity or ADef.GetCascade then
-    raise ENotSupportedException.Create(
-      'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL Firebird: multiple tables in a single TRUNCATE are not supported.');
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade or (ADef.PartitionName <> '') then
+    raise ENotSupportedException.Create('DDL Firebird: advanced TRUNCATE options (RESTART IDENTITY, CASCADE, PARTITION) are not supported.');
+
   Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
@@ -303,6 +309,114 @@ end;
 function TFluentDDLSerializerFirebird.AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string;
 begin
   Result := inherited AlterTableDropConstraint(ADef);
+end;
+
+function TFluentDDLSerializerFirebird.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR ALTER PROCEDURE ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'CREATE PROCEDURE ' + Quote(ADef.ProcedureName);
+
+  if ADef.Params <> '' then
+    Result := Result + ' (' + ADef.Params + ')';
+
+  Result := Result + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerFirebird.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP PROCEDURE IF EXISTS ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'DROP PROCEDURE ' + Quote(ADef.ProcedureName);
+end;
+
+function TFluentDDLSerializerFirebird.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+var
+  LTime, LEvent: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LTime := 'AFTER';
+  if ADef.Time = ttBefore then LTime := 'BEFORE';
+
+  case ADef.Event of
+    teInsert: LEvent := 'INSERT';
+    teUpdate: LEvent := 'UPDATE';
+    teDelete: LEvent := 'DELETE';
+  else
+    LEvent := 'INSERT';
+  end;
+
+  Result := 'CREATE TRIGGER ' + Quote(ADef.TriggerName) + ' FOR ' + Quote(ADef.TableName) +
+            ' ' + LTime + ' ' + LEvent + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerFirebird.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP TRIGGER IF EXISTS ' + Quote(ADef.TriggerName)
+  else
+    Result := 'DROP TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerFirebird.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.Enabled then
+    Result := 'ALTER TRIGGER ' + Quote(ADef.TriggerName) + ' ACTIVE'
+  else
+    Result := 'ALTER TRIGGER ' + Quote(ADef.TriggerName) + ' INACTIVE';
+end;
+
+function TFluentDDLSerializerFirebird.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    Result := 'CREATE OR ALTER FUNCTION ' + Quote(ADef.FunctionName)
+  else
+    Result := 'CREATE FUNCTION ' + Quote(ADef.FunctionName);
+
+  if ADef.Params <> '' then
+    Result := Result + ' (' + ADef.Params + ')';
+
+  Result := Result + ' RETURNS ' + ADef.Returns + ' AS ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerFirebird.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
+  else
+    Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
+end;
+
+function TFluentDDLSerializerFirebird.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise ENotSupportedException.Create('DDL Firebird: CREATE SCHEMA is not supported (ADR-075).');
+end;
+
+function TFluentDDLSerializerFirebird.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  raise ENotSupportedException.Create('DDL Firebird: DROP SCHEMA is not supported (ADR-075).');
 end;
 
 end.

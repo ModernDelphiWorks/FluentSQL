@@ -35,8 +35,16 @@ type
     procedure TestMultipleJoins_GeneratesMultipleLookupStages;
     [Test]
     procedure TestChainedJoin_PreservesAliasInLocalField;
-    [Test]
+     [Test]
     procedure TestSimpleSelectRegression_ReturnsFindCommand;
+    [Test]
+    procedure TestUnion_GeneratesUnionWith;
+    [Test]
+    procedure TestUnionAll_GeneratesUnionWith;
+    [Test]
+    procedure TestChainedUnion_GeneratesNestedStages;
+    [Test]
+    procedure TestUnionWithWhereAndParams_ResolvesCorrectly;
   end;
 
 implementation
@@ -280,6 +288,88 @@ begin
   Assert.Contains(LResult, '"find":"users"');
   Assert.Contains(LResult, '"filter":{"id":1}');
   Assert.Contains(LResult, '"projection":{"name":1}');
+end;
+
+procedure TTestDMLMongoDB.TestUnion_GeneratesUnionWith;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('name')
+    .From('users')
+    .Union(
+      CreateFluentSQL(dbnMongoDB)
+        .Select('name')
+        .From('admins')
+    )
+    .AsString;
+
+  Assert.Contains(LResult, '"aggregate":"users"');
+  Assert.Contains(LResult, '"$unionWith":{"coll":"admins","pipeline":[{"$project":{"name":1,"_id":0}}]}');
+end;
+
+procedure TTestDMLMongoDB.TestUnionAll_GeneratesUnionWith;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('name')
+    .From('users')
+    .UnionAll(
+      CreateFluentSQL(dbnMongoDB)
+        .Select('name')
+        .From('admins')
+    )
+    .AsString;
+
+  // MongoDB uses $unionWith for both Union and UnionAll (preserving duplicates)
+  Assert.Contains(LResult, '"$unionWith":{"coll":"admins"');
+end;
+
+procedure TTestDMLMongoDB.TestChainedUnion_GeneratesNestedStages;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('id')
+    .From('t1')
+    .Union(
+      CreateFluentSQL(dbnMongoDB)
+        .Select('id')
+        .From('t2')
+    )
+    .Union(
+      CreateFluentSQL(dbnMongoDB)
+        .Select('id')
+        .From('t3')
+    )
+    .AsString;
+
+  Assert.Contains(LResult, '"aggregate":"t1"');
+  Assert.Contains(LResult, '"$unionWith":{"coll":"t2"');
+  Assert.Contains(LResult, '"$unionWith":{"coll":"t3"');
+end;
+
+procedure TTestDMLMongoDB.TestUnionWithWhereAndParams_ResolvesCorrectly;
+var
+  LResult: string;
+begin
+  LResult := CreateFluentSQL(dbnMongoDB)
+    .Select('name')
+    .From('users')
+    .Where('active').Equal(1)
+    .Union(
+      CreateFluentSQL(dbnMongoDB)
+        .Select('name')
+        .From('archived_users')
+        .Where('reason').Equal('deleted')
+    )
+    .AsString;
+
+  // Main branch match
+  Assert.Contains(LResult, '"$match":{"active":1}');
+  // Union branch match
+  Assert.Contains(LResult, '"pipeline":[{"$match":{"reason":"deleted"}},{"$project"');
 end;
 
 initialization

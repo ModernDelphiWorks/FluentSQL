@@ -114,6 +114,8 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 - [x] **ESP-066** — DDL MongoDB (Phase 4 — Capped & TTL) — delivered 2026-04-17.
 - [x] **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having) — delivered 2026-04-17.
 - [x] **ESP-068** — SQL-to-MQL Translation: Joins ($lookup) — delivered 2026-04-17.
+- [x] **ESP-070** — DDL: Stored Procedures and Triggers (Create/Drop/Enable/Disable) — delivered 2026-04-17.
+- [x] **ESP-071** — DDL: Stored Functions (Create/Drop) — delivered 2026-04-17.
 - [ ] DDL Fluente (âmbito alargado): restantes índices/alterações e extensões ainda não cobertas.
 
 ---
@@ -165,6 +167,8 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 | Date | Mudança | Referência |
 |------|---------|------------|
 | 2026-04-17 | Release **v1.4.0**: Massive DDL expansion, MongoDB Aggregations/Joins, and Identity support. | `CHANGELOG.md` [1.4.0] |
+| 2026-04-17 | Entregue **ESP-071** — DDL: Stored Functions (Create/Drop); validado na rodada 60. |
+| 2026-04-17 | Entregue **ESP-070** — DDL: Stored Procedures and Triggers (Create/Drop/Enable/Disable). |
 | 2026-04-17 | Entregue **ESP-068** — SQL-to-MQL Translation: Joins ($lookup); validado na rodada 57. | `.claude/pipeline/develop-report.md` |
 | 2026-04-17 | Entregue **ESP-067** — SQL-to-MQL Translation: Aggregations (Group By & Having). |
 | 2026-04-17 | Entregue **ESP-066** — DDL MongoDB Phase 4 (Capped & TTL). |

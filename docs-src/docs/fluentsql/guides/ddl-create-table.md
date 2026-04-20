@@ -13,6 +13,7 @@ Encadeie colunas com métodos `ColumnInteger`, `ColumnVarChar`, etc., e utilize 
 - **`.PrimaryKey`**: Define a chave primária da tabela.
 - **`.NotNull`**: Define a obrigatoriedade do campo.
 - **`.DefaultValue(AValue: Variant)`**: Define o valor padrão.
+- **`.Identity`**: Suporte para [Auto-incremento e Identidade Nativa](./ddl-advanced-columns.md) (v1.4.0).
 
 Finalize com **`AsString`**.
 

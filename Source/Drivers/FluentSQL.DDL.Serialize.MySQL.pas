@@ -27,7 +27,8 @@ uses
 type
   TFluentDDLSerializerMySQL = class(TFluentDDLSerializeAbstract)
   protected
-    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string; override;
+    function MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0;
+      const APrecision: Integer = 0; const AScale: Integer = 0): string; override;
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
@@ -49,6 +50,15 @@ type
     function DropSequence(const ADef: IFluentDDLDropSequenceDef): string; override;
     function AlterTableAddConstraint(const ADef: IFluentDDLAlterTableAddConstraintDef): string; override;
     function AlterTableDropConstraint(const ADef: IFluentDDLAlterTableDropConstraintDef): string; override;
+    function CreateProcedure(const ADef: IFluentDDLProcedureDef): string; override;
+    function DropProcedure(const ADef: IFluentDDLDropProcedureDef): string; override;
+    function CreateTrigger(const ADef: IFluentDDLTriggerDef): string; override;
+    function DropTrigger(const ADef: IFluentDDLDropTriggerDef): string; override;
+    function ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string; override;
+    function CreateFunction(const ADef: IFluentDDLFunctionDef): string; override;
+    function DropFunction(const ADef: IFluentDDLDropFunctionDef): string; override;
+    function CreateSchema(const ADef: IFluentSQLSchemaDef): string; override;
+    function DropSchema(const ADef: IFluentSQLSchemaDef): string; override;
   end;
 
 implementation
@@ -88,27 +98,21 @@ begin
   Result := dbnMySQL;
 end;
 
-function TFluentDDLSerializerMySQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer = 0): string;
+function TFluentDDLSerializerMySQL.MapLogicalType(const AType: TDDLLogicalType; const AArg: Integer;
+  const APrecision: Integer; const AScale: Integer): string;
 begin
   case AType of
-    dltInteger:
-      Result := 'INT';
-    dltBigInt:
-      Result := 'BIGINT';
-    dltVarChar:
-      Result := 'VARCHAR(' + IntToStr(AArg) + ')';
-    dltBoolean:
-      Result := 'BOOLEAN';
-    dltDate:
-      Result := 'DATE';
-    dltDateTime:
-      Result := 'DATETIME';
-    dltLongText:
-      Result := 'LONGTEXT';
-    dltBlob:
-      Result := 'LONGBLOB';
-    dltGuid:
-      Result := 'CHAR(36)';
+    dltInteger: Result := 'INT';
+    dltBigInt: Result := 'BIGINT';
+    dltVarChar: Result := 'VARCHAR(' + IntToStr(AArg) + ')';
+    dltBoolean: Result := 'BOOLEAN';
+    dltDate: Result := 'DATE';
+    dltDateTime: Result := 'DATETIME';
+    dltLongText: Result := 'LONGTEXT';
+    dltBlob: Result := 'LONGBLOB';
+    dltGuid: Result := 'CHAR(36)';
+    dltNumeric: Result := MapNumeric('DECIMAL', APrecision, AScale);
+    dltDecimal: Result := MapNumeric('DECIMAL', APrecision, AScale);
   else
     raise ENotSupportedException.Create('DDL: unknown logical type');
   end;
@@ -193,7 +197,7 @@ begin
     if not ADef.TypeChanged then
       raise EArgumentException.Create('DDL MySQL: column type must be restated during ALTER COLUMN (MODIFY COLUMN).');
 
-    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg);
+    LType := MapLogicalType(ADef.LogicalType, ADef.TypeArg, ADef.Precision, ADef.Scale);
     Result := LBase + ' MODIFY COLUMN ' + Quote(ADef.ColumnName) + ' ' + LType;
 
     if ADef.NotNull then
@@ -202,8 +206,6 @@ begin
       Result := Result + ' NULL';
   end;
 end;
-
-
 
 function TFluentDDLSerializerMySQL.CreateIndex(const ADef: IFluentDDLCreateIndexDef): string;
 begin
@@ -236,13 +238,29 @@ begin
 end;
 
 function TFluentDDLSerializerMySQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
+var
+  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
-  if ADef.GetRestartIdentity or ADef.GetCascade then
+
+  Result := 'TRUNCATE TABLE ';
+  for LI := 0 to Length(ADef.TableNames) - 1 do
+  begin
+    if LI > 0 then Result := Result + ', ';
+    Result := Result + Quote(ADef.TableNames[LI]);
+  end;
+
+  if ADef.PartitionName <> '' then
+  begin
+    if Length(ADef.TableNames) > 1 then
+      raise ENotSupportedException.Create('DDL MySQL: PARTITION clause is only supported for single-table TRUNCATE.');
+    Result := Result + ' PARTITION (' + ADef.PartitionName + ')';
+  end;
+
+  if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade then
     raise ENotSupportedException.Create(
-      'DDL TRUNCATE TABLE: RESTART IDENTITY and CASCADE are PostgreSQL-only options in this vertical (ESP-029 / ADR-029).');
-  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
+      'DDL TRUNCATE TABLE: identity management and CASCADE are PostgreSQL-specific in this build (ESP-074).');
 end;
 
 function TFluentDDLSerializerMySQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;
@@ -289,6 +307,110 @@ begin
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP PRIMARY KEY'
   else
     Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' DROP CONSTRAINT ' + Quote(ADef.ConstraintName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateProcedure(const ADef: IFluentDDLProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    raise ENotSupportedException.Create('DDL MySQL: CREATE OR REPLACE PROCEDURE is not supported (ADR-070); use DropProcedure.IfExists first.');
+
+  Result := 'CREATE PROCEDURE ' + Quote(ADef.ProcedureName) + '(' + ADef.Params + ') ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMySQL.DropProcedure(const ADef: IFluentDDLDropProcedureDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP PROCEDURE IF EXISTS ' + Quote(ADef.ProcedureName)
+  else
+    Result := 'DROP PROCEDURE ' + Quote(ADef.ProcedureName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateTrigger(const ADef: IFluentDDLTriggerDef): string;
+var
+  LTime, LEvent: string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  LTime := 'AFTER';
+  if ADef.Time = ttBefore then LTime := 'BEFORE';
+
+  case ADef.Event of
+    teInsert: LEvent := 'INSERT';
+    teUpdate: LEvent := 'UPDATE';
+    teDelete: LEvent := 'DELETE';
+  else
+    LEvent := 'INSERT';
+  end;
+
+  Result := 'CREATE TRIGGER ' + Quote(ADef.TriggerName) + ' ' + LTime + ' ' + LEvent +
+            ' ON ' + Quote(ADef.TableName) + ' FOR EACH ROW ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMySQL.DropTrigger(const ADef: IFluentDDLDropTriggerDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP TRIGGER IF EXISTS ' + Quote(ADef.TriggerName)
+  else
+    Result := 'DROP TRIGGER ' + Quote(ADef.TriggerName);
+end;
+
+function TFluentDDLSerializerMySQL.ManageTrigger(const ADef: IFluentDDLTriggerManagementDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  Result := '-- MySQL: Direct trigger management is MariaDB-specific. Standard MySQL does not support ENABLE/DISABLE TRIGGER.' + sLineBreak;
+  if ADef.Enabled then
+    Result := Result + 'ALTER TRIGGER ' + Quote(ADef.TriggerName) + ' ENABLE'
+  else
+    Result := Result + 'ALTER TRIGGER ' + Quote(ADef.TriggerName) + ' DISABLE';
+end;
+
+function TFluentDDLSerializerMySQL.CreateFunction(const ADef: IFluentDDLFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.OrReplace then
+    raise ENotSupportedException.Create('DDL MySQL: CREATE OR REPLACE FUNCTION is not supported (ADR-071); use DropFunction.IfExists first.');
+
+  Result := 'CREATE FUNCTION ' + Quote(ADef.FunctionName) + '(' + ADef.Params + ') ' +
+            'RETURNS ' + ADef.Returns + ' ' + ADef.Body;
+end;
+
+function TFluentDDLSerializerMySQL.DropFunction(const ADef: IFluentDDLDropFunctionDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+
+  if ADef.IfExists then
+    Result := 'DROP FUNCTION IF EXISTS ' + Quote(ADef.FunctionName)
+  else
+    Result := 'DROP FUNCTION ' + Quote(ADef.FunctionName);
+end;
+
+function TFluentDDLSerializerMySQL.CreateSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'CREATE DATABASE ' + Quote(ADef.GetSchemaName);
+end;
+
+function TFluentDDLSerializerMySQL.DropSchema(const ADef: IFluentSQLSchemaDef): string;
+begin
+  if not Assigned(ADef) then
+    Exit('');
+  Result := 'DROP DATABASE ' + Quote(ADef.GetSchemaName);
 end;
 
 end.
