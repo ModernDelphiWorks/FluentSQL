@@ -48,7 +48,7 @@ end;
 
 ## Comando MERGE (v1.5.0+)
 
-Utilize o builder de **MERGE** para operações de sincronização (atualmente em estágio de esqueleto):
+Utilize o builder de **MERGE** para operações de sincronização (UPSERT) de forma fluente:
 
 ```pascal
 uses FluentSQL;
@@ -61,8 +61,8 @@ begin
     .Into('Target', 'T')
     .Using('Source', 'S')
     .On('T.ID = S.ID')
-    .WhenMatched.Update
-    .WhenNotMatched.Insert
+    .WhenMatched.Update(['T.VALOR = S.VALOR'])
+    .WhenNotMatched.Insert(['ID', 'VALOR'], ['S.ID', 'S.VALOR'])
     .AsString;
 end;
 ```
