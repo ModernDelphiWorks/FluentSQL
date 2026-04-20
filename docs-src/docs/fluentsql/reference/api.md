@@ -3,7 +3,7 @@ displayed_sidebar: fluentsqlSidebar
 title: API reference
 ---
 
-Documentation aligned with release **v1.3.0** (2026-04-14), featuring Rename Table support and new entry points. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
+Documentation aligned with release **v1.4.0** (2026-04-17), featuring MongoDB Aggregations and Joins support. Implementation details live under `Source/Core/` and `FluentSQL.Interfaces.pas`.
 
 ## Main entry points
 
@@ -19,7 +19,7 @@ Documentation aligned with release **v1.3.0** (2026-04-14), featuring Rename Tab
 | DDL (`RENAME TABLE`) | **`Schema(ADialect).AlterTableRename('ANTIGA', 'NOVA')`** (2 args) devolve **`IFluentDDLAlterTableRenameTableBuilder`**. Ver [RENAME TABLE](../guides/ddl-alter-table-rename-table.md). |
 | **Constraints** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`** disponíveis após a definição de coluna no builder de DDL. |
 | **Foreign Keys** | **`.References('TABELA', 'COLUNA')`** disponível no builder de DDL; gera a cláusula REFERENCES. |
-| Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** fecha a linha corrente e inicia a próxima para **INSERT em lote**. |
+| Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, `GroupBy`, `Having`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** fecha a linha corrente e inicia a próxima para **INSERT em lote**. |
 | Subquery em conjunto | `Union`, `UnionAll` e `Intersect` recebem `IFluentSQL` da ramificação secundária; a AST armazena `UnionType` e `UnionQuery`. |
 
 ## Main outputs
@@ -41,6 +41,8 @@ Documentation aligned with release **v1.3.0** (2026-04-14), featuring Rename Tab
 - **INSERT em lote:** em `IFluentSQLInsert`, `AddRow` grava a linha corrente e abre uma nova linha; exige que a linha corrente não esteja vazia. A última linha pendente é serializada automaticamente no `AsString` (flush implícito).
 - **Extensão por motor:** `ForDialectOnly` acrescenta fragmentos opt-in associados a um dialeto específico; estes fragmentos só entram na string final quando o dialeto da instância coincide.
 - **MongoDB — INSERT em lote:** com `dbnMongoDB`, o uso de múltiplas linhas através de `AddRow` produz um comando `insertMany` com um array de documentos.
+- **MongoDB — Agregações:** o uso de `GroupBy`, `Having` ou funções agregadas (`Sum`, `Count`, etc.) em `dbnMongoDB` aciona o pipeline de agregação (`aggregate` command), mapeando SQL para estágios `$group`, `$match`, `$project` e `$sort`.
+- **MongoDB — Joins:** `InnerJoin` e `LeftJoin` são mapeados para estágios `$lookup` no MongoDB, seguidos de `$unwind` para manter a estrutura de resultado plana (SQL-like).
 - **DDL:** builders e serializers para DDL emitem apenas strings SQL; o framework não realiza a execução dos comandos no banco de dados. Dialetos não suportados levantam `ENotSupportedException`.
 
 ## Suggested reading in code
