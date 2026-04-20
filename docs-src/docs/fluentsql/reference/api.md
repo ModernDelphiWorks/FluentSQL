@@ -20,6 +20,7 @@ Documentation alinhada ao release **v1.5.1** (2026-04-20), apresentando suporte 
 | DDL (`ALTER TABLE DROP`) | **`Schema(ADialect).AlterTableDrop('TABELA')`** devolve **`IFluentDDLAlterTableDropBuilder`**. Ver [DDL — ALTER TABLE DROP COLUMN](../guides/ddl-alter-table-drop-column.md). |
 | DDL (`RENAME COLUMN`) | **`Schema(ADialect).AlterTableRename('TABELA', 'ANTIGA', 'NOVA')`** (3 args) devolve **`IFluentDDLAlterTableRenameColumnBuilder`**. Ver [RENAME COLUMN](../guides/ddl-alter-table-rename-column.md). |
 | DDL (`RENAME TABLE`) | **`Schema(ADialect).AlterTableRename('ANTIGA', 'NOVA')`** (2 args) devolve **`IFluentDDLAlterTableRenameTableBuilder`**. Ver [RENAME TABLE](../guides/ddl-alter-table-rename-table.md). |
+| **Funções Escalares** | **`Round`, `Floor`, `Ceil`, `Abs`, `SubString`, `Concat`, `Coalesce`, `Year`, `CurrentDate`, etc.** Disponíveis via helpers ou interfaces para abstração multi-dialeto. Ver [Guia de Funções](../guides/scalar-functions.md). |
 | **Constraints** | **`.PrimaryKey`**, **`.NotNull`**, **`.DefaultValue(AValue)`** disponíveis após a definição de coluna no builder de DDL. |
 | **Foreign Keys** | **`.References('TABELA', 'COLUNA')`** disponível no builder de DDL; gera a cláusula REFERENCES. |
 | Métodos fluentes | Encadeamento de construção: `Select`, `From`, `Where`, `Join`, `OrderBy`, `Union`, `UnionAll`, `Intersect`, `GroupBy`, `Having`, etc., conforme `IFluentSQL` e interfaces de seção. No contexto **Insert**, **`AddRow`** fecha a linha corrente e inicia a próxima para **INSERT em lote**. |

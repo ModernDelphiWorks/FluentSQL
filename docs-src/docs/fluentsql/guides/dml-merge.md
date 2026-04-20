@@ -1,18 +1,15 @@
 ---
 displayed_sidebar: fluentsqlSidebar
-title: DML — MERGE (Skeleton)
+title: DML — MERGE
 ---
 
-# DML — MERGE (Skeleton)
+# DML — MERGE
 
-Introduzido na **v1.5.0**, o suporte a **MERGE** permite realizar operações complexas de sincronização de dados (UPSERT) de forma fluente.
-
-> [!NOTE]
-> Na versão v1.5.0, esta funcionalidade está em estágio de **esqueleto (skeleton)**. A serialização completa e otimização por dialeto serão expandidas em versões futuras.
+Introduzido na **v1.5.0** e consolidado na **v1.5.1**, o suporte a **MERGE** permite realizar operações complexas de sincronização de dados (UPSERT) de forma fluente e tipada.
 
 ## Sintaxe fluente
 
-A API do MERGE segue o padrão SQL ANSI:
+A API do MERGE segue o padrão SQL ANSI e oferece métodos para parametrização automática de valores:
 
 ```pascal
 var
@@ -24,9 +21,9 @@ begin
     .Using('SourceTable', 'S')
     .On('T.ID = S.ID')
     .WhenMatched
-      .Update
+      .Update(['T.VALOR = S.VALOR', 'T.DATA = S.DATA'])
     .WhenNotMatched
-      .Insert
+      .Insert(['ID', 'VALOR'], ['S.ID', 'S.VALOR'])
     .AsString;
 end;
 ```
@@ -36,20 +33,40 @@ end;
 | Método | Descrição |
 |--------|-----------|
 | **`Into(Table, Alias)`** | Define a tabela alvo. |
-| **`Using(Table, Alias)`** | Define a tabela fonte (pode ser subquery futuramente). |
+| **`Using(Table, Alias)`** | Define a tabela fonte. |
 | **`On(Condition)`** | Define o critério de junção. |
-| **`WhenMatched`** | Bloco executado quando há correspondência. |
-| **`WhenNotMatched`** | Bloco executado quando NÃO há correspondência. |
-| **`Update`** | Operação de atualização (dentro de WhenMatched). |
-| **`Delete`** | Operação de exclusão (dentro de WhenMatched - *previsto*). |
-| **`Insert`** | Operação de inserção (dentro de WhenNotMatched). |
+| **`WhenMatched`** | Bloco executado quando há correspondência (UPDATE ou DELETE). |
+| **`WhenNotMatched`** | Bloco executado quando NÃO há correspondência (INSERT). |
+| **`.Update(Columns)`** | Operação de atualização dentro de `WhenMatched`. |
+| **`.Delete`** | Operação de exclusão dentro de `WhenMatched`. |
+| **`.Insert(Columns, Values)`** | Operação de inserção dentro de `WhenNotMatched`. |
 
 ## Suporte por Dialeto
 
-Atualmente, o foco da serialização inicial é o **MSSQL**. SQL Server possui suporte nativo robusto ao comando `MERGE`.
+| Dialeto | Estado | Notas |
+|---------|--------|-------|
+| **MSSQL** | ✅ Completo | Utiliza o comando `MERGE` nativo do SQL Server. |
+| **PostgreSQL** | 🔄 Planejado | Mapeamento para `INSERT ... ON CONFLICT` em desenvolvimento. |
+| **MySQL** | 🔄 Planejado | Mapeamento para `INSERT ... ON DUPLICATE KEY UPDATE` em desenvolvimento. |
 
-Para outros dialetos que utilizam sintaxes diferentes (como `INSERT ... ON CONFLICT` no PostgreSQL), a serialização será implementada nas próximas fases para manter a abstração.
+## Exemplo com Parametrização
 
-## Exemplo de AST
+O `MERGE` também suporta a coleção de parâmetros do FluentSQL:
 
-Internamente, o MERGE gera um nó de AST que captura todas as seções e condições, permitindo que o serializer do driver decida como traduzir para o SQL específico do banco de dados.
+```pascal
+LMerge := Query(dbnMSSQL)
+  .Merge
+  .Into('PRODUTOS')
+  .Using('TEMP_PRODUTOS', 'TMP')
+  .On('PRODUTOS.SKU = TMP.SKU')
+  .WhenMatched.Update
+  .WhenNotMatched.Insert
+  .AsString;
+
+// Os parâmetros gerados em cláusulas 'Using' ou 'On' são capturados em Query.Params
+```
+
+## Detalhes Técnicos
+
+Internamente, o MERGE utiliza a Árvore Sintática Abstrata (AST) do FluentSQL para garantir que a estrutura do comando esteja correta antes da serialização. O driver do MSSQL (`FluentSQL.Drivers.MSSQL.pas`) é o primeiro a receber suporte completo de serialização para este nó.
+
