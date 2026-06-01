@@ -34,6 +34,7 @@ const sidebars: SidebarsConfig = {
           label: 'Manual de uso',
           items: [
             'fluentsql/guides/construir-select',
+            'fluentsql/guides/scalar-functions',
             'fluentsql/guides/dml-insert-update-delete',
             'fluentsql/guides/dml-merge',
             'fluentsql/guides/parametros-e-uniao',

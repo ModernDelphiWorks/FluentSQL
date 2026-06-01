@@ -23,7 +23,7 @@ Este arquivo é um **artefato vivo**: descreve a direção do produto e deve **m
 
 - **Fase 0 (identidade / rebranding, âmbito consumidor):** encerrada no roadmap após auditoria **ESP-008** (evidências e matriz em `.claude/pipeline/implement-report.md`). Issue: [#17](https://github.com/ModernDelphiWorks/FluentSQL/issues/17).
 - **Fase 5 — DDL Schemas & MERGE Skeleton (ESP-075/076):** entregue em **v1.5.0** (**2026-04-20**). **ESP-077 — Encoding & Governance:** entregue em **v1.5.1** (**2026-04-20**).
-- **ESP-079 — Production Readiness (Test Restructuring & MERGE Completion):** planeado e em execução via pipeline. Atraso de 3 dias no cronograma exige estabilização imediata da suíte de testes e conclusão do MERGE DML (Update/Insert).
+- **ESP-079 — Production Readiness (Test Restructuring & MERGE Completion):** entregue em **2026-04-20** via pipeline. Suíte de testes modularizada e MERGE funcional.
 - **Pipeline:** `.claude/pipeline/task.md`, `esp.md`, `plan.md` e relatórios para rastreio fino.
 - **Projeto Kanban:** GitHub Project nº 16 (`gh project item-list 16 --owner ModernDelphiWorks`). Card #146 em **Ready**.
 - **Visibilidade de execução (ESP-024):** [`VISIBILIDADE-EXECUCAO.md`](VISIBILIDADE-EXECUCAO.md) na raiz (versionado).
@@ -164,7 +164,7 @@ O `/sprint` tica o item correspondente ao fechar a rodada.
 
 | Date | Mudança | Referência |
 |------|---------|------------|
-| 2026-04-20 | Planeada **ESP-079**: Production Readiness (Test Restructuring & MERGE Completion); **ADR-079.1** / **ADR-079.2** no pipeline. | `.claude/pipeline/esp.md` |
+| 2026-04-20 | Entregue **ESP-079**: Production Readiness (Test Restructuring & MERGE Completion); v1.5.2 previsto ou incorporado em v1.5.1 final. | `.claude/pipeline/develop-report.md` |
 | 2026-04-20 | Release **v1.5.1**: Pipeline hygiene, Docusaurus 3 tsconfig fixes, and governance stabilization. | `CHANGELOG.md` [1.5.1] |
 | 2026-04-20 | Release **v1.5.0**: Phase 5 Foundation — DDL Schemas and MERGE DML skeleton. | `CHANGELOG.md` [1.5.0] |
 | 2026-04-17 | Entregue **ESP-071** — DDL: Stored Functions (Create/Drop); validado na rodada 60. |
