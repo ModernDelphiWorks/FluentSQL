@@ -1,62 +1,53 @@
 # FluentSQL
 
-🇬🇧 [English](README.en.md) · Repositório: [github.com/ModernDelphiWorks/FluentSQL](https://github.com/ModernDelphiWorks/FluentSQL)
+[![Delphi Supported Versions](https://img.shields.io/badge/Delphi%20Supported%20Versions-XE%2B-blue.svg)]()
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Licença:** [MIT](LICENSE)
-
----
-
-**FluentSQL** é uma biblioteca para **Delphi** e **Lazarus** cujo contrato é simples: **gerar `string`** — scripts **SQL** (e, onde o driver for outro formato, texto equivalente, p.ex. **MQL/JSON**) através de uma **API fluente orientada a objetos** (classes/interfaces, encadeamento). **CRUD**, **DDL** e o que a API expuser traduzem-se em **texto** + **`Params`** quando aplicável; **não** há conexão, **não** há execução no motor, **não** há leitura de catálogo nem validação “modelo ↔ base” *dentro* deste pacote — isso fica na tua aplicação ou em camadas à parte (por exemplo um ORM como o **[Janus](https://github.com/ModernDelphiWorks/Janus)**, que declara o FluentSQL como dependência para construção de SQL).
+*   [🇬🇧 English](#-english)
+*   [🇧🇷 Português](#-português)
 
 ---
 
-## Matriz de funcionalidades
+## 🇬🇧 English
 
-| Funcionalidade | Estado |
-|----------------|--------|
-| DML fluente (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) | ✅ |
-| DDL fluente (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP/RENAME — conforme dialeto e entregas) | ✅ |
-| Serialização multi-dialeto (`dbn*`, `Source/Drivers/`) | ✅ |
-| Parametrização (`IFluentSQLParams`, placeholders `:pN` / `?`) | ✅ |
-| `UNION` / `UNION ALL` / `INTERSECT` com `Params` mesclados | ✅ |
-| INSERT em lote (SQL multi-`VALUES` / Mongo `insertMany`) | ✅ |
-| Driver **MongoDB** (saída MQL/JSON como texto) | ✅ |
-| Extensão explícita por motor (opt-in por dialeto, **ESP-016** / **ADR-016**) | ✅ |
-| **Apenas geração de string via POO** — sem camada de acesso a dados | ✅ *by design* |
+**FluentSQL** is a modern, high-performance database-agnostic SQL/MQL script generation library for **Delphi** and **Lazarus**. 
+
+Its contract is simple: **it only emits `string`** — standard **SQL** scripts (and, where the driver targets another format, equivalent text like **MQL/JSON** for MongoDB) through a **fluent, object-oriented API** (classes/interfaces, method chaining). 
+
+**CRUD** (DML) and **DDL** statements translate purely into **text** + **`Params`** (when applicable). There is **no** database connection, **no** execution on the server, **no** catalog introspection, and **no** "class ↔ database" validation *inside* this package — that stays in your application or in other layers (for example, an ORM such as **[Janus](https://github.com/ModernDelphiWorks/Janus)**, which lists FluentSQL as a dependency for SQL construction). **FluentSQL stays strings-only by design.**
 
 ---
 
-## Bancos e dialetos (referência)
+### 🚀 Feature Matrix
 
-Firebird · InterBase · MySQL · PostgreSQL · Microsoft SQL Server · Oracle · IBM DB2 · SQLite · Informix · Advantage (ADS) · SQL Anywhere (ASA) · Absolute Database · ElevateDB · NexusDB · MongoDB (MQL) — *o registo concreto de cada serializador depende da tua build e de `FluentSQL.Register.pas`; ver documentação.*
+| Feature | Status |
+|---------|--------|
+| Fluent DML (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) | ✅ |
+| Fluent DDL (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP/RENAME column) | ✅ |
+| Multi-dialect serialization (`dbn*`, `Source/Drivers/`) | ✅ |
+| Parameterization (`IFluentSQLParams`, `:pN` / `?` placeholders) | ✅ |
+| `UNION` / `UNION ALL` / `INTERSECT` with merged `Params` | ✅ |
+| Batch INSERT (multi-`VALUES` / Mongo `insertMany`) | ✅ |
+| **MongoDB** driver (MQL/JSON as text output) | ✅ |
+| Per-engine explicit extension (dialect opt-in, **ESP-016** / **ADR-016**) | ✅ |
+| **String generation only via OOP** — no data-access layer | ✅ *by design* |
 
 ---
 
-## Versões Delphi / Lazarus
+### 🏛 Supported Engines & Dialects
+Firebird · InterBase · MySQL · PostgreSQL · Microsoft SQL Server · Oracle · IBM DB2 · SQLite · Informix · Advantage (ADS) · SQL Anywhere (ASA) · Absolute Database · ElevateDB · NexusDB · MongoDB (MQL) — *actual serializer registration depends on your build and `FluentSQL.Register.pas`; see the docs.*
 
-- **Delphi:** XE ou superior (ou versão compatível usada nos projetos de teste).
-- **Lazarus / FPC:** onde o repositório estiver validado para a tua plataforma.
-
----
-
-## Instalação (Boss)
-
+### ⚙️ Installation
+To install using [`boss`]:
 ```sh
 boss install FluentSQL
 ```
 
-O nome do pacote em `boss.json` é **FluentSQL**. Tutoriais antigos podem referir `CQuery4D` ou `CQLBr`; a tabela de migração está no [CHANGELOG.md](CHANGELOG.md).
-
-## Dependências
-
-O manifesto Boss na raiz **não** impõe dependências transitórias obrigatórias para o núcleo: inclui `Source/` no teu projeto e os drivers que compilares. Projetos de teste em `Test Delphi/` usam defines por `.dpr` para ativar dialetos (ver [configuração](docs-src/docs/fluentsql/reference/configuration.md)).
-
 ---
 
-## Início rápido
+### ⚡️ Quick Start
 
-**DML (Consultas):**
-
+#### DML (Queries)
 ```delphi
 uses FluentSQL;
 
@@ -72,8 +63,7 @@ begin
 end;
 ```
 
-**DDL (Definição de dados):**
-
+#### DDL (Data Definition)
 ```delphi
 uses FluentSQL;
 
@@ -88,11 +78,100 @@ begin
 end;
 ```
 
-O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Para operações de definição de dados, utilize **`Schema(ADialect)`**. As fábricas legadas (`CreateFluentSQL`, `TCQ`, `CreateFluentDDLTable`, etc.) encontram-se obsoletas. Em código reutilizável, prefira as interfaces definidas em `FluentSQL.Interfaces`.
+---
+
+### 📚 Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Index / overview](docs-src/docs/fluentsql/index.md) | Main entry |
+| [Introduction](docs-src/docs/fluentsql/introduction.md) | Context and scope |
+| [Installation](docs-src/docs/fluentsql/getting-started/installation.md) | Boss and search path |
+| [Quick start](docs-src/docs/fluentsql/getting-started/quickstart.md) | First end-to-end flow |
+| [Architecture](docs-src/docs/fluentsql/architecture/overview.md) | AST, drivers, flow |
+| [API reference](docs-src/docs/fluentsql/reference/api.md) | Public contracts |
+| [Configuration & `dbn*`](docs-src/docs/fluentsql/reference/configuration.md) | Dialect constants |
+| [Tests](docs-src/docs/fluentsql/tests/overview.md) | DUnitX suite |
+| [Troubleshooting](docs-src/docs/fluentsql/troubleshooting/common-errors.md) | Common errors |
+| [Docs CI](docs-src/docs/fluentsql/getting-started/documentation-ci.md) | Docusaurus / GitHub Actions |
 
 ---
 
-## Documentação
+### ⛏️ Contributing
+Issues and pull requests are welcome. For larger changes, open an issue first to align scope — the product rejects proposals that turn the core into a data-access layer or server execution engine (see [ROADMAP.md](ROADMAP.md)).
+
+---
+
+## 🇧🇷 Português
+
+**FluentSQL** é uma biblioteca moderna e de alta performance para **Delphi** e **Lazarus** cujo contrato é simples: **gerar `string`** — scripts **SQL** (e, onde o driver for outro formato, texto equivalente, p.ex. **MQL/JSON** para MongoDB) através de uma **API fluente orientada a objetos** (classes/interfaces, encadeamento).
+
+**CRUD** (DML) e **DDL** traduzem-se estritamente em **texto** + **`Params`** quando aplicável. **Não** há conexão com banco de dados, **não** há execução no motor, **não** há leitura de catálogo nem validação "modelo ↔ base" *dentro* deste pacote — isso fica na sua aplicação ou em camadas à parte (por exemplo, um ORM como o **[Janus](https://github.com/ModernDelphiWorks/Janus)**, que declara o FluentSQL como dependência para construção de SQL). **O FluentSQL mantém-se apenas gerador de strings por design.**
+
+---
+
+### 🚀 Matriz de Funcionalidades
+
+| Funcionalidade | Estado |
+|----------------|--------|
+| DML fluente (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) | ✅ |
+| DDL fluente (`CREATE TABLE`, `DROP TABLE`, `ALTER` ADD/DROP/RENAME) | ✅ |
+| Serialização multi-dialeto (`dbn*`, `Source/Drivers/`) | ✅ |
+| Parametrização (`IFluentSQLParams`, placeholders `:pN` / `?`) | ✅ |
+| `UNION` / `UNION ALL` / `INTERSECT` com `Params` mesclados | ✅ |
+| INSERT em lote (SQL multi-`VALUES` / Mongo `insertMany`) | ✅ |
+| Driver **MongoDB** (saída MQL/JSON como texto) | ✅ |
+| Extensão explícita por motor (opt-in por dialeto, **ESP-016** / **ADR-016**) | ✅ |
+| **Apenas geração de string via POO** — sem camada de acesso a dados | ✅ *by design* |
+
+---
+
+### 🏛 Bancos e Dialetos Suportados
+Firebird · InterBase · MySQL · PostgreSQL · Microsoft SQL Server · Oracle · IBM DB2 · SQLite · Informix · Advantage (ADS) · SQL Anywhere (ASA) · Absolute Database · ElevateDB · NexusDB · MongoDB (MQL) — *o registo concreto de cada serializador depende da tua build e de `FluentSQL.Register.pas`; ver documentação.*
+
+### ⚙️ Instalação (Boss)
+```sh
+boss install FluentSQL
+```
+
+---
+
+### ⚡️ Início Rápido
+
+#### DML (Consultas)
+```delphi
+uses FluentSQL;
+
+var
+  SQL: string;
+begin
+  SQL := Query(dbnFirebird)
+    .Select
+    .Column('ID').Column('NOME')
+    .From('CLIENTES')
+    .Where('ATIVO').Equal(1)
+    .AsString;
+end;
+```
+
+#### DDL (Definição de Dados)
+```delphi
+uses FluentSQL;
+
+var
+  SQL: string;
+begin
+  SQL := Schema(dbnPostgreSQL)
+    .CreateTable('USUARIOS')
+    .ColumnInteger('ID').PrimaryKey
+    .ColumnVarChar('NOME', 100).NotNull
+    .AsString;
+end;
+```
+
+---
+
+### 📚 Documentação
 
 | Documento | Descrição |
 |-----------|-----------|
@@ -107,37 +186,10 @@ O ponto de entrada principal para consultas DML é **`Query(ADialect)`**. Para o
 | [Troubleshooting](docs-src/docs/fluentsql/troubleshooting/common-errors.md) | Erros comuns |
 | [CI da documentação](docs-src/docs/fluentsql/getting-started/documentation-ci.md) | Build Docusaurus / GitHub Actions |
 
-O site estático em `docs/` é gerado e commitado no CI quando `docs-src/` muda nos ramos `main` ou `develop` (workflow [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml)). PRs que alterem `docs-src/` passam por [`.github/workflows/docs-build.yml`](.github/workflows/docs-build.yml).
-
 ---
 
-## Ecossistema
-
-- **[Janus](https://github.com/ModernDelphiWorks/Janus)** — ORM Delphi que faz a ponte entre modelo OO e bases relacionais; usa **FluentSQL** para construção de SQL, enquanto responsabilidades de persistência, metadados e validação modelo↔BD ficam no próprio Janus e nas suas dependências (p.ex. MetaDbDiff, DataEngine). O FluentSQL mantém-se **só strings**.
-
----
-
-## Testes
-
-Projetos **DUnitX** em `Test Delphi/`:
-
-| Projeto | Notas |
-|---------|--------|
-| `Firebird_tests/PTestFluentSQLFirebird.dpr` | Cenários principais (parametrização, multi-dialeto). |
-| `Firebird_tests/PTestFluentSQLSample.dpr` | Exemplo mínimo. |
-| `*_tests/TestFluentSQL_<Dialect>.dpr` | MSSQL, MySQL, Oracle, DB2, Interbase, etc. |
-
-
-**Roadmap:** [ROADMAP.md](ROADMAP.md) · **Extensão por dialeto (fechamento ESP-016):** issue [#27](https://github.com/ModernDelphiWorks/FluentSQL/issues/27), guia [extensao-por-dialeto.md](docs-src/docs/fluentsql/guides/extensao-por-dialeto.md).
+### ⛏️ Contribuição
+Issues e pull requests são bem-vindos. Para alterações maiores, abra primeiro uma issue para alinhar escopo — o produto rejeita propostas que transformem o núcleo em camada de acesso a dados ou execução no SGBD (ver [ROADMAP.md](ROADMAP.md)).
 
 ---
-
-## Contribuição
-
-Issues e pull requests são bem-vindos. Para alterações maiores, abre primeiro uma issue para alinhar escopo — o produto rejeita propostas que transformem o núcleo em camada de acesso a dados ou execução no SGBD (ver [ROADMAP.md](ROADMAP.md)).
-
----
-
-## Licença
-
-[MIT](LICENSE).
+*Copyright © 2025-2026 Isaque Pinheiro. Licensed under MIT License.*
