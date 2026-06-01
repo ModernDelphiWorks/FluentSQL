@@ -1,12 +1,10 @@
 {
   ------------------------------------------------------------------------------
   FluentSQL
-  DDL Serialization Proxy (ESP-037).
-  Delegates DDL generation to registered drivers via the Driver/Registry
-  architecture. Public surface: TFluentDDLSerialize class only.
+  Database-agnostic fluent SQL/MQL script generation library for Delphi and Lazarus.
 
   SPDX-License-Identifier: MIT
-  Copyright (c) 2026 Ecosystem - Innovative Tools for Delphi Development
+  Copyright (c) 2025-2026 Isaque Pinheiro
 
   Licensed under the MIT License.
   See the LICENSE file in the project root for full license information.
