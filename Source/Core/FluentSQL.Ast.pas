@@ -39,6 +39,7 @@ type
     FInsert: IFluentSQLInsert;
     FUpdate: IFluentSQLUpdate;
     FDelete : IFluentSQLDelete;
+    FMerge: IFluentSQLMergeDef;
     FGroupBy: IFluentSQLGroupBy;
     FHaving: IFluentSQLHaving;
     FJoins: IFluentSQLJoins;
@@ -80,6 +81,8 @@ type
     function GroupBy: IFluentSQLGroupBy;
     function Having: IFluentSQLHaving;
     function OrderBy: IFluentSQLOrderBy;
+    function Merge: IFluentSQLMergeDef;
+    procedure _SetMerge(const Value: IFluentSQLMergeDef);
     property ASTColumns: IFluentSQLNames read _GetASTColumns write _SetASTColumns;
     property ASTSection: IFluentSQLSection read _GetASTSection write _SetASTSection;
     property ASTName: IFluentSQLName read _GetASTName write _SetASTName;
@@ -314,6 +317,16 @@ end;
 function TFluentSQLAST.Where: IFluentSQLWhere;
 begin
   Result := FWhere;
+end;
+
+function TFluentSQLAST.Merge: IFluentSQLMergeDef;
+begin
+  Result := FMerge;
+end;
+
+procedure TFluentSQLAST._SetMerge(const Value: IFluentSQLMergeDef);
+begin
+  FMerge := Value;
 end;
 
 end.
