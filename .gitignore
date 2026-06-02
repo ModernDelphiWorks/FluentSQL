@@ -34,3 +34,7 @@ tests_output*.txt
 test_*.dpr
 !Test Delphi/*_tests/PTestFluentSQL*.dpr
 !Test Delphi/*_tests/TestFluentSQL_*.dpr
+
+# Boss package manager files
+!boss.json
+!boss-lock.json
