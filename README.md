@@ -1,4 +1,4 @@
-# FluentSQL Framework for Delphi & Lazarus
+# FluentSQL — fluent SQL builder for Delphi & Lazarus
 
 [![Delphi XE+](https://img.shields.io/badge/Delphi-XE%20or%20superior-blue.svg)]()
 [![Lazarus Compatible](https://img.shields.io/badge/Lazarus-Compatible-orange.svg)]()
@@ -7,7 +7,7 @@
 
 > 🔒 **Supply-chain transparency (CRA-ready):** a machine-readable **SBOM** (CycloneDX) is published on the package portal — [pubpascal.dev/packages/fluentsql](https://www.pubpascal.dev/packages/fluentsql) · security disclosure policy in **[SECURITY.md](SECURITY.md)** · changes tracked in **[CHANGELOG.md](CHANGELOG.md)**.
 
-📚 **[Documentation](https://moderndelphiworks.github.io/FluentSQL/)**
+📚 **[Documentation](https://moderndelphiworks.github.io/FluentSQL/)** · ⬇️ **[Download](../../releases)** · 🐛 **[Issues](../../issues)**
 
 *   [🇬🇧 English](#-english)
 *   [🇧🇷 Português](#-português)
@@ -16,7 +16,7 @@
 
 ## 🇬🇧 English
 
-**FluentSQL** is a modern, high-performance database-agnostic SQL/MQL script generation library for Delphi and Lazarus. Its core contract is extremely simple: **it only emits `string`** — standard SQL scripts (or drivers-specific equivalents like MQL/JSON for MongoDB) through a robust, fluent object-oriented API (classes, interfaces, and method chaining). DML (CRUD) and DDL statements translate purely into parameterized text. There is no active database connection, no server-side execution, no database catalog introspection, and no validation inside this package. It remains completely strings-only by design, making it highly modular and ideal as a dependency for advanced Object-Relational Mappers (such as **Janus**).
+**FluentSQL** is a modern, high-performance database-agnostic SQL/MQL script generation library for Delphi and Lazarus. Its core contract is extremely simple: **it only emits `string`** — standard SQL scripts (or driver-specific equivalents such as MQL/JSON for MongoDB) through a robust, fluent object-oriented API (classes, interfaces, and method chaining). DML (CRUD) and DDL statements translate purely into parameterized text. There is no active database connection, no server-side execution, no database catalog introspection, and no validation inside this package. It remains completely strings-only by design, making it highly modular and ideal as a dependency for advanced Object-Relational Mappers (such as **Janus**).
 
 ### 🚀 Key Features
 
@@ -41,10 +41,16 @@
 
 ### ⚙️ Installation
 
-To install using the package manager [**Boss**](https://github.com/HashLoad/boss):
+Install via [**Boss**](https://github.com/HashLoad/boss):
 
 ```sh
 boss install FluentSQL
+```
+
+Or via [**pubpascal**](https://www.pubpascal.dev/packages/fluentsql):
+
+```sh
+pubpascal install fluentsql
 ```
 
 ---
@@ -52,6 +58,7 @@ boss install FluentSQL
 ### ⚡️ Quick Start
 
 #### 1. DML Query Building (SELECT)
+
 ```delphi
 uses
   FluentSQL;
@@ -65,12 +72,13 @@ begin
     .From('CLIENTES')
     .Where('ATIVO').Equal(1)
     .AsString;
-    
+
   // SQL = 'SELECT ID, NOME FROM CLIENTES WHERE ATIVO = 1'
 end;
 ```
 
 #### 2. DDL Schema Definition (CREATE TABLE)
+
 ```delphi
 uses
   FluentSQL;
@@ -83,7 +91,7 @@ begin
     .ColumnInteger('ID').PrimaryKey
     .ColumnVarChar('NOME', 100).NotNull
     .AsString;
-    
+
   // SQL = 'CREATE TABLE USUARIOS (ID INTEGER PRIMARY KEY, NOME VARCHAR(100) NOT NULL)'
 end;
 ```
@@ -92,7 +100,7 @@ end;
 
 ## 🇧🇷 Português
 
-**FluentSQL** é uma biblioteca moderna e de alta performance para geração de scripts SQL/MQL agnósticos a banco de dados em Delphi e Lazarus. Seu contrato principal é extremamente simples: **gerar `string`** — scripts SQL padrão (e, onde o driver for outro formato, texto equivalente, p.ex. MQL/JSON para MongoDB) através de uma API fluente orientada a objetos (classes/interfaces e encadeamento de métodos). Instruções CRUD (DML) e DDL traduzem-se estritamente em textos parametrizados. Não há conexão ativa com banco de dados, nem execução ou leitura de catálogo dentro deste pacote. Ele mantém-se apenas gerador de strings por design, sendo uma dependência ideal para Mapeadores Objeto-Relacionais (como o **Janus**).
+**FluentSQL** é uma biblioteca moderna e de alta performance para geração de scripts SQL/MQL agnósticos a banco de dados em Delphi e Lazarus. Seu contrato principal é extremamente simples: **gerar apenas `string`** — scripts SQL padrão (ou equivalentes de driver, como MQL/JSON para MongoDB) por meio de uma API fluente orientada a objetos (classes, interfaces e encadeamento de métodos). Instruções DML (CRUD) e DDL traduzem-se estritamente em textos parametrizados. Não há conexão ativa com banco de dados, nem execução ou leitura de catálogo dentro deste pacote. Ele mantém-se apenas gerador de strings por design, sendo uma dependência ideal para Mapeadores Objeto-Relacionais (como o **Janus**).
 
 ### 🚀 Recursos Principais
 
@@ -117,10 +125,16 @@ end;
 
 ### ⚙️ Instalação
 
-Para instalar usando o gerenciador de pacotes [**Boss**](https://github.com/HashLoad/boss):
+Instale via [**Boss**](https://github.com/HashLoad/boss):
 
 ```sh
 boss install FluentSQL
+```
+
+Ou via [**pubpascal**](https://www.pubpascal.dev/packages/fluentsql):
+
+```sh
+pubpascal install fluentsql
 ```
 
 ---
@@ -128,6 +142,7 @@ boss install FluentSQL
 ### ⚡️ Início Rápido
 
 #### 1. Construindo Consultas DML (SELECT)
+
 ```delphi
 uses
   FluentSQL;
@@ -141,12 +156,13 @@ begin
     .From('CLIENTES')
     .Where('ATIVO').Equal(1)
     .AsString;
-    
+
   // SQL = 'SELECT ID, NOME FROM CLIENTES WHERE ATIVO = 1'
 end;
 ```
 
 #### 2. Definindo Schemas DDL (CREATE TABLE)
+
 ```delphi
 uses
   FluentSQL;
@@ -159,10 +175,49 @@ begin
     .ColumnInteger('ID').PrimaryKey
     .ColumnVarChar('NOME', 100).NotNull
     .AsString;
-    
+
   // SQL = 'CREATE TABLE USUARIOS (ID INTEGER PRIMARY KEY, NOME VARCHAR(100) NOT NULL)'
 end;
 ```
 
 ---
-*Copyright © 2025-2026 Isaque Pinheiro. Licensed under MIT License.*
+
+## ⛏️ Contributing / Contribuição
+
+Contributions are welcome — whether it's a bug report, a new dialect driver, or a documentation improvement. Open an issue first so we can align on scope before you start coding.
+
+Contribuições são bem-vindas — seja um relatório de bug, um novo driver de dialeto ou melhoria na documentação. Abra uma issue primeiro para alinharmos o escopo antes de codificar.
+
+[![Issues](https://img.shields.io/badge/Issues-channel-orange)](../../issues)
+
+**Steps / Passos:**
+
+1. Fork the repository / Faça um fork do repositório.
+2. Create a feature branch: `git checkout -b feat/my-feature`.
+3. Commit your changes following the existing style / Faça commit seguindo o estilo existente.
+4. Open a Pull Request against `main` with a clear description / Abra um Pull Request contra `main` com descrição clara.
+5. Wait for review and address any feedback / Aguarde a revisão e responda ao feedback.
+
+---
+
+## 📬 Contact / Contato
+
+[![Email](https://img.shields.io/badge/Email-isaquesp%40gmail.com-D14836?logo=gmail&logoColor=white)](mailto:isaquesp@gmail.com)
+
+---
+
+## 💲 Donation / Doação
+
+If FluentSQL saves you time, consider supporting its development.
+Se o FluentSQL economiza seu tempo, considere apoiar seu desenvolvimento.
+
+[![Doação](https://img.shields.io/badge/PagSeguro-contribua-green)](https://pag.ae/bglQrWD)
+
+---
+
+## 📄 License / Licença
+
+This project is distributed under the [MIT License](LICENSE).
+Este projeto é distribuído sob a [Licença MIT](LICENSE).
+
+*Copyright © 2025-2026 Isaque Pinheiro.*
