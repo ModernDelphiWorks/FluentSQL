@@ -7,6 +7,8 @@
 
 > 🔒 **Supply-chain transparency (CRA-ready):** a machine-readable **SBOM** (CycloneDX) is published on the package portal — [pubpascal.dev/packages/fluentsql](https://www.pubpascal.dev/packages/fluentsql) · security disclosure policy in **[SECURITY.md](SECURITY.md)** · changes tracked in **[CHANGELOG.md](CHANGELOG.md)**.
 
+📚 **[Documentation](https://moderndelphiworks.github.io/FluentSQL/)**
+
 *   [🇬🇧 English](#-english)
 *   [🇧🇷 Português](#-português)
 
