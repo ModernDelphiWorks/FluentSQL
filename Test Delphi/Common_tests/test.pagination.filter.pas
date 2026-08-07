@@ -78,6 +78,15 @@ type
     [Test]
     procedure TestBindEPredicadoNaoDivergem;
     /// <summary>
+    ///   First sozinho e Skip sozinho. Antes da T9 o limite que nao foi pedido
+    ///   saia com lixo de pilha (ROWNUMBER > 4910988), variando a cada execucao;
+    ///   estes dois asserts nao podiam nem ser escritos.
+    /// </summary>
+    [Test]
+    procedure TestMSSQLFirstSozinhoNaoInventaLimiteInferior;
+    [Test]
+    procedure TestMSSQLSkipSozinhoNaoInventaLimiteSuperior;
+    /// <summary>
     ///   A janela do ROW_NUMBER() usa o ORDER BY do usuario. Numerar por outra
     ///   coisa e ordenar so no fim devolve OUTRA pagina: medido no SQL Server
     ///   2022, "pagina 2 de 10 por NOME" dava K..T em vez de B..K.
@@ -270,6 +279,22 @@ begin
   Assert.Contains(LSql, ':p1', False,
     'O bind existe na lista de params mas o texto nao o referencia: ' +
     'foi exatamente assim que o defeito passou despercebido.');
+end;
+
+procedure TTestPaginationWithFilter.TestMSSQLFirstSozinhoNaoInventaLimiteInferior;
+begin
+  Assert.AreEqual(
+    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER ' +
+    'FROM T) AS T WHERE (ATIVO = :p1) AND (ROWNUMBER <= 10)',
+    _Monta(dbnMSSQL, cbFirst), False);
+end;
+
+procedure TTestPaginationWithFilter.TestMSSQLSkipSozinhoNaoInventaLimiteSuperior;
+begin
+  Assert.AreEqual(
+    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER ' +
+    'FROM T) AS T WHERE (ATIVO = :p1) AND (ROWNUMBER > 20)',
+    _Monta(dbnMSSQL, cbSkip), False);
 end;
 
 procedure TTestPaginationWithFilter.TestMSSQLJanelaUsaOrderByDoUsuario;
