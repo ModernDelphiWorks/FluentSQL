@@ -7,6 +7,25 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed
+
+- **BREAKING CHANGE — `TFluentSQLDriver` perdeu 6 valores.** Foram removidos da enum pública (`FluentSQL.Interfaces.pas`), do `FluentSQL.Register.pas`, do `FluentSQL.Utils.pas` e do `FluentSQL.inc`:
+  `dbnInformix`, `dbnADS`, `dbnASA`, `dbnAbsoluteDB`, `dbnElevateDB`, `dbnNexusDB`.
+  Nenhum deles jamais teve implementação: as units `FluentSQL.Serialize*`, `FluentSQL.Select*` e `FluentSQL.Functions*` correspondentes não existem no repositório, e o `uses` condicional do `Register` referenciava ficheiros inexistentes. Qualquer chamada com esses valores terminava em `EAccessViolation`.
+  **O que fazer:** código que nomeie qualquer um dos 6 deixa de compilar (`E2003 Undeclared identifier`). Não há substituto — migre para um dos 9 dialetos restantes (`dbnMSSQL`, `dbnMySQL`, `dbnFirebird`, `dbnSQLite`, `dbnInterbase`, `dbnDB2`, `dbnOracle`, `dbnPostgreSQL`, `dbnMongoDB`). `dbnInterbase` e `dbnDB2` **permanecem**: têm implementação real, apenas continuam desligados por omissão no `FluentSQL.inc`.
+- Removidos overrides mortos e inalcançáveis de `Round`, `Floor` e `Abs` em `FluentSQL.Functions{MSSQL,MySQL,PostgreSQL}.pas`, e os overrides de agregação de `FluentSQL.FunctionsMongoDB.pas`.
+
+### Changed
+
+- **BREAKING CHANGE (comportamento) — `TFluentSQLRegister.Functions` deixou de devolver `nil`.** Passa a levantar `EFluentSQLDriverNotRegistered` (classe nova em `FluentSQL.Interfaces.pas`). Antes, o `nil` era desreferenciado em `FluentSQL.Functions.pas` e chegava ao consumidor como `EAccessViolation` opaca. `Select` e `Serialize` passaram de `Exception` crua para a mesma classe nomeada. **Quem captura esses erros para os traduzir em erro de domínio deve rever o `try..except`.**
+- `Ceil` e `Length` deixaram de ser emitidos como SQL ANSI fixo pelo núcleo e passaram a delegar ao driver. Corrige SQL inválido gerado em silêncio: `CEIL(...)` não existe em T-SQL (agora `CEILING`), e `LENGTH(...)` não existe nem em T-SQL (agora `LEN`) nem no núcleo do Firebird (agora `CHAR_LENGTH`).
+
+### Added
+
+- `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
+- Implementações em falta de `Trim`, `LTrim`, `RTrim`, `Coalesce`, `Modulus`, `CurrentDate` e `CurrentTimestamp` nos drivers **Firebird**, **SQLite** e **Oracle**.
+- Funções escalares do **MongoDB** passam a levantar `EFluentSQLFunctionNotSupported` em vez de `EAbstractError`. As agregações (`Count`, `Sum`, `Min`, `Max`, `Average`) não mudaram.
+
 ## [1.5.1] — 2026-04-20
 
 ### Fixed

@@ -19,25 +19,23 @@ Versão publicada no manifesto: ver `boss.json` na raiz do repositório.
 
 O primeiro argumento da fábrica é do tipo `TFluentSQLDriver`, definido em `FluentSQL.Interfaces.pas`:
 
-| Constante | Uso típico |
-|-----------|------------|
-| `dbnMSSQL` | Microsoft SQL Server |
-| `dbnMySQL` | MySQL |
-| `dbnFirebird` | Firebird |
-| `dbnSQLite` | SQLite |
-| `dbnInterbase` | InterBase |
-| `dbnDB2` | IBM DB2 |
-| `dbnOracle` | Oracle |
-| `dbnInformix` | Informix |
-| `dbnPostgreSQL` | PostgreSQL |
-| `dbnADS` | Advantage Database Server |
-| `dbnASA` | SQL Anywhere (ASA) |
-| `dbnAbsoluteDB` | Absolute Database |
-| `dbnMongoDB` | Serialização orientada a MQL (estado do driver conforme roadmap) |
-| `dbnElevateDB` | ElevateDB |
-| `dbnNexusDB` | NexusDB |
+A enum tem **9 valores**, todos com implementação real em `Source/Drivers/`:
 
-O registo concreto de serializadores, `Select` e funções por dialeto ocorre em `FluentSQL.Register.pas` (nem todo dialeto da enum precisa estar ativo na sua build).
+| Constante | Uso típico | Ativo por padrão no `FluentSQL.inc` |
+|-----------|------------|:---:|
+| `dbnMSSQL` | Microsoft SQL Server | ✅ |
+| `dbnMySQL` | MySQL | ✅ |
+| `dbnFirebird` | Firebird | ✅ |
+| `dbnSQLite` | SQLite | ✅ |
+| `dbnInterbase` | InterBase | ❌ |
+| `dbnDB2` | IBM DB2 | ❌ |
+| `dbnOracle` | Oracle | ✅ |
+| `dbnPostgreSQL` | PostgreSQL | ✅ |
+| `dbnMongoDB` | Serialização orientada a MQL (estado do driver conforme roadmap) | ✅ |
+
+O registo concreto de serializadores, `Select` e funções por dialeto ocorre em `FluentSQL.Register.pas` (nem todo dialeto da enum precisa estar ativo na sua build — ver a coluna acima e a secção seguinte).
+
+> **Alteração incompatível:** até **1.5.1** a enum tinha 15 valores. Os seis seguintes foram **removidos** por nunca terem tido implementação alguma — as units `FluentSQL.Serialize*`, `FluentSQL.Select*` e `FluentSQL.Functions*` correspondentes não existiam no repositório, e qualquer chamada com esses valores terminava em `EAccessViolation`: `dbnInformix`, `dbnADS`, `dbnASA`, `dbnAbsoluteDB`, `dbnElevateDB`, `dbnNexusDB`. Código que nomeie qualquer um deles deixa de compilar (`E2003 Undeclared identifier`); não há substituto, escolha um dos 9 dialetos acima. Ver **`CHANGELOG.md`**, secção **[Unreleased]**.
 
 ## Search path (Delphi / Lazarus)
 

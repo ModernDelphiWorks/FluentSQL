@@ -33,8 +33,23 @@ title: Erros comuns
 - **Provável causa:** o dialeto selecionado (ex: SQLite, Firebird) não possui suporte implementado para a operação solicitada (Schemas ou MERGE skeleton).
 - **Ação:** verifique a [Matriz de Suporte](../architecture/overview.md#matriz-de-dialetos). No caso de Schemas, utilize dialetos como PostgreSQL ou MSSQL. Operações de Schema no MySQL são mapeadas para Database.
 
-## «Select do banco … não está registrado» em runtime (testes ou app)
+## `EFluentSQLDriverNotRegistered` — «… do banco … não está registrado» em runtime (testes ou app)
 
-- **Sintoma:** em execução, exceção ao serializar indicando que o **select** do dialeto não foi registrado, apesar de units `FluentSQL.Select*` estarem no `uses`.
-- **Provável causa:** em `FluentSQL.inc` / registo condicional, o driver só entra no registo global se a compilação define macros como `MSSQL`, `ORACLE`, `DB2`, `INTERBASE` **antes** da cadeia de `uses` que puxa o núcleo — e o seu `.dpr` pode não definir o símbolo correspondente ao SGBD alvo.
-- **Ação:** no `.dpr` do programa, declare `{$DEFINE MSSQL}` (ou `ORACLE`, `DB2`, `INTERBASE`, conforme o dialeto) **antes** dos `uses` que referenciam o FluentSQL, alinhado ao que o projeto espera em `FluentSQL.Register`. Para detalhe e follow-up: issue [#14](https://github.com/ModernDelphiWorks/FluentSQL/issues/14).
+- **Sintoma:** em execução, exceção ao serializar indicando que o **select**, o **serialize** ou as **funções** do dialeto não foram registrados, apesar de units `FluentSQL.Select*` / `FluentSQL.Functions*` estarem no `uses`.
+- **Classe da exceção:** `EFluentSQLDriverNotRegistered` (declarada em `FluentSQL.Interfaces.pas`). Até a **1.5.1** o `select` e o `serialize` levantavam `Exception` crua e as **funções** não levantavam nada — devolviam `nil`, e o consumidor recebia uma `EAccessViolation` opaca. Se a sua camada captura esse erro para o traduzir em erro de domínio, passe a capturar a classe nomeada.
+- **Provável causa:** o dialeto está desligado em **`Source\FluentSQL.inc`**. Esse ficheiro é a única fonte de verdade sobre quais drivers entram no registo global: `FluentSQL.Register.pas` inclui-o (`{$include ..\FluentSQL.inc}`) e todos os blocos `{$IFDEF FIREBIRD}`, `{$IFDEF DB2}` etc. são resolvidos a partir dele. Por omissão vêm ligados **Firebird, MSSQL, MySQL, SQLite, Oracle, PostgreSQL e MongoDB**; **`INTERBASE` e `DB2` vêm desligados**.
+- **Ação — o que funciona.** Escolha **uma** das duas:
+  1. **Editar `Source\FluentSQL.inc`** e descomentar o símbolo do dialeto (`{.$DEFINE DB2}` → `{$DEFINE DB2}`).
+  2. **Definir o símbolo globalmente para toda a compilação**, o que não exige tocar no ficheiro da biblioteca: `-DDB2` na linha de comando do `dcc32` / `dcclinux64`, ou *Project Options → Building → Delphi Compiler → Conditional defines* na IDE.
+
+> **Não funciona: `{$DEFINE}` no seu `.dpr`.** No Delphi, `{$DEFINE}` tem **escopo de ficheiro** — vale só para o ficheiro onde está escrito, e **não se propaga** para as units do FluentSQL que estão a ser compiladas. Declarar `{$DEFINE DB2}` no topo do seu programa não tem efeito nenhum sobre como `FluentSQL.Register.pas` compila.
+>
+> Os `{$DEFINE}` no topo de `Test Delphi\Firebird_tests\PTestFluentSQLFirebird.dpr` são, pela mesma razão, **decorativos** — quem imitar aquele padrão cai exatamente neste erro. Verificado em 2026-08-07: (a) apagar os sete `{$DEFINE}` daquele `.dpr` deixa o resultado idêntico (94 testes, 93 verdes), porque quem já os ligava era o `.inc`; (b) o `.dpr` do DB2 não define símbolo nenhum e falha com esta exceção em 22 testes — recompilado com `-DDB2`, passam 10 e nenhum erra.
+
+Para detalhe e follow-up: issue [#14](https://github.com/ModernDelphiWorks/FluentSQL/issues/14).
+
+## `EFluentSQLFunctionNotSupported` ao usar funções escalares no MongoDB
+
+- **Sintoma:** ao chamar `Trim`, `Upper` via `Length`, `Concat`, `Coalesce`, `Year`, `CurrentDate`, `Ceil`, `Modulus` e afins com `dbnMongoDB`, a chamada levanta em vez de devolver texto.
+- **Provável causa:** não é um driver incompleto — é deliberado. O serializador MongoDB só sabe consumir **nome de campo** ou **marcador de agregação**; um documento MQL devolvido no lugar de uma coluna seria tratado como nome de campo e produziria MQL inválido em silêncio. Agregações (`Count`, `Sum`, `Min`, `Max`, `Average`) **funcionam** normalmente.
+- **Ação:** faça a transformação escalar no pipeline da aplicação, ou use um dialeto SQL. A exceção é nomeada e traz a função e o dialeto na mensagem, para tradução em erro de domínio.
