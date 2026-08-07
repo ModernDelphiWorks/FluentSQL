@@ -22,6 +22,7 @@ uses
   DUnitX.TestFramework,
   UTestFluentSQLFirebird in 'UTestFluentSQLFirebird.pas',
   test.core.params in '..\Common_tests\test.core.params.pas',
+  test.driver.functions.matrix in '..\Common_tests\test.driver.functions.matrix.pas',
   test.ddl.firebird in 'test.ddl.firebird.pas',
   test.operators.isin.firebird in 'test.operators.isin.firebird.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',

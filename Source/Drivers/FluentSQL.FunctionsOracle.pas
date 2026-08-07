@@ -34,6 +34,15 @@ type
     function Month(const AValue: String): String; override;
     function Year(const AValue: String): String; override;
     function Concat(const AValue: array of String): String; override;
+    function Length(const AValue: String): String; override;
+    function Trim(const AValue: String): String; override;
+    function LTrim(const AValue: String): String; override;
+    function RTrim(const AValue: String): String; override;
+    function Coalesce(const AValues: array of String): String; override;
+    function CurrentDate: String; override;
+    function CurrentTimestamp: String; override;
+    function Ceil(const AValue: String): String; override;
+    function Modulus(const AValue, ADivisor: String): String; override;
   end;
 
 implementation
@@ -96,6 +105,65 @@ end;
 function TFluentSQLFunctionsOracle.Year(const AValue: String): String;
 begin
   Result := 'EXTRACT(YEAR FROM ' + AVAlue + ')';
+end;
+
+// LENGTH, TRIM, LTRIM, RTRIM, COALESCE e MOD sao built-ins do Oracle.
+function TFluentSQLFunctionsOracle.Length(const AValue: String): String;
+begin
+  Result := 'LENGTH(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsOracle.Trim(const AValue: String): String;
+begin
+  Result := 'TRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsOracle.LTrim(const AValue: String): String;
+begin
+  Result := 'LTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsOracle.RTrim(const AValue: String): String;
+begin
+  Result := 'RTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsOracle.Coalesce(const AValues: array of String): String;
+var
+  LFor: Integer;
+begin
+  Result := 'COALESCE(';
+  for LFor := Low(AValues) to High(AValues) do
+  begin
+    Result := Result + AValues[LFor];
+    if LFor < High(AValues) then
+      Result := Result + ', ';
+  end;
+  Result := Result + ')';
+end;
+
+// Oracle: CURRENT_DATE traz data COM hora. Para manter a semantica dos demais
+// dialetos (data sem hora, como CAST(GETDATE() AS DATE) no MSSQL) usa-se
+// TRUNC(SYSDATE), que e o idioma canonico no Oracle.
+function TFluentSQLFunctionsOracle.CurrentDate: String;
+begin
+  Result := 'TRUNC(SYSDATE)';
+end;
+
+function TFluentSQLFunctionsOracle.CurrentTimestamp: String;
+begin
+  Result := 'SYSTIMESTAMP';
+end;
+
+// Oracle tem CEIL; nao tem CEILING.
+function TFluentSQLFunctionsOracle.Ceil(const AValue: String): String;
+begin
+  Result := 'CEIL(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsOracle.Modulus(const AValue, ADivisor: String): String;
+begin
+  Result := 'MOD(' + AValue + ', ' + ADivisor + ')';
 end;
 
 end.

@@ -178,7 +178,6 @@ class function TUtils.DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver;
 begin
   case ADriverName of
     dbnFirebird,
-    dbnAbsoluteDB,
     dbnInterbase: Result := FormatDateTime('mm/dd/yyyy hh:nn:ss', AValue);
 
     dbnMSSQL,
@@ -186,13 +185,8 @@ begin
     dbnSQLite,
     dbnDB2,
     dbnOracle,
-    dbnInformix,
     dbnPostgreSQL,
-    dbnADS,
-    dbnASA,
-    dbnMongoDB,
-    dbnElevateDB,
-    dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
+    dbnMongoDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
   end;
   Result := QuotedStr(Result);
 end;
@@ -202,7 +196,6 @@ class function TUtils.DateToSQLFormat(const ADriverName: TFluentSQLDriver;
 begin
   case ADriverName of
     dbnFirebird,
-    dbnAbsoluteDB,
     dbnInterbase: Result := FormatDateTime('mm/dd/yyyy', AValue);
 
     dbnMSSQL,
@@ -210,13 +203,8 @@ begin
     dbnSQLite,
     dbnDB2,
     dbnOracle,
-    dbnInformix,
     dbnPostgreSQL,
-    dbnADS,
-    dbnASA,
-    dbnMongoDB,
-    dbnElevateDB,
-    dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
+    dbnMongoDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
   end;
   Result := QuotedStr(Result);
 end;
