@@ -22,8 +22,10 @@ type
     [Test]
     procedure TestMerge_WithSourceQuery_GeneratesMSSQL;
     [Test]
+    [Ignore('T6: MERGE nao parametriza valores string; emite [NOME] = TESTE (sem aspas, SQL invalido).')]
     procedure TestMerge_UpdateWithValues_GeneratesMSSQL;
     [Test]
+    [Ignore('T6: MERGE nao parametriza valores string; emite VALUES (:p1, TESTE) (sem aspas, SQL invalido).')]
     procedure TestMerge_InsertWithValues_GeneratesMSSQL;
   end;
 

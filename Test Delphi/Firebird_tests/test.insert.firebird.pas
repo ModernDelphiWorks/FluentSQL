@@ -39,7 +39,7 @@ procedure TTestFluentSQLInsert.TestInsertFirebird;
 var
   LAsString: String;
 begin
-  LAsString := 'INSERT INTO CLIENTES (ID_CLIENTE, NOME_CLIENTE) VALUES (1, ''MyName'')';
+  LAsString := 'INSERT INTO CLIENTES (ID_CLIENTE, NOME_CLIENTE) VALUES (:p1, :p2)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Insert
                                       .Into('CLIENTES')

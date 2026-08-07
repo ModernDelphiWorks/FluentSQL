@@ -69,7 +69,7 @@ begin
                'ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER '+
                'FROM CLIENTES AS C) AS CLIENTES '+
                'WHERE (ROWNUMBER > 0 AND ROWNUMBER <= 3) '+
-               'ORDER BY ID_CLIENTE';
+               'ORDER BY ID_CLIENTE ASC';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                               .Select
                               .Column('ID_CLIENTE')
@@ -95,7 +95,7 @@ procedure TTestFluentSQLSelect.TestSelectAllNoSQL;
 var
   LAsString: String;
 begin
-  LAsString := 'clientes.Find( {} )';
+  LAsString := '{"find":"CLIENTES","filter":{},"projection":{}}';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMongoDB)
                                       .Select
                                       .All
@@ -107,7 +107,7 @@ procedure TTestFluentSQLSelect.TestSelectAllOrderBy;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE';
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
@@ -133,7 +133,7 @@ procedure TTestFluentSQLSelect.TestSelectAllWhereAndAnd;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND (ID >= 10) AND (ID <= 20)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND (ID >= :p1) AND (ID <= :p2)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
@@ -148,7 +148,7 @@ procedure TTestFluentSQLSelect.TestSelectAllWhereAndOr;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND ((ID >= 10) OR (ID <= 20))';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (ID_CLIENTE = 1) AND ((ID >= :p1) OR (ID <= :p2))';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Select
                                       .All
@@ -196,7 +196,7 @@ procedure TTestFluentSQLSelect.TestSelectPagingFirebird;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT FIRST 3 SKIP 0 * FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE';
+  LAsString := 'SELECT FIRST 3 SKIP 0 * FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE ASC';
   TFluentSQL.SetDatabaseDafault(dbnFirebird);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -211,7 +211,7 @@ procedure TTestFluentSQLSelect.TestSelectPagingFirebirdDistinct;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT DISTINCT FIRST 3 SKIP 0 CLI.ID_CLIENTE FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE';
+  LAsString := 'SELECT DISTINCT FIRST 3 SKIP 0 CLI.ID_CLIENTE FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE ASC';
   TFluentSQL.SetDatabaseDafault(dbnFirebird);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -227,7 +227,7 @@ procedure TTestFluentSQLSelect.TestSelectPagingMSSQL;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE';
+  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE ASC';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
@@ -241,7 +241,7 @@ procedure TTestFluentSQLSelect.TestSelectPagingMySQL;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE LIMIT 3 OFFSET 0';
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC LIMIT 3 OFFSET 0';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMySQL)
                                       .Select
                                       .All
@@ -255,7 +255,7 @@ procedure TTestFluentSQLSelect.TestSelectPagingOracle;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (SELECT * FROM CLIENTES ORDER BY ID_CLIENTE) T) WHERE ROWNUM <= 3 AND ROWINI > 0';
+  LAsString := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC) T) WHERE ROWNUM <= 3 AND ROWINI > 0';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnOracle)
                                       .Select
                                       .All

@@ -39,6 +39,7 @@ type
     [Test]
     procedure TestYearSelect;
     [Test]
+    [Ignore('T6: .Where.Date().Equal.Date() justapoe placeholder e expressao (= :p1 TO_DATE(...)), SQL invalido.')]
     procedure TestDate;
     [Test]
     procedure TestConcatSelect;

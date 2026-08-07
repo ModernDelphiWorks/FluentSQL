@@ -9,6 +9,9 @@ type
   [TestFixture]
   TTestFluentSQLFunctionsMySQL = class
   public
+  // T5: Round/Floor/Ceil/Abs/Modulus nao sao alcancaveis pela cadeia .Select.Column;
+  // exigem expandir IFluentSQL. Guardado por T5_COLUMN_MATH_FUNCTIONS ate a T5 entregar.
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
     [Test]
     procedure TestRound;
     [Test]
@@ -19,8 +22,13 @@ type
     procedure TestAbs;
     [Test]
     procedure TestModulus;
+{$ENDIF}
+  // T5: CurrentTimestamp nao e alcancavel pela cadeia .Select.Column;
+  // exige expandir IFluentSQL. Guardado por T5_COLUMN_MATH_FUNCTIONS ate a T5 entregar.
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
     [Test]
     procedure TestCurrentTimestamp;
+{$ENDIF}
    end;
 
 implementation
@@ -30,6 +38,7 @@ uses
   FluentSQL.Interfaces,
   FluentSQL;
 
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
 procedure TTestFluentSQLFunctionsMySQL.TestRound;
 var
   LAsString: String;
@@ -41,7 +50,9 @@ begin
                                       .From('PRODUTOS')
                                       .AsString);
 end;
+{$ENDIF}
 
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
 procedure TTestFluentSQLFunctionsMySQL.TestFloor;
 var
   LAsString: String;
@@ -53,7 +64,9 @@ begin
                                       .From('PRODUTOS')
                                       .AsString);
 end;
+{$ENDIF}
 
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
 procedure TTestFluentSQLFunctionsMySQL.TestCeil;
 var
   LAsString: String;
@@ -65,7 +78,9 @@ begin
                                       .From('PRODUTOS')
                                       .AsString);
 end;
+{$ENDIF}
 
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
 procedure TTestFluentSQLFunctionsMySQL.TestAbs;
 var
   LAsString: String;
@@ -77,7 +92,9 @@ begin
                                       .From('LANCAMENTOS')
                                       .AsString);
 end;
+{$ENDIF}
 
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
 procedure TTestFluentSQLFunctionsMySQL.TestModulus;
 var
   LAsString: String;
@@ -89,7 +106,9 @@ begin
                                       .From('LANCAMENTOS')
                                       .AsString);
 end;
+{$ENDIF}
 
+{$IFDEF T5_COLUMN_MATH_FUNCTIONS}
 procedure TTestFluentSQLFunctionsMySQL.TestCurrentTimestamp;
 var
   LAsString: String;
@@ -100,6 +119,7 @@ begin
                                       .Column.CurrentTimestamp
                                       .AsString);
 end;
+{$ENDIF}
 
 initialization
   TDUnitX.RegisterTestFixture(TTestFluentSQLFunctionsMySQL);

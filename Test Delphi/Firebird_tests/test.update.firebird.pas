@@ -43,7 +43,7 @@ var
   LDate: TDate;
   LDateTime: TDateTime;
 begin
-  LAsString := 'UPDATE CLIENTES SET ID_CLIENTE = ''1'', NOME_CLIENTE = ''MyName'', DATA_CADASTRO = ''12/31/2021'', DATA_ALTERACAO = ''12/31/2021 23:59:59''';
+  LAsString := 'UPDATE CLIENTES SET ID_CLIENTE = :p1, NOME_CLIENTE = :p2, DATA_CADASTRO = :p3, DATA_ALTERACAO = :p4';
   LDate := EncodeDate(2021, 12, 31);
   LDateTime := EncodeDate(2021, 12, 31)+EncodeTime(23, 59, 59, 0);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
@@ -59,7 +59,7 @@ procedure TTestFluentSQLUpdate.TestUpdateWhereFirebird;
 var
   LAsString: String;
 begin
-  LAsString := 'UPDATE CLIENTES SET ID_CLIENTE = 1, NOME_CLIENTE = ''MyName'' WHERE ID_CLIENTE = 1';
+  LAsString := 'UPDATE CLIENTES SET ID_CLIENTE = :p1, NOME_CLIENTE = :p2 WHERE ID_CLIENTE = 1';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                       .Update('CLIENTES')
                                       .SetValue('ID_CLIENTE', 1)
