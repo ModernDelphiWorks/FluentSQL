@@ -13,7 +13,7 @@ uses
   DUnitX.TestFramework,
   test.functions.mysql in 'test.functions.mysql.pas',
   test.select.mysql in 'test.select.mysql.pas',
-  test.core.params in '..\test.core.params.pas',
+  test.core.params in '..\Common_tests\test.core.params.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
   FluentSQL.Cases in '..\..\Source\Core\FluentSQL.Cases.pas',
   FluentSQL.Core in '..\..\Source\Core\FluentSQL.Core.pas',

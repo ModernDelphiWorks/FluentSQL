@@ -203,7 +203,7 @@ end;
 procedure TFluentSQLRegister._RegisterDB2;
 begin
   Self.RegisterSerialize(dbnDB2, TFluentSQLSerializeDB2.Create);
-  Self.RegisterSelect(dbnDB2, TIFluentSQLSelectDB2.Create);
+  Self.RegisterSelect(dbnDB2, TFluentSQLSelectDB2.Create);
   Self.RegisterFunctions(dbnDB2, TFluentSQLFunctionsDB2.Create);
 end;
 {$ENDIF}

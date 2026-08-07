@@ -323,7 +323,7 @@ procedure TTestDDLMSSQL.TestComments_MSSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnMSSQL).CreateTable('Users')
+  LSql := FluentSQL.Schema(dbnMSSQL).Table('Users').Create
     .Description('App users table')
     .ColumnInteger('ID').Description('Internal ID')
     .AsString;

@@ -480,7 +480,7 @@ procedure TTestDDLFirebird.TestComments_Firebird_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).CreateTable('Users')
+  LSql := FluentSQL.Schema(dbnFirebird).Table('Users').Create
     .Description('Application users table')
     .ColumnInteger('ID').PrimaryKey.Description('Internal ID')
     .AsString;
