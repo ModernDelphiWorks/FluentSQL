@@ -97,5 +97,80 @@ run('08b a ordem TROCADA: $limit antes de $skip',
   LEITURA DE 08 x 08b: com a ordem trocada a consulta devolve conjunto VAZIO, sem
   erro nenhum - o pior tipo de defeito. E tambem por isso que $skip vem antes:
   nessa ordem o otimizador consegue coalescer $sort/$skip/$limit num unico
-  estagio. FluentSQL.SerializeMongoDB.pas:811-814 emite nesta ordem.
+  estagio. FluentSQL.SerializeMongoDB.pas emite nesta ordem.
 */
+
+/*
+  ==============================================================================
+  PARTE Z - First(0): o defeito MAIS SILENCIOSO dos sete dialetos
+
+  "limit" nao significa o que parece quando vale zero. Os casos Z1..Z3 sao o que
+  o FluentSQL emitia ATE a T10 - e nao foi a T10 que introduziu isto: e defeito
+  antigo, que so apareceu quando se foi medir First(0) nos sete dialetos.
+  ==============================================================================
+*/
+
+run('Z1 First(0) na forma ANTIGA: "limit":0',
+    {find:'T', filter:{}, projection:{_id:0,ID:1}, limit:0});
+/*
+  SAIDA: 60 documentos - a colecao INTEIRA.
+
+  LEITURA: limit:0 quer dizer SEM LIMITE. O usuario pediu NADA e recebia TUDO,
+  sem erro e sem aviso. Nos outros seis dialetos First(0) devolvia zero linhas -
+  ou, no MSSQL, erro alto; so aqui devolvia dado errado calado.
+*/
+
+run('Z2 First(0)+Skip(20) na forma ANTIGA',
+    {find:'T', filter:{}, projection:{_id:0,ID:1}, limit:0, skip:20});
+/* SAIDA: 40 documentos. Mesmo defeito, agora com o salto aplicado. */
+
+run('Z3 First(0) na forma ANTIGA, no pipeline: $limit 0',
+    {aggregate:'T', pipeline:[{$group:{_id:'$NOME'}},{$limit:0}], cursor:{}});
+/*
+  SAIDA BRUTA:
+    MongoServerError: the limit must be positive
+
+  LEITURA: no pipeline o mesmo pedido falha ALTO. Os dois caminhos do mesmo
+  driver discordavam entre si sobre o que First(0) significa.
+*/
+
+/*
+  ------------------------------------------------------------------------------
+  FORMA ESCOLHIDA: pular tudo, com 2^63-1.
+
+  ATENCAO AO REPETIR: este numero NAO pode ser escrito como literal JavaScript.
+  O mongosh o converte para double e o servidor recusa com "Cannot represent as
+  a 64-bit integer: $skip: 9.223372036854776e+18". Isso e do CONSOLE, nao do
+  servidor - com EJSON.parse do TEXTO, que e o que o FluentSQL produz e o que um
+  driver real entrega, o servidor aceita. Z4..Z6 usam EJSON.parse por isso.
+  ------------------------------------------------------------------------------
+*/
+
+function runTexto(r, txt) {
+  print('=== ' + r);
+  print('    ' + txt);
+  try { let x = db.runCommand(EJSON.parse(txt, {relaxed:false}));
+    print('    -> ' + (x.cursor ? x.cursor.firstBatch.length + ' documentos'
+                                : JSON.stringify(x).substring(0,120))); }
+  catch(e){ print('    -> ERRO ' + e); }
+}
+
+runTexto('Z4 First(0), forma NOVA (find)',
+  '{"find":"T","filter":{},"projection":{},"skip":9223372036854775807}');
+/* SAIDA: 0 documentos. */
+
+runTexto('Z5 First(0), forma NOVA (pipeline)',
+  '{"aggregate":"T","pipeline":[{"$group":{"_id":"$NOME"}},{"$skip":9223372036854775807}],"cursor":{}}');
+/* SAIDA: 0 documentos. Os dois caminhos passam a concordar. */
+
+runTexto('Z6 First(0) com filtro do usuario',
+  '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}');
+/* SAIDA: 0 documentos - e o filtro do usuario continua intacto. */
+
+run('Z7 Skip(0) - inalterado e correto',
+    {find:'T', filter:{}, projection:{_id:0,ID:1}, skip:0});
+/* SAIDA: 60 documentos. Skip(0) e "nao pule nada", nao "sem Skip". */
+
+run('Z8 First(10)+Skip(0) - inalterado e correto',
+    {find:'T', filter:{}, projection:{_id:0,ID:1}, limit:10, skip:0});
+/* SAIDA: 10 documentos. */

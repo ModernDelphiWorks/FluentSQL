@@ -112,6 +112,32 @@
   E por isso que o FluentSQL NAO exige OrderBy para paginar: 6 dos 7 dialetos
   aceitam paginar sem ordenacao, e exigir seria inventar restricao que os bancos
   nao tem.
+
+  ------------------------------------------------------------------------------
+  BURACOS DE COBERTURA CONHECIDOS DESTE ARQUIVO
+
+  Catalogados por revisao independente, medidos por reversao. Nao sao defeitos
+  do codigo; sao limites do que ESTES testes provam.
+
+  1. ONDE ELES MORAM. A matriz inteira vive no projeto Firebird
+     (PTestFluentSQLFirebird.dpr) e e o UNICO projeto que a compila. Consequencia
+     medida: reverter a cauda LIMIT/OFFSET do SQLite derruba 4 testes, TODOS
+     aqui - e SQLite_tests nao tem teste de paginacao nenhum. A cobertura existe,
+     mas mora longe do driver que ela protege. Mover ou replicar a matriz para os
+     projetos por dialeto e trabalho separado.
+
+  2. O QUE A MATRIZ NAO PEGA. Os testes que percorrem os 7 dialetos verificam
+     "nao levantou excecao" e "a clausula sobreviveu", nao a FORMA. Um driver
+     pode emitir a ordem errada sem que a matriz reclame - foi o caso do Firebird
+     com DISTINCT antes de FIRST/SKIP, que so a camada 2 pegava. Onde a ordem foi
+     medida como load-bearing ela ganhou assert de string exata dentro do teste
+     de matriz (ver TestDistinctComPaginacaoEmTodoDialeto); onde nao ganhou, a
+     protecao e so da camada 2, que cobre um dialeto por metodo.
+
+  3. FluentSQL.Select.pas:106 (TFluentSQLSelect.Serialize) e CODIGO MORTO.
+     Reverter a linha nao derruba teste nenhum, porque os 9 drivers sobrescrevem
+     Serialize e FluentSQL.Ast.pas sempre pega a instancia do Register. A forma
+     neutra foi corrigida ali por coerencia, nao por efeito observavel.
   ------------------------------------------------------------------------------
 }
 
@@ -247,6 +273,37 @@ type
     [Test]
     procedure TestSqlExatoSkipSozinho;
     /// <summary>
+    ///   First(0) devolve ZERO linhas nos 7 dialetos, com SQL que o motor
+    ///   aceita. `TFluentSQLPagination` declara que First(0) e pedido legitimo e
+    ///   distinto de "sem First"; sem este teste a declaracao era so um
+    ///   comentario. A ausencia dele deixou passar uma regressao: a T10 passou a
+    ///   emitir "FETCH NEXT 0 ROWS ONLY" no MSSQL, que e Msg 10744, onde a base
+    ///   emitia "ROWNUMBER <= 0", valido. E revelou um defeito ANTIGO e pior no
+    ///   MongoDB, onde "limit":0 significa SEM LIMITE e devolvia a colecao
+    ///   inteira, calada.
+    /// </summary>
+    [Test]
+    procedure TestSqlExatoFirstZero;
+    /// <summary>
+    ///   First(0) nao pode virar "limite ausente" em dialeto nenhum. Assert
+    ///   negativo, complementar ao de string exata: pega a classe inteira de
+    ///   defeito em que o zero e tratado como "nao pediu".
+    /// </summary>
+    [Test]
+    procedure TestFirstZeroNuncaViraLimiteAusente;
+    /// <summary>
+    ///   Skip(0) e "nao pule nada", nao "sem Skip", e foi medido correto nos 7.
+    ///   Fica travado porque a correcao do First(0) mexe no mesmo ramo.
+    /// </summary>
+    [Test]
+    procedure TestSqlExatoSkipZero;
+    /// <summary>
+    ///   First(0) combinado com Distinct, Union e GroupBy. E onde as duas
+    ///   alternativas recusadas no MSSQL (TOP 0) quebravam.
+    /// </summary>
+    [Test]
+    procedure TestFirstZeroNasCombinacoes;
+    /// <summary>
     ///   Dialeto desligado no .inc recusa com excecao NOMEADA. Se o dono ligar o
     ///   driver, este teste fica vermelho e cobra a linha na matriz - que e o
     ///   ponto: nao existe dialeto fora da regra, so dialeto ainda nao ligado.
@@ -272,7 +329,9 @@ type
   /// </summary>
   TCombinacao = (cbFirst, cbSkip, cbFirstSkip, cbOrderByAsc, cbOrderByDesc,
                  cbDoisTermos, cbDistinct, cbDistinctSemPaginacao, cbGroupBy,
-                 cbUnion, cbWith);
+                 cbUnion, cbWith,
+                 cbFirstZero, cbSkipZero, cbFirstZeroSkip20, cbFirst10SkipZero,
+                 cbDistinctFirstZero, cbUnionFirstZero, cbGroupByFirstZero);
 
 const
   cCOMBINACAO: array[TCombinacao] of String = (
@@ -286,7 +345,14 @@ const
     'Distinct SEM paginacao',
     'GroupBy + First + Skip',
     'Union + First + Skip',
-    'WithAlias + First + Skip'
+    'WithAlias + First + Skip',
+    'Where + First(0)',
+    'Where + Skip(0)',
+    'Where + First(0) + Skip(20)',
+    'Where + First(10) + Skip(0)',
+    'Distinct + First(0)',
+    'Union + First(0)',
+    'GroupBy + First(0)'
   );
 
   cDIALETO: array[TFluentSQLDriver] of String = (
@@ -332,6 +398,26 @@ begin
     cbWith:
       Result := Query(ADriver).Select.All.From('T')
                   .WithAlias('CTE').First(10).Skip(20).AsString;
+    cbFirstZero:
+      Result := Query(ADriver).Select.All.From('T')
+                  .Where('ATIVO').Equal(1).First(0).AsString;
+    cbSkipZero:
+      Result := Query(ADriver).Select.All.From('T')
+                  .Where('ATIVO').Equal(1).Skip(0).AsString;
+    cbFirstZeroSkip20:
+      Result := Query(ADriver).Select.All.From('T')
+                  .Where('ATIVO').Equal(1).First(0).Skip(20).AsString;
+    cbFirst10SkipZero:
+      Result := Query(ADriver).Select.All.From('T')
+                  .Where('ATIVO').Equal(1).First(10).Skip(0).AsString;
+    cbDistinctFirstZero:
+      Result := Query(ADriver).Select.Distinct.Column('NOME').From('T').First(0).AsString;
+    cbUnionFirstZero:
+      Result := Query(ADriver).Select.All.From('T')
+                  .Union(Query(ADriver).Select.All.From('U')).First(0).AsString;
+    cbGroupByFirstZero:
+      Result := Query(ADriver).Select.Column('NOME').From('T')
+                  .GroupBy('NOME').First(0).AsString;
   else
     raise Exception.Create('Combinacao sem montagem em _Monta. ' +
       'Toda combinacao de TCombinacao precisa estar coberta pela matriz.');
@@ -510,6 +596,23 @@ begin
   Assert.AreEqual('', LFalhas, AMensagem + LFalhas);
 end;
 
+/// <summary>
+///   Nome da classe de excecao que o dialeto levantou para a consulta dada, ou
+///   '' se nao levantou. Uma excecao NOMEADA e resposta aceitavel; "Exception"
+///   pelado nao e - nao ha o que capturar nem o que distinguir.
+/// </summary>
+function _ClasseDaExcecao(const ADriver: TFluentSQLDriver;
+  const ACombinacao: TCombinacao): String;
+begin
+  Result := '';
+  try
+    _Monta(ADriver, ACombinacao);
+  except
+    on E: Exception do
+      Result := E.ClassName;
+  end;
+end;
+
 procedure TTestPaginationWithFilter.TestFirstSozinhoEmTodoDialeto;
 begin
   _ConfereTabela(cFIRST_SOZINHO, cbFirst,
@@ -539,6 +642,152 @@ begin
   Assert.AreEqual('SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20',
     _Monta(dbnPostgreSQL, cbSkip), False,
     'O PostgreSQL NAO leva teto: e o unico em que OFFSET e clausula independente.');
+end;
+
+/// <summary>
+///   First(0) por dialeto. Cada linha foi MEDIDA devolvendo zero linhas no
+///   motor real - ver test.pagination.&lt;dialeto&gt;.sql, parte Z.
+///
+///   Os dois numeros gigantes nao sao truque: sao o maior inteiro que cada
+///   motor aceita no deslocamento, usados para exprimir "pule tudo" = "devolva
+///   nada". Sao necessarios porque nesses dois dialetos NAO existe forma
+///   literal de pedir zero linhas pelo limite:
+///     MSSQL   "FETCH NEXT 0 ROWS ONLY" -> Msg 10744 (restricao do LITERAL: a
+///             mesma consulta com variavel BIGINT = 0 e aceita)
+///     MongoDB "limit":0 -> SEM LIMITE, devolve a colecao inteira; {"$limit":0}
+///             -> "the limit must be positive"
+/// </summary>
+const
+  cFIRST_ZERO: array[TFluentSQLDriver] of String = (
+    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS',
+    {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 0',
+    {dbnFirebird}   'SELECT FIRST 0 * FROM T WHERE (ATIVO = :p1)',
+    {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0',
+    {dbnInterbase}  '',
+    {dbnDB2}        '',
+    {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) FETCH NEXT 0 ROWS ONLY',
+    {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}'
+  );
+
+  /// <summary>Skip(0) = "nao pule nada". Medido correto nos 7 antes e depois.</summary>
+  cSKIP_ZERO: array[TFluentSQLDriver] of String = (
+    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 0 ROWS',
+    {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 18446744073709551615 OFFSET 0',
+    {dbnFirebird}   'SELECT SKIP 0 * FROM T WHERE (ATIVO = :p1)',
+    {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT -1 OFFSET 0',
+    {dbnInterbase}  '',
+    {dbnDB2}        '',
+    {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 0 ROWS',
+    {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 0',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":0}'
+  );
+
+  /// <summary>
+  ///   First(0) + Skip(20). Zero linhas e zero linhas com ou sem salto, entao
+  ///   MSSQL e MongoDB ABSORVEM o deslocamento do usuario no "pula tudo". Os
+  ///   outros cinco preservam os dois numeros porque conseguem exprimir o zero.
+  /// </summary>
+  cFIRST_ZERO_SKIP20: array[TFluentSQLDriver] of String = (
+    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS',
+    {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 0 OFFSET 20',
+    {dbnFirebird}   'SELECT FIRST 0 SKIP 20 * FROM T WHERE (ATIVO = :p1)',
+    {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0 OFFSET 20',
+    {dbnInterbase}  '',
+    {dbnDB2}        '',
+    {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20 ROWS FETCH NEXT 0 ROWS ONLY',
+    {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0 OFFSET 20',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}'
+  );
+
+procedure TTestPaginationWithFilter.TestSqlExatoFirstZero;
+begin
+  _ConfereTabela(cFIRST_ZERO, cbFirstZero,
+    'First(0) mudou de forma em algum dialeto. Ele TEM que devolver zero ' +
+    'linhas nos sete, com SQL que o motor aceita:');
+  _ConfereTabela(cFIRST_ZERO_SKIP20, cbFirstZeroSkip20,
+    'First(0) + Skip(20) mudou de forma em algum dialeto:');
+end;
+
+procedure TTestPaginationWithFilter.TestSqlExatoSkipZero;
+begin
+  _ConfereTabela(cSKIP_ZERO, cbSkipZero,
+    'Skip(0) e "nao pule nada", e foi medido correto nos 7 antes e depois da ' +
+    'T10. Se mudou, a correcao do First(0) vazou para o ramo errado:');
+end;
+
+procedure TTestPaginationWithFilter.TestFirstZeroNuncaViraLimiteAusente;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LComZero: String;
+  LSemNada: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    LComZero := _Monta(LDriver, cbFirstZero);
+    // A mesma consulta sem paginacao nenhuma. Se First(0) produzir EXATAMENTE
+    // isto, o zero foi tratado como "nao pediu" - que e o defeito do MongoDB,
+    // onde "limit":0 significa SEM LIMITE e devolvia a colecao inteira.
+    LSemNada := Query(LDriver).Select.All.From('T').Where('ATIVO').Equal(1).AsString;
+    if LComZero = LSemNada then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> First(0) emitiu o mesmo texto de uma consulta SEM paginacao: ' + LComZero;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'First(0) e um pedido, nao a ausencia de um. Tratar o zero como "nao ' +
+    'pediu" devolve TUDO onde o usuario pediu NADA - falha silenciosa:' + LFalhas);
+
+  // O assert acima NAO pega o caso do MongoDB, e vale registrar por que: la o
+  // texto emitido era DIFERENTE do de uma consulta sem paginacao (tinha
+  // "limit":0 a mais), mas o SIGNIFICADO era o mesmo - no MongoDB limit:0 quer
+  // dizer SEM LIMITE, e a consulta devolvia os 60 documentos da colecao. Texto
+  // diferente, semantica identica: por isso o proximo assert prende o token, e
+  // nao a igualdade de strings.
+  Assert.DoesNotContain(_Monta(dbnMongoDB, cbFirstZero), '"limit":0', False,
+    'No MongoDB "limit":0 significa SEM LIMITE, nao "zero documentos" - medido, ' +
+    'devolve a colecao inteira. Foi o unico dos sete dialetos em que First(0) ' +
+    'falhava CALADO, devolvendo dado em vez de erro.');
+  Assert.DoesNotContain(_Monta(dbnMongoDB, cbGroupByFirstZero), '"$limit":0', False,
+    'No pipeline o mesmo pedido falha alto: "the limit must be positive".');
+end;
+
+procedure TTestPaginationWithFilter.TestFirstZeroNasCombinacoes;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LComb: TCombinacao;
+  LClasse: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    for LComb := cbDistinctFirstZero to cbGroupByFirstZero do
+    begin
+      // O MongoDB nao tem UNION, e a recusa dele e materia de outro teste.
+      if (LDriver = dbnMongoDB) and (LComb = cbUnionFirstZero) then
+        Continue;
+      LClasse := _ClasseDaExcecao(LDriver, LComb);
+      if LClasse <> '' then
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] + ' / ' +
+          cCOMBINACAO[LComb] + ' -> levantou ' + LClasse;
+    end;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'First(0) tem que valer em toda combinacao. E aqui que "SELECT TOP 0", a ' +
+    'alternativa obvia e mais barata no MSSQL, foi recusada: num UNION ela ' +
+    'limita so o primeiro ramo e devolve o outro inteiro:' + LFalhas);
+  // O UNION e o caso que derrubou o TOP 0. Prende a forma emitida.
+  Assert.AreEqual(
+    'SELECT * FROM T UNION SELECT * FROM U ORDER BY 1 OFFSET 9223372036854775807 ROWS',
+    _Monta(dbnMSSQL, cbUnionFirstZero), False,
+    'A cauda tem que recortar o UNION INTEIRO. "SELECT TOP 0 * FROM T UNION ' +
+    'SELECT * FROM U" devolve as 60 linhas de U - medido.');
 end;
 
 procedure TTestPaginationWithFilter.TestMSSQLOrderByDoUsuarioPrecedeOffsetFetch;
@@ -598,23 +847,6 @@ begin
     'consulta paginada sem OrderBy. So entra onde (SELECT NULL) e recusado.');
 end;
 
-/// <summary>
-///   Nome da classe de excecao que o dialeto levantou para a consulta dada, ou
-///   '' se nao levantou. Uma excecao NOMEADA e resposta aceitavel; "Exception"
-///   pelado nao e - nao ha o que capturar nem o que distinguir.
-/// </summary>
-function _ClasseDaExcecao(const ADriver: TFluentSQLDriver;
-  const ACombinacao: TCombinacao): String;
-begin
-  Result := '';
-  try
-    _Monta(ADriver, ACombinacao);
-  except
-    on E: Exception do
-      Result := E.ClassName;
-  end;
-end;
-
 procedure TTestPaginationWithFilter.TestDistinctComPaginacaoEmTodoDialeto;
 var
   LDriver: TFluentSQLDriver;
@@ -636,6 +868,14 @@ begin
     'e Oracle (os quatro tratavam sqDistinct como qualificador desconhecido ' +
     'dentro do laco de paginacao). Nenhum dialeto pode recusar esta combinacao:' +
     LFalhas);
+  // "Nao levantou" e pouco: o Firebird emitia DISTINCT antes de FIRST/SKIP, que
+  // NAO levanta nada no FluentSQL e o motor recusa com -104. A ordem entre o
+  // DISTINCT e a paginacao fica travada aqui, no dialeto em que ela importa.
+  Assert.AreEqual('SELECT FIRST 10 SKIP 20 DISTINCT NOME FROM T',
+    _Monta(dbnFirebird, cbDistinct), False,
+    'Gramatica do Firebird: SELECT [FIRST m] [SKIP n] [DISTINCT] <colunas>. ' +
+    'Com o DISTINCT na frente o motor recusa a consulta inteira com ' +
+    '"-SQL error code = -104 / Token unknown - line 1, column 23".');
 end;
 
 procedure TTestPaginationWithFilter.TestDistinctSozinhoNaoExplodeEmDialetoNenhum;

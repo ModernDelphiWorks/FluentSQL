@@ -33,6 +33,23 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   No MSSQL, como `<offset_fetch>` só existe dentro de um `ORDER BY`, sem `OrderBy` do usuário é emitido `ORDER BY (SELECT NULL)` — preenchimento **gramatical**, que não promete determinismo e não acrescenta operador `Sort` ao plano. Sob `DISTINCT` ou `UNION` o motor recusa `(SELECT NULL)` (`Msg 145` e `Msg 104`) e é emitido `ORDER BY 1`, o único item que está sempre na lista de seleção. Todas as formas foram medidas em motor real; os `docker run`, versões e saídas brutas estão em `Test Delphi\Common_tests\test.pagination.<dialeto>.sql`.
 
+- **BREAKING CHANGE (SQL emitido) — `First(0)` passou a devolver zero linhas nos 7 dialetos.** `First(0)` é pedido legítimo e distinto de "sem `First`", como o próprio `TFluentSQLPagination` declara. Estava errado em dois dialetos, cada um de um jeito:
+
+  | Dialeto | Antes | Depois |
+  |---|---|---|
+  | MSSQL | `... OFFSET 0 ROWS FETCH NEXT 0 ROWS ONLY` — **`Msg 10744`**, recusado | `... OFFSET 9223372036854775807 ROWS` → 0 linhas |
+  | MongoDB (`find`) | `"limit":0` — **devolvia a coleção INTEIRA**, em silêncio | `"skip":9223372036854775807` → 0 documentos |
+  | MongoDB (`aggregate`) | `{"$limit":0}` — `the limit must be positive` | `{"$skip":9223372036854775807}` → 0 documentos |
+  | Firebird / MySQL / SQLite / PostgreSQL / Oracle | já corretos | inalterados |
+
+  No MongoDB `limit: 0` significa **sem limite** — o usuário pedia nada e recebia tudo, sem erro. Era o único dos sete em que `First(0)` falhava calado, e os dois caminhos do próprio driver (`find` e `aggregate`) discordavam entre si sobre o que `First(0)` queria dizer.
+
+  No SQL Server a restrição é do **literal**, não da semântica: o mesmo `FETCH` com o contador vindo de uma variável `BIGINT` valendo `0` é aceito e devolve zero linhas. Duas alternativas mais baratas foram medidas e **recusadas**: `SELECT TOP 0` não coexiste com `OFFSET` (`Msg 10741`) e num `UNION` limita apenas o primeiro ramo, devolvendo o outro inteiro; `FETCH NEXT (SELECT 0) ROWS ONLY` só é aceito quando o `OFFSET` é o literal `0`. A forma escolhida **custa uma varredura completa** — 767 leituras lógicas contra 0 do `TOP 0` numa tabela de 200 mil linhas —, preço aceito em troca de correção uniforme em todas as combinações. Medições em `test.pagination.mssql.sql`, parte Z.
+
+  Onde MSSQL e MongoDB precisam do "pula tudo", o `Skip(n)` do usuário é **absorvido** (`First(0).Skip(20)` emite só o "pula tudo"): zero linhas é zero linhas com ou sem salto. Os outros cinco preservam os dois números.
+
+  **`Skip(0)` foi medido correto nos 7 antes e depois** e não mudou — é "não pule nada", não "sem `Skip`".
+
 - **BREAKING CHANGE (SQL emitido) — Firebird: `FIRST`/`SKIP` passaram a preceder o `DISTINCT`.** Era `SELECT DISTINCT FIRST 3 SKIP 20 ...`, forma que o Firebird 5.0.4 **recusa** com `-104 Token unknown`; a gramática é `SELECT [FIRST m] [SKIP n] [{DISTINCT | ALL}] <colunas>`. Toda consulta `Select.Distinct` com paginação neste driver era rejeitada pelo motor.
 - **MSSQL, Oracle e DB2: `DISTINCT` passou a preceder a lista de colunas.** Emitiam `SELECT NOME DISTINCT FROM T`. Não dependia de paginação: `Select.Distinct` sozinho já saía assim.
 - **BREAKING CHANGE (comportamento) — `TFluentSQLRegister.Functions` deixou de devolver `nil`.** Passa a levantar `EFluentSQLDriverNotRegistered` (classe nova em `FluentSQL.Interfaces.pas`). Antes, o `nil` era desreferenciado em `FluentSQL.Functions.pas` e chegava ao consumidor como `EAccessViolation` opaca. `Select` e `Serialize` passaram de `Exception` crua para a mesma classe nomeada. **Quem captura esses erros para os traduzir em erro de domínio deve rever o `try..except`.**
@@ -44,6 +61,18 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
 - `EFluentSQLQualifierNotSupported` em `FluentSQL.Interfaces.pas`. Substitui oito cópias de `raise Exception.Create('... Unknown qualifier')` — quatro delas nomeando o driver errado na mensagem.
 - Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4.
+- Matriz de teste `Test Delphi\Common_tests\test.pagination.filter.pas` foi de **15 para 28 testes**, e a contagem merece o detalhe porque `+13` esconde o que aconteceu: **6 removidos, 19 acrescentados**. Os 6 removidos descreviam a janela `ROW_NUMBER()` que deixou de existir, e cada um tem substituto:
+
+  | Removido | Substituto |
+  |---|---|
+  | `TestMSSQLPaginacaoComFiltroEmiteWhereNaoAnd` | `TestMSSQLPaginacaoComFiltroPreservaPredicado` |
+  | `TestMSSQLPaginacaoSemFiltroContinuaComWhere` | `TestSqlExatoMSSQL` + `TestFirstSozinhoEmTodoDialeto` |
+  | `TestMSSQLFirstSozinhoNaoInventaLimiteInferior` | `TestFirstSozinhoEmTodoDialeto` (7 dialetos, não 1) |
+  | `TestMSSQLSkipSozinhoNaoInventaLimiteSuperior` | `TestSkipSozinhoEmTodoDialeto` + `TestSqlExatoSkipSozinho` |
+  | `TestMSSQLJanelaUsaOrderByDoUsuario` | `TestMSSQLOrderByDoUsuarioPrecedeOffsetFetch` |
+  | `TestMSSQLJanelaSemOrderByUsaSelectNull` | `TestMSSQLSemOrderByUsaSelectNull` |
+
+  Nenhuma regra deixou de ser verificada; três delas passaram de 1 para 7 dialetos.
 - Implementações em falta de `Trim`, `LTrim`, `RTrim`, `Coalesce`, `Modulus`, `CurrentDate` e `CurrentTimestamp` nos drivers **Firebird**, **SQLite** e **Oracle**.
 - Funções escalares do **MongoDB** passam a levantar `EFluentSQLFunctionNotSupported` em vez de `EAbstractError`. As agregações (`Count`, `Sum`, `Min`, `Max`, `Average`) não mudaram.
 
@@ -60,6 +89,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - **Firebird — `Union` + paginação pagina apenas o primeiro ramo.** O FluentSQL emite `SELECT FIRST 3 SKIP 20 * FROM T UNION SELECT * FROM U`; no Firebird o `FIRST`/`SKIP` escrito num ramo recorta **aquele ramo**, não o resultado do `UNION` — medido, devolve 63 linhas onde os outros seis dialetos devolvem 3. É SQL válido com semântica divergente. Não corrigido: o conserto exige embrulhar o `UNION` numa subconsulta, mudando substancialmente a forma emitida por este driver. Detalhes em `test.pagination.firebird.sql`, parte 3.
 - **MSSQL — `WITH` (CTE) e `UNION` combinados com `OrderBy` do usuário geram SQL inválido, com ou sem paginação.** `FluentSQL.Serialize.pas` monta o `ORDER BY` **dentro** de `LBase` e só depois embrulha na CTE ou concatena o `UNION`, produzindo `WITH CTE AS (SELECT ... ORDER BY ...)` (`Msg 1033`) e `SELECT ... ORDER BY ... UNION SELECT ...` (`Msg 156`). É defeito de composição, independente de paginação, e não foi corrigido nesta entrega. Casos I e J de `test.pagination.mssql.sql`.
 - **MongoDB — `Union` levanta `EIntfCastError`,** com ou sem paginação. Não é defeito de paginação; o MongoDB não tem `UNION` e deveria recusar com exceção nomeada, como já faz para CTE (`EFluentSQLMongoDBSerialize`).
+- **`FluentSQL.Select.pas` — `TFluentSQLSelect.Serialize` é código morto.** Os 9 drivers sobrescrevem `Serialize` e `FluentSQL.Ast.pas` sempre pega a instância do `Register`; reverter a linha corrigida não derruba teste algum. A forma neutra foi corrigida ali por coerência, não por efeito observável.
+- **A matriz de paginação vive apenas no projeto Firebird.** `PTestFluentSQLFirebird.dpr` é o único que compila `test.pagination.filter.pas`. Consequência medida: reverter a cauda `LIMIT/OFFSET` do SQLite derruba 4 testes, **todos ali** — `SQLite_tests` não tem teste de paginação nenhum. A cobertura existe, mas mora longe do driver que protege.
 - **MongoDB — `Abs`, `Cast`, `Upper`, `Lower`, `Round` e `Floor` geram MQL inválido em silêncio.** Essas seis são do "padrão A" (o núcleo emite SQL ANSI sem consultar o driver), e `FluentSQL.SerializeMongoDB.pas` só reconhece nome de campo e os prefixos de agregação (`AGG:`, `SUM(`, `COUNT(`, `MIN(`, `MAX(`, `AVG(`, `AVERAGE(`). O resultado é que a coluna é **descartada sem exceção**: `.Column(Fun.Round('v',2))` produz `{"find":"t","filter":{},"projection":{}}` — a projeção sai vazia — enquanto `.Column(Fun.Sum('v'))` produz corretamente `{"aggregate":"t","pipeline":[{"$project":{"x":1,"_id":0}}],...}`. É o mesmo modo de falha que foi corrigido para `Ceil` e `Length`, e sobrevive nestas seis. **Não corrigido nesta entrega** — o conserto exige mover as seis para o "padrão B" (implementação por driver nos 9 dialetos) ou ensinar o serializador MongoDB a montar `$project` com expressão, e nenhum dos dois cabia no escopo. Registrado como dívida; até lá, não use funções escalares na projeção com `dbnMongoDB`.
 
 ## [1.5.1] — 2026-04-20

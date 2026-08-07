@@ -125,3 +125,29 @@ SELECT ID FROM T LIMIT 20 OFFSET 3;
   O FluentSQL emite SEMPRE "LIMIT m OFFSET n" (casos 01..10 acima); nao ha
   caminho no driver SQLite que produza a forma com virgula.
 */
+
+/*
+  ==============================================================================
+  PARTE Z - First(0) e Skip(0)
+
+  LIMIT 0 devolve zero linhas. Repare no contraste com o caso 02: o zero
+  literal exprime "nada", e o -1 exprime "sem teto" - sao dois pedidos
+  diferentes e o SQLite escreve os dois. Foi por nao haver teste de First(0) que
+  a regressao do MSSQL passou.
+  ==============================================================================
+*/
+
+-- Z1 First(0)                 -> 0 linhas
+SELECT ID FROM T LIMIT 0;
+-- Z2 Skip(0)                  -> 60 linhas
+SELECT ID FROM T LIMIT -1 OFFSET 0;
+-- Z3 First(0)+Skip(20)        -> 0 linhas
+SELECT ID FROM T LIMIT 0 OFFSET 20;
+-- Z4 First(10)+Skip(0)        -> 10 linhas
+SELECT ID FROM T LIMIT 10 OFFSET 0;
+-- Z5 First(0) nas combinacoes -> 0 linhas nas cinco
+SELECT ID FROM T WHERE (ATIVO = 1) LIMIT 0;
+SELECT ID FROM T ORDER BY NOME ASC LIMIT 0;
+SELECT DISTINCT NOME FROM T LIMIT 0;
+SELECT ID FROM T UNION SELECT ID FROM U LIMIT 0;
+SELECT NOME FROM T GROUP BY NOME LIMIT 0;

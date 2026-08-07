@@ -77,3 +77,29 @@ SELECT ID FROM T UNION SELECT ID FROM U LIMIT 3 OFFSET 20;
 
 -- 10 WithAlias+First+Skip            -> 21, 22, 23
 WITH CTE AS (SELECT * FROM T) SELECT ID FROM CTE LIMIT 3 OFFSET 20;
+
+/*
+  ==============================================================================
+  PARTE Z - First(0) e Skip(0)
+
+  O PostgreSQL aceita LIMIT 0 e devolve zero linhas, sem nenhum tratamento
+  especial. Travado aqui porque foi a ausencia deste caso que deixou passar uma
+  regressao no MSSQL, onde "FETCH NEXT 0 ROWS ONLY" e Msg 10744, e revelou um
+  defeito antigo no MongoDB, onde "limit":0 significa SEM LIMITE.
+  ==============================================================================
+*/
+
+-- Z1 First(0)                         -> 0 linhas
+SELECT count(*) FROM (SELECT * FROM T LIMIT 0) x;
+-- Z2 Skip(0): "nao pule nada"         -> 60 linhas
+SELECT count(*) FROM (SELECT * FROM T OFFSET 0) x;
+-- Z3 First(0)+Skip(20)                -> 0 linhas
+SELECT count(*) FROM (SELECT * FROM T LIMIT 0 OFFSET 20) x;
+-- Z4 First(10)+Skip(0)                -> 10 linhas
+SELECT count(*) FROM (SELECT * FROM T LIMIT 10 OFFSET 0) x;
+-- Z5 First(0) nas combinacoes         -> 0 linhas nas cinco
+SELECT count(*) FROM (SELECT * FROM T WHERE (ATIVO = 1) LIMIT 0) x;
+SELECT count(*) FROM (SELECT * FROM T ORDER BY NOME ASC LIMIT 0) x;
+SELECT count(*) FROM (SELECT DISTINCT NOME FROM T LIMIT 0) x;
+SELECT count(*) FROM (SELECT * FROM T UNION SELECT * FROM U LIMIT 0) x;
+SELECT count(*) FROM (SELECT NOME FROM T GROUP BY NOME LIMIT 0) x;

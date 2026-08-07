@@ -99,3 +99,28 @@ SELECT ID FROM T UNION SELECT ID FROM U LIMIT 3 OFFSET 20;
 
 -- 10 WithAlias+First+Skip            -> 21, 22, 23
 WITH CTE AS (SELECT * FROM T) SELECT ID FROM CTE LIMIT 3 OFFSET 20;
+
+/*
+  ==============================================================================
+  PARTE Z - First(0) e Skip(0)
+
+  LIMIT 0 devolve zero linhas no MySQL, sem tratamento especial. Repare no
+  contraste com o teto do caso 02: aqui o zero e literal e funciona; o que NAO
+  se pode escrever neste dialeto e "sem teto", dai o 2^64-1.
+  ==============================================================================
+*/
+
+-- Z1 First(0)                -> 0
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T LIMIT 0) x) AS z1;
+-- Z2 Skip(0)                 -> 60
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T LIMIT 18446744073709551615 OFFSET 0) x) AS z2;
+-- Z3 First(0)+Skip(20)       -> 0
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T LIMIT 0 OFFSET 20) x) AS z3;
+-- Z4 First(10)+Skip(0)       -> 10
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T LIMIT 10 OFFSET 0) x) AS z4;
+-- Z5 First(0) nas combinacoes -> 0 nas cinco
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T WHERE (ATIVO=1) LIMIT 0) x) AS z5a;
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T ORDER BY NOME ASC LIMIT 0) x) AS z5b;
+SELECT (SELECT COUNT(*) FROM (SELECT DISTINCT NOME FROM T LIMIT 0) x) AS z5c;
+SELECT (SELECT COUNT(*) FROM (SELECT * FROM T UNION SELECT * FROM U LIMIT 0) x) AS z5d;
+SELECT (SELECT COUNT(*) FROM (SELECT NOME FROM T GROUP BY NOME LIMIT 0) x) AS z5e;

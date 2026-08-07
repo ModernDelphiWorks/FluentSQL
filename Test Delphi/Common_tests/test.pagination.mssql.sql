@@ -235,3 +235,168 @@ GO
   concatenado depois. Defeito de composicao UNION x OrderBy, independente de
   paginacao. NAO corrigido na T10.
 */
+
+/*
+  ==============================================================================
+  PARTE Z - First(0): "me devolva ZERO linhas"
+
+  TFluentSQLPagination declara que First(0) e pedido LEGITIMO e distinto de "sem
+  First". A primeira versao da T10 nao tinha teste para isso e introduziu uma
+  REGRESSAO: passou a emitir FETCH NEXT 0 ROWS ONLY, que o motor recusa, onde a
+  base 79450e9 emitia ROWNUMBER <= 0, valido.
+  ==============================================================================
+*/
+
+PRINT '=== Z1: FETCH NEXT 0 - o que a 1a versao da T10 emitia [REGRESSAO] ===';
+GO
+SELECT * FROM T ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 0 ROWS ONLY;
+GO
+/*
+  SAIDA BRUTA:
+    Msg 10744, Level 15, State 1, Line 1
+    The number of rows provided for a FETCH clause must be greater then zero.
+*/
+
+PRINT '=== Z2: o mesmo pedido na forma da base 79450e9 ===';
+GO
+SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER FROM T) AS T WHERE (ROWNUMBER <= 0);
+GO
+/* SAIDA: 0 linhas, sem erro. Confirma que Z1 e regressao, nao defeito herdado. */
+
+PRINT '=== Z3: a restricao e do LITERAL, nao da semantica ===';
+GO
+DECLARE @n BIGINT = 0;
+SELECT ID FROM T ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT @n ROWS ONLY;
+GO
+/*
+  SAIDA: 0 linhas, SEM ERRO.
+
+  LEITURA: o mesmo FETCH com zero e aceito quando o contador vem de variavel.
+  "Zero linhas" e pedido legitimo para o motor; o que nao existe e a forma
+  LITERAL de escreve-lo. Como o FluentSQL emite literais, precisa de outro
+  caminho - dai os candidatos abaixo.
+*/
+
+PRINT '=== Z4: CANDIDATO RECUSADO - TOP 0 nao coexiste com OFFSET ===';
+GO
+SELECT TOP 0 * FROM T ORDER BY (SELECT NULL) OFFSET 20 ROWS;
+GO
+/*
+  SAIDA BRUTA:
+    Msg 10741, Level 15, State 2, Line 1
+    A TOP can not be used in the same query or sub-query as a OFFSET.
+*/
+
+PRINT '=== Z5: CANDIDATO RECUSADO - TOP 0 num UNION limita so o PRIMEIRO RAMO ===';
+GO
+SELECT TOP 0 * FROM T UNION SELECT * FROM U;
+GO
+/*
+  SAIDA BRUTA: 60 linhas - a tabela U INTEIRA.
+
+  LEITURA: e por isto que "SELECT TOP 0", a forma obvia e a mais barata, foi
+  recusada. Ela acerta em quase todas as combinacoes e ERRA no UNION, devolvendo
+  dados onde o usuario pediu nada. Forma que erra numa combinacao nao serve para
+  uma API que promete a mesma semantica nos sete dialetos. Alem disso o TOP mora
+  na clausula SELECT, o que devolveria ao TFluentSQLSelectMSSQL o conhecimento
+  da paginacao que a T10 tirou de la - foi esse acoplamento que fazia UNION e
+  CTE sumirem em silencio.
+*/
+
+PRINT '=== Z6: CANDIDATO RECUSADO - FETCH NEXT (SELECT 0) so vale com OFFSET 0 ===';
+GO
+SELECT ID FROM T ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT (SELECT 0) ROWS ONLY;
+GO
+SELECT ID FROM T ORDER BY (SELECT NULL) OFFSET 20 ROWS FETCH NEXT (SELECT 0) ROWS ONLY;
+GO
+/*
+  SAIDA BRUTA:
+    primeiro -> 0 linhas, sem erro
+    segundo  -> Msg 10744, The number of rows provided for a FETCH clause must
+                be greater then zero.
+
+  LEITURA: aceito E barato (0 leituras logicas), mas SO quando o OFFSET e o
+  literal 0. Com OFFSET 1, 20 ou (SELECT 20) volta a dar Msg 10744. Como
+  First(0) tem que valer junto com Skip(n), tambem nao serve.
+*/
+
+PRINT '=== Z7: FORMA ESCOLHIDA - OFFSET 2^63-1 ROWS ===';
+GO
+SELECT ID FROM T ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS;
+GO
+/* SAIDA: 0 linhas. */
+
+PRINT '=== Z8: 2^63 e recusado - prova de que 2^63-1 e o teto ===';
+GO
+SELECT ID FROM T ORDER BY (SELECT NULL) OFFSET 9223372036854775808 ROWS;
+GO
+/*
+  SAIDA BRUTA:
+    Msg 8115, Level 16, State 2, Line 1
+    Arithmetic overflow error converting expression to data type bigint.
+*/
+
+PRINT '=== Z9: O PRECO da forma escolhida, em tabela de 200 mil linhas ===';
+GO
+IF OBJECT_ID('dbo.BIG') IS NOT NULL DROP TABLE dbo.BIG;
+SELECT TOP (200000) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS ID INTO dbo.BIG
+FROM sys.all_objects a CROSS JOIN sys.all_objects b;
+GO
+SET STATISTICS IO ON;
+GO
+SELECT ID FROM BIG ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS;
+GO
+SELECT TOP 0 ID FROM BIG;
+GO
+SET STATISTICS IO OFF;
+GO
+/*
+  SAIDA BRUTA:
+    OFFSET 2^63-1 -> Table 'BIG'. Scan count 1, logical reads 767, ...
+    TOP 0         -> Table 'BIG'. Scan count 0, logical reads 0, ...
+
+  LEITURA HONESTA: a forma escolhida CUSTA uma varredura completa - o motor le
+  para contar o que pula; o TOP 0 curto-circuita. O preco foi aceito em troca de
+  correcao uniforme (Z4 e Z5) e vale so para First(0), pedido degenerado. Se um
+  dia o custo pesar, o caminho e TOP 0 COM excecao para UNION: duas formas para
+  o mesmo pedido, que e justamente o que se evitou aqui.
+*/
+
+PRINT '=== Z10: a forma escolhida em TODAS as combinacoes ===';
+GO
+SELECT * FROM T WHERE (ATIVO = 1) ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS;
+SELECT * FROM T ORDER BY NOME ASC OFFSET 9223372036854775807 ROWS;
+SELECT DISTINCT NOME FROM T ORDER BY 1 OFFSET 9223372036854775807 ROWS;
+SELECT * FROM T UNION SELECT * FROM U ORDER BY 1 OFFSET 9223372036854775807 ROWS;
+SELECT NOME FROM T GROUP BY NOME ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS;
+WITH CTE AS (SELECT * FROM T) SELECT ID FROM CTE ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS;
+GO
+/* SAIDA: (0 rows affected) nas seis. */
+
+PRINT '=== Z11: Skip(0) e First(10)+Skip(0) - inalterados e corretos ===';
+GO
+SELECT * FROM T ORDER BY (SELECT NULL) OFFSET 0 ROWS;
+GO
+/* SAIDA: 60 linhas. Skip(0) e "nao pule nada", nao "sem Skip". */
+SELECT * FROM T ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY;
+GO
+/* SAIDA: 10 linhas. */
+
+/*
+  ==============================================================================
+  ARMADILHA DE MEDICAO, para quem repetir este arquivo
+
+  NAO conte linhas embrulhando a consulta em "SELECT COUNT(*) FROM (...) z"
+  quando ela tiver UNION. Medido:
+
+    SELECT COUNT(*) FROM (SELECT * FROM T UNION SELECT * FROM U
+                          ORDER BY 1 OFFSET 9223372036854775807 ROWS) z;  -> 60
+    SELECT * FROM T UNION SELECT * FROM U
+                          ORDER BY 1 OFFSET 9223372036854775807 ROWS;     ->  0
+
+  Dentro da subconsulta o T-SQL liga o ORDER BY/OFFSET ao SEGUNDO RAMO do UNION,
+  nao ao conjunto. O embrulho MENTE; vale a execucao direta. O mesmo embrulho
+  com OFFSET 20 FETCH 3 devolve 63 em vez de 3. Este erro de medicao chegou a
+  produzir um falso negativo durante a T10.
+  ==============================================================================
+*/

@@ -65,7 +65,11 @@ type
     ///     nao emitir paginacao nenhuma.
     ///
     ///   Todas as medicoes, com o docker run e a saida bruta:
-    ///   Test Delphi\Common_tests\test.pagination.filter.mssql.sql.
+    ///   Test Delphi\Common_tests\test.pagination.mssql.sql - Msg 102 no caso L,
+    ///   Msg 145 no E, Msg 104 no G, e os dois planos lado a lado no caso S.
+    ///   NAO confundir com test.pagination.filter.mssql.sql, que e o oraculo da
+    ///   T9 e mede outra coisa (a sobrevivencia do predicado); la nao ha caso L,
+    ///   nem E, nem G.
     /// </summary>
     function PaginationOrderBy(const AAST: IFluentSQLAST): String;
   public

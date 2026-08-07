@@ -153,7 +153,20 @@ procedure TTestFluentSQLSelectDB2.TestSelectPagingDB2;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY ID_CLIENTE ASC) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE';
+  // ESTE TESTE CONTINUA VERMELHO, E DE PROPOSITO - mesmo tratamento dado ao
+  // TestSelectPagingOracle de Oracle_tests\test.select.Oracle.pas, e pelo mesmo
+  // motivo. Ele e um dos 23 vermelhos pre-existentes deste projeto: espera
+  // "ORDER BY ID_CLIENTE" e o framework emite "ORDER BY ID_CLIENTE ASC", assert
+  // da era pre-parametrizacao. Corrigir isso e decisao de convencao do dono.
+  //
+  // (O nome diz DB2 mas a consulta e montada com dbnMSSQL - a divergencia entre
+  // nome e dialeto ja existia e nao foi tocada aqui.)
+  //
+  // O QUE A T10 MUDOU: so a FORMA da paginacao, ROW_NUMBER() -> OFFSET/FETCH.
+  // Sem atualizar esta linha o teste passaria a falhar por DOIS motivos e o
+  // vermelho pre-existente deixaria de ser rastreavel; com ela, o unico motivo
+  // que resta e o de sempre, o ASC.
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE OFFSET 3 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All

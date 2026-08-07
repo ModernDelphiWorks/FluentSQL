@@ -115,3 +115,26 @@ SELECT FIRST 3 SKIP 20 * FROM T UNION SELECT * FROM U;
   a forma emitida pelo Firebird, e o escopo da tarefa era explicito em nao mexer
   na forma deste driver. Fica registrado como achado.
 */
+
+/*
+  ==============================================================================
+  PARTE Z - First(0) e Skip(0)
+
+  FIRST 0 devolve zero linhas no Firebird, sem tratamento especial - mais um
+  ponto a favor de nao ter migrado este driver para OFFSET/FETCH.
+  ==============================================================================
+*/
+
+/* Z1 First(0)                 -> 0  */
+SELECT COUNT(*) FROM (SELECT FIRST 0 * FROM T);
+/* Z2 Skip(0): "nao pule nada" -> 60 */
+SELECT COUNT(*) FROM (SELECT SKIP 0 * FROM T);
+/* Z3 First(0)+Skip(20)        -> 0  */
+SELECT COUNT(*) FROM (SELECT FIRST 0 SKIP 20 * FROM T);
+/* Z4 First(10)+Skip(0)        -> 10 */
+SELECT COUNT(*) FROM (SELECT FIRST 10 SKIP 0 * FROM T);
+/* Z5 First(0) nas combinacoes -> 0 nas quatro */
+SELECT COUNT(*) FROM (SELECT FIRST 0 * FROM T WHERE (ATIVO = 1));
+SELECT COUNT(*) FROM (SELECT FIRST 0 * FROM T ORDER BY NOME ASC);
+SELECT COUNT(*) FROM (SELECT FIRST 0 DISTINCT NOME FROM T);
+SELECT COUNT(*) FROM (SELECT FIRST 0 NOME FROM T GROUP BY NOME);

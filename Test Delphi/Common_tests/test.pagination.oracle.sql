@@ -226,3 +226,41 @@ SELECT ID FROM (SELECT T.*, ROWNUM AS ROWINI FROM (SELECT * FROM T) T) WHERE ROW
 /* SAIDA: 21 22 23 */
 
 EXIT
+
+/*
+  ==============================================================================
+  PARTE Z - First(0) e Skip(0)
+
+  A Oracle e um dos CINCO dialetos em que First(0) ja funcionava e nao precisou
+  de nada: o row_limiting_clause aceita zero literal. Esta parte existe para
+  travar isso, porque foi a AUSENCIA de teste de First(0) que deixou passar uma
+  regressao no MSSQL - la "FETCH NEXT 0 ROWS ONLY" e Msg 10744.
+
+  Medido nesta versao (23.26.2.0.0), com execucao direta:
+  ==============================================================================
+*/
+
+PROMPT
+PROMPT === Z1 First(0) ===
+SELECT COUNT(*) FROM (SELECT * FROM T FETCH NEXT 0 ROWS ONLY);
+/* SAIDA: 0 */
+
+PROMPT === Z2 Skip(0) - "nao pule nada", nao "sem Skip" ===
+SELECT COUNT(*) FROM (SELECT * FROM T OFFSET 0 ROWS);
+/* SAIDA: 60 */
+
+PROMPT === Z3 First(0)+Skip(20) - os DOIS numeros sobrevivem ===
+SELECT COUNT(*) FROM (SELECT * FROM T OFFSET 20 ROWS FETCH NEXT 0 ROWS ONLY);
+/* SAIDA: 0.  Compare com o MSSQL, que precisa ABSORVER o 20 no "pula tudo". */
+
+PROMPT === Z4 First(10)+Skip(0) ===
+SELECT COUNT(*) FROM (SELECT * FROM T OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY);
+/* SAIDA: 10 */
+
+PROMPT === Z5 First(0) nas combinacoes ===
+SELECT COUNT(*) FROM (SELECT * FROM T WHERE (ATIVO = 1) FETCH NEXT 0 ROWS ONLY);
+SELECT COUNT(*) FROM (SELECT * FROM T ORDER BY NOME ASC FETCH NEXT 0 ROWS ONLY);
+SELECT COUNT(*) FROM (SELECT DISTINCT NOME FROM T FETCH NEXT 0 ROWS ONLY);
+SELECT COUNT(*) FROM (SELECT ID FROM T UNION SELECT ID FROM U FETCH NEXT 0 ROWS ONLY);
+SELECT COUNT(*) FROM (SELECT NOME FROM T GROUP BY NOME FETCH NEXT 0 ROWS ONLY);
+/* SAIDA: 0 nas cinco. */
