@@ -221,7 +221,11 @@ procedure TTestFluentSQLFunctionsOracle.TestDate;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE TO_DATE(NASCTO, ''dd/MM/yyyy'') = TO_DATE(''02/11/2020'', ''dd/MM/yyyy'')';
+  // Sob a convencao vigente o lado direito e parametrizado, igual ao irmao
+  // Firebird (test.functions.firebird.pas). A lib hoje emite
+  // "= :p1 TO_DATE('02/11/2020', 'dd/MM/yyyy')" -- placeholder e expressao
+  // justapostos, SQL invalido. Este e o alvo que a T6 tem que atingir.
+  LAsString := 'SELECT * FROM CLIENTES WHERE TO_DATE(NASCTO, ''dd/MM/yyyy'') = :p1';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnOracle)
                                  .Select
                                  .All

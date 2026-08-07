@@ -186,6 +186,7 @@
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

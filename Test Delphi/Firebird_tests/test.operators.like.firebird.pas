@@ -14,24 +14,31 @@ type
     [TearDown]
     procedure TearDown;
 
+    // Estes seis usam Assert.AreEqual(string, string), que e CASE-INSENSITIVE por
+    // default no DUnitX (DUnitX.Assert.pas:1294-1296 delega a fIgnoreCaseDefault,
+    // inicializado true em :1366-1369). Logo cobrem ESTRUTURA e SEMANTICA do
+    // operador (LIKE vs NOT LIKE, valor parametrizado), nao a caixa. Passam hoje.
     [Test]
-    [Ignore('T6: LIKE/NOT LIKE sao emitidos em minusculo (NOME like :p1). Assert mantem o SQL correto.')]
     procedure TestLikeFull;
     [Test]
-    [Ignore('T6: LIKE/NOT LIKE sao emitidos em minusculo (NOME like :p1). Assert mantem o SQL correto.')]
     procedure TestLikeRight;
     [Test]
-    [Ignore('T6: LIKE/NOT LIKE sao emitidos em minusculo (NOME like :p1). Assert mantem o SQL correto.')]
     procedure TestLikeLeft;
     [Test]
-    [Ignore('T6: LIKE/NOT LIKE sao emitidos em minusculo (NOME like :p1). Assert mantem o SQL correto.')]
     procedure TestNotLikeFull;
     [Test]
-    [Ignore('T6: LIKE/NOT LIKE sao emitidos em minusculo (NOME like :p1). Assert mantem o SQL correto.')]
     procedure TestNotLikeRight;
     [Test]
-    [Ignore('T6: LIKE/NOT LIKE sao emitidos em minusculo (NOME like :p1). Assert mantem o SQL correto.')]
     procedure TestNotLikeLeft;
+
+    // A caixa do operador exige comparacao case-sensitive explicita. Estes dois
+    // sao os unicos que caem com o defeito de caixa -- e por isso os unicos [Ignore].
+    [Test]
+    [Ignore('T6: o operador LIKE e emitido em minusculo (NOME like :p1).')]
+    procedure TestLikeFull_CaseSensitive_EmitsUppercaseLIKE;
+    [Test]
+    [Ignore('T6: o operador NOT LIKE e emitido em minusculo (NOME not like :p1).')]
+    procedure TestNotLikeFull_CaseSensitive_EmitsUppercaseNOTLIKE;
 
    end;
 
@@ -128,6 +135,33 @@ begin
                                  .From('CLIENTES')
                                  .Where('NOME').NotLikeRight('VALUE')
                                  .AsString);
+end;
+
+procedure TTestFluentSQLOperatorsLike.TestLikeFull_CaseSensitive_EmitsUppercaseLIKE;
+var
+  LAsString : String;
+begin
+  LAsString := 'SELECT * FROM CLIENTES WHERE (NOME LIKE :p1)';
+  // ignoreCase = False: unico assert da suite que trava a CAIXA do operador.
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+                                 .Select
+                                 .All
+                                 .From('CLIENTES')
+                                 .Where('NOME').LikeFull('VALUE')
+                                 .AsString, False);
+end;
+
+procedure TTestFluentSQLOperatorsLike.TestNotLikeFull_CaseSensitive_EmitsUppercaseNOTLIKE;
+var
+  LAsString : String;
+begin
+  LAsString := 'SELECT * FROM CLIENTES WHERE (NOME NOT LIKE :p1)';
+  Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
+                                 .Select
+                                 .All
+                                 .From('CLIENTES')
+                                 .Where('NOME').NotLikeFull('VALUE')
+                                 .AsString, False);
 end;
 
 initialization

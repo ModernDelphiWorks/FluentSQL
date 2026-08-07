@@ -16,7 +16,6 @@ type
     [Test]
     procedure TestIdentity_Oracle_ByDefault_GeneratesExpected;
     [Test]
-    [Ignore('T6: Oracle envolve o MODIFY em parenteses (MODIFY ("ID" ...)) para alteracao de coluna unica.')]
     procedure TestIdentity_AlterTableAlter_Oracle_GeneratesExpected;
   end;
 
@@ -64,7 +63,9 @@ begin
   LSql := FluentSQL.Schema(dbnOracle).Table('LOGS').Alter.Column('ID')
     .Identity(disAlways)
     .AsString;
-  Assert.AreEqual('ALTER TABLE "LOGS" MODIFY "ID" GENERATED ALWAYS AS IDENTITY', LSql);
+  // Oracle aceita MODIFY col ... e MODIFY (col ...); a lib emite a forma com
+  // parenteses, valida tambem para coluna unica. Nao e defeito.
+  Assert.AreEqual('ALTER TABLE "LOGS" MODIFY ("ID" GENERATED ALWAYS AS IDENTITY)', LSql);
 end;
 
 initialization
