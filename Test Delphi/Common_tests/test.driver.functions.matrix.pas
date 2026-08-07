@@ -40,8 +40,10 @@
   dialeto. Isso nao e evidencia de que o SQL gerado seja valido naquele motor.
 
   A tabela NAO detecta divergencia de dialeto no padrao A. Foi exatamente esse o
-  buraco por onde CEIL(...) chegou ao MSSQL e LENGTH(...) ao Firebird; o conserto
-  foi mover as duas para o padrao B, nao ajustar teste. Caso vivo hoje: no
+  buraco por onde passaram TRES celulas erradas: CEIL(...) no MSSQL (T-SQL so tem
+  CEILING), LENGTH(...) no MSSQL (T-SQL usa LEN) e LENGTH(...) no Firebird (que
+  usa CHAR_LENGTH). O conserto foi mover Ceil e Length para o padrao B, nao
+  ajustar teste. Caso vivo hoje: no
   MongoDB, Abs/Cast/Upper/Lower/Round/Floor nao levantam e mesmo assim produzem
   MQL invalido - a coluna e descartada em silencio (ver o comentario da linha
   dbnMongoDB na tabela, e a divida no CHANGELOG). Suspeita de divergencia numa
