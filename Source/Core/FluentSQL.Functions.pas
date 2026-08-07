@@ -76,7 +76,43 @@ implementation
 
 uses FluentSQL;
 
-{ TFluentSQLFunctions }
+{ TFluentSQLFunctions
+
+  ============================================================================
+  DOIS PADROES CONVIVEM AQUI. LEIA ANTES DE ADICIONAR UMA FUNCAO NOVA.
+  ============================================================================
+
+  PADRAO A - o core emite SQL ANSI direto, sem consultar o driver.
+    Ex.: Result := 'COUNT(' + AValue + ')';
+    Use APENAS quando a forma ANSI for comprovadamente valida nos 7 dialetos
+    ativos (Firebird, MSSQL, MySQL, SQLite, Oracle, PostgreSQL, MongoDB).
+    Hoje em A: Count, Sum, Min, Max, Average, Abs, Upper, Lower, Cast, Round,
+               Floor.
+    Custo de manutencao: zero. Risco: se um dialeto divergir, o core emite SQL
+    invalido EM SILENCIO - foi exatamente o que aconteceu com CEIL no MSSQL.
+
+  PADRAO B - o core delega ao driver registrado.
+    Ex.: Result := FRegister.Functions(FDatabase).Trim(AValue);
+    Obrigatorio sempre que UM dialeto que seja divirja da forma ANSI.
+    Hoje em B: Length, Ceil, Trim, LTrim, RTrim, SubString, Concat, Coalesce,
+               Date, Day, Month, Year, CurrentDate, CurrentTimestamp, Modulus.
+
+  ADICIONAR UMA FUNCAO NO PADRAO B custa 6 pontos de toque, TODOS obrigatorios:
+    1. FluentSQL.Interfaces.pas ......... assinatura em IFluentSQLFunctions
+    2. FluentSQL.FunctionsAbstract.pas .. virtual + corpo que levanta
+    3. FluentSQL.Functions.pas .......... override delegando ao FRegister
+    4. CADA Source\Drivers\FluentSQL.Functions*.pas ... implementacao real
+    5. FluentSQL.pas .................... metodo publico (_AssertSection/_AssertHaveName)
+    6. MongoDB ......................... ver nota abaixo
+
+  Pular o item 4 compila limpo e explode em EAbstractError na primeira consulta.
+
+  NOTA MONGODB: TFluentSQLFunctionsMongoDB NAO deve emitir MQL para funcoes
+  escalares. O FluentSQL.SerializeMongoDB.pas so sabe consumir nome de campo e
+  os prefixos de agregacao ('AGG:' e as formas ANSI 'SUM('/'COUNT('/...). Um
+  documento MQL do tipo $toUpper devolvido daqui seria tratado como nome de
+  campo e viraria MQL invalido em silencio. Por isso as escalares levantam
+  EFluentSQLFunctionNotSupported: erro honesto e melhor que MQL indefensavel. }
 
 constructor TFluentSQLFunctions.Create(const ADatabase: TFluentSQLDriver;
   const ARegister: TFluentSQLRegister);
@@ -136,9 +172,10 @@ begin
   Result := 'LOWER(' + AValue + ')';
 end;
 
+// PADRAO B: nao ha forma ANSI unica. MSSQL usa LEN, Firebird usa CHAR_LENGTH.
 function TFluentSQLFunctions.Length(const AValue: String): String;
 begin
-  Result := 'LENGTH(' + AValue + ')';
+  Result := FRegister.Functions(FDatabase).Length(AValue);
 end;
 
 function TFluentSQLFunctions.Trim(const AValue: String): String;
@@ -226,9 +263,10 @@ begin
   Result := 'FLOOR(' + AValue + ')';
 end;
 
+// PADRAO B: T-SQL nao tem CEIL, so CEILING.
 function TFluentSQLFunctions.Ceil(const AValue: String): String;
 begin
-  Result := 'CEIL(' + AValue + ')';
+  Result := FRegister.Functions(FDatabase).Ceil(AValue);
 end;
 
 function TFluentSQLFunctions.Schema(const AName: string): IFluentSQLSchemaBuilder;

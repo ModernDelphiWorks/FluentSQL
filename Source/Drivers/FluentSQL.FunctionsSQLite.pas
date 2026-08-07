@@ -34,6 +34,15 @@ type
     function Month(const AValue: String): String; override;
     function Year(const AValue: String): String; override;
     function Concat(const AValue: array of String): String; override;
+    function Length(const AValue: String): String; override;
+    function Trim(const AValue: String): String; override;
+    function LTrim(const AValue: String): String; override;
+    function RTrim(const AValue: String): String; override;
+    function Coalesce(const AValues: array of String): String; override;
+    function CurrentDate: String; override;
+    function CurrentTimestamp: String; override;
+    function Ceil(const AValue: String): String; override;
+    function Modulus(const AValue, ADivisor: String): String; override;
   end;
 
 implementation
@@ -96,6 +105,67 @@ end;
 function TFluentSQLFunctionsSQLite.Year(const AValue: String): String;
 begin
   Result := 'STRFTIME(%Y, ' + AValue + ')';
+end;
+
+// LENGTH, TRIM, LTRIM, RTRIM e COALESCE sao funcoes do core do SQLite,
+// disponiveis em qualquer build.
+function TFluentSQLFunctionsSQLite.Length(const AValue: String): String;
+begin
+  Result := 'LENGTH(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsSQLite.Trim(const AValue: String): String;
+begin
+  Result := 'TRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsSQLite.LTrim(const AValue: String): String;
+begin
+  Result := 'LTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsSQLite.RTrim(const AValue: String): String;
+begin
+  Result := 'RTRIM(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsSQLite.Coalesce(const AValues: array of String): String;
+var
+  LFor: Integer;
+begin
+  Result := 'COALESCE(';
+  for LFor := Low(AValues) to High(AValues) do
+  begin
+    Result := Result + AValues[LFor];
+    if LFor < High(AValues) then
+      Result := Result + ', ';
+  end;
+  Result := Result + ')';
+end;
+
+// CURRENT_DATE / CURRENT_TIMESTAMP sao palavras-chave do SQLite (UTC).
+function TFluentSQLFunctionsSQLite.CurrentDate: String;
+begin
+  Result := 'CURRENT_DATE';
+end;
+
+function TFluentSQLFunctionsSQLite.CurrentTimestamp: String;
+begin
+  Result := 'CURRENT_TIMESTAMP';
+end;
+
+// ATENCAO: CEIL/CEILING no SQLite exigem 3.35.0+ compilado com
+// SQLITE_ENABLE_MATH_FUNCTIONS. Mesma condicao que ja vale para FLOOR e para o
+// comportamento anterior deste driver, entao nao ha regressao aqui.
+function TFluentSQLFunctionsSQLite.Ceil(const AValue: String): String;
+begin
+  Result := 'CEIL(' + AValue + ')';
+end;
+
+// SQLite tem o operador % no core (nao tem MOD()).
+function TFluentSQLFunctionsSQLite.Modulus(const AValue, ADivisor: String): String;
+begin
+  Result := '(' + AValue + ' % ' + ADivisor + ')';
 end;
 
 end.

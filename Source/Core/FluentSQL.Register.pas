@@ -43,14 +43,8 @@ type
     {$IFDEF INTERBASE}procedure _RegisterInterbase;{$ENDIF}
     {$IFDEF DB2}procedure _RegisterDB2;{$ENDIF}
     {$IFDEF ORACLE}procedure _RegisterOracle;{$ENDIF}
-    {$IFDEF INFORMIX}procedure _RegisterInformix;{$ENDIF}
     {$IFDEF POSTGRESQL}procedure _RegisterPostgreSQL;{$ENDIF}
-    {$IFDEF ADS}procedure _RegisterADS;{$ENDIF}
-    {$IFDEF ASA}procedure _RegisterASA;{$ENDIF}
-    {$IFDEF ABSOLUTEDB}procedure _RegisterAbsoluteDB;{$ENDIF}
     {$IFDEF MONGODB}procedure _RegisterMongoDB;{$ENDIF}
-    {$IFDEF ELEVATEDB}procedure _RegisterElevateDB;{$ENDIF}
-    {$IFDEF NEXUSDB}procedure _RegisterNexusDB;{$ENDIF}
   public
     constructor Create;
     destructor Destroy; override;
@@ -76,21 +70,21 @@ uses
   {$IFDEF INTERBASE}FluentSQL.SerializeInterbase, FluentSQL.SelectInterbase, FluentSQL.FunctionsInterbase,{$ENDIF}
   {$IFDEF DB2}FluentSQL.SerializeDB2, FluentSQL.SelectDB2, FluentSQL.FunctionsDB2,{$ENDIF}
   {$IFDEF ORACLE}FluentSQL.SerializeOracle, FluentSQL.Select.Oracle, FluentSQL.FunctionsOracle, FluentSQL.DDL.Serialize.Oracle,{$ENDIF}
-  {$IFDEF INFORMIX}FluentSQL.SerializeInformix, FluentSQL.SelectInformix, FluentSQL.FunctionsInformix,{$ENDIF}
   {$IFDEF POSTGRESQL}FluentSQL.SerializePostgreSQL, FluentSQL.Select.PostgreSQL, FluentSQL.FunctionsPostgreSQL, FluentSQL.DDL.Serialize.PostgreSQL,{$ENDIF}
-  {$IFDEF ADS}FluentSQL.SerializeADS, FluentSQL.SelectADS, FluentSQL.FunctionsADS,{$ENDIF}
-  {$IFDEF ASA}FluentSQL.SerializeASA, FluentSQL.SelectASA, FluentSQL.FunctionsASA,{$ENDIF}
-  {$IFDEF ABSOLUTEDB}FluentSQL.SerializeAbsoluteDB, FluentSQL.SelectAbsoluteDB, FluentSQL.FunctionsAbsoluteDB,{$ENDIF}
   {$IFDEF MONGODB}FluentSQL.SerializeMongoDB, FluentSQL.SelectMongoDB, FluentSQL.FunctionsMongoDB, FluentSQL.DDL.Serialize.MongoDB,{$ENDIF}
-  {$IFDEF ELEVATEDB}FluentSQL.SerializeElevateDB, FluentSQL.SelectElevateDB, FluentSQL.FunctionsElevateDB,{$ENDIF}
-  {$IFDEF NEXUSDB}FluentSQL.SerializeNexusDB, FluentSQL.SelectNexusDB, FluentSQL.FunctionsNexusDB,{$ENDIF}
   FluentSQL.Utils;
 
 const
-  TStrDBEngineName: array[dbnMSSQL..dbnNexusDB] of string = (
+  /// <summary>
+  ///   Nome de cada dialeto, na MESMA ordem do enum TFluentSQLDriver. O indice e
+  ///   posicional: desalinhar aqui faz o Register devolver o driver errado, em
+  ///   silencio. Declarado como array[TFluentSQLDriver] (e nao array[dbnA..dbnZ])
+  ///   de proposito: assim qualquer membro adicionado ou removido do enum quebra
+  ///   a compilacao com E2072 ate ser refletido nesta lista.
+  /// </summary>
+  TStrDBEngineName: array[TFluentSQLDriver] of string = (
     'MSSQL', 'MySQL', 'Firebird', 'SQLite', 'Interbase', 'DB2',
-    'Oracle', 'Informix', 'PostgreSQL', 'ADS', 'ASA', 'AbsoluteDB',
-    'MongoDB', 'ElevateDB', 'NexusDB'
+    'Oracle', 'PostgreSQL', 'MongoDB'
   );
 
 constructor TFluentSQLRegister.Create;
@@ -140,14 +134,8 @@ begin
   {$IFDEF INTERBASE}_RegisterInterbase;{$ENDIF}
   {$IFDEF DB2}_RegisterDB2;{$ENDIF}
   {$IFDEF ORACLE}_RegisterOracle;{$ENDIF}
-  {$IFDEF INFORMIX}_RegisterInformix;{$ENDIF}
   {$IFDEF POSTGRESQL}_RegisterPostgreSQL;{$ENDIF}
-  {$IFDEF ADS}_RegisterADS;{$ENDIF}
-  {$IFDEF ASA}_RegisterASA;{$ENDIF}
-  {$IFDEF ABSOLUTEDB}_RegisterAbsoluteDB;{$ENDIF}
   {$IFDEF MONGODB}_RegisterMongoDB;{$ENDIF}
-  {$IFDEF ELEVATEDB}_RegisterElevateDB;{$ENDIF}
-  {$IFDEF NEXUSDB}_RegisterNexusDB;{$ENDIF}
 end;
 
 {$IFDEF FIREBIRD}
@@ -218,15 +206,6 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF INFORMIX}
-procedure TFluentSQLRegister._RegisterInformix;
-begin
-  Self.RegisterSerialize(dbnInformix, TFluentSQLSerializeInformix.Create);
-  Self.RegisterSelect(dbnInformix, TIFluentSQLSelectInformix.Create);
-  Self.RegisterFunctions(dbnInformix, TFluentSQLFunctionsInformix.Create);
-end;
-{$ENDIF}
-
 {$IFDEF POSTGRESQL}
 procedure TFluentSQLRegister._RegisterPostgreSQL;
 begin
@@ -234,33 +213,6 @@ begin
   Self.RegisterSelect(dbnPostgreSQL, TFluentSQLSelectPostgreSQL.Create);
   Self.RegisterFunctions(dbnPostgreSQL, TFluentSQLFunctionsPostgreSQL.Create);
   Self.RegisterDDLSerialize(dbnPostgreSQL, TFluentDDLSerializerPostgreSQL.Create);
-end;
-{$ENDIF}
-
-{$IFDEF ADS}
-procedure TFluentSQLRegister._RegisterADS;
-begin
-  Self.RegisterSerialize(dbnADS, TFluentSQLSerializeADS.Create);
-  Self.RegisterSelect(dbnADS, TIFluentSQLSelectADS.Create);
-  Self.RegisterFunctions(dbnADS, TFluentSQLFunctionsADS.Create);
-end;
-{$ENDIF}
-
-{$IFDEF ASA}
-procedure TFluentSQLRegister._RegisterASA;
-begin
-  Self.RegisterSerialize(dbnASA, TFluentSQLSerializeASA.Create);
-  Self.RegisterSelect(dbnASA, TIFluentSQLSelectASA.Create);
-  Self.RegisterFunctions(dbnASA, TFluentSQLFunctionsASA.Create);
-end;
-{$ENDIF}
-
-{$IFDEF ABSOLUTEDB}
-procedure TFluentSQLRegister._RegisterAbsoluteDB;
-begin
-  Self.RegisterSerialize(dbnAbsoluteDB, TFluentSQLSerializeAbsoluteDB.Create);
-  Self.RegisterSelect(dbnAbsoluteDB, TIFluentSQLSelectAbsoluteDB.Create);
-  Self.RegisterFunctions(dbnAbsoluteDB, TFluentSQLFunctionsAbsoluteDB.Create);
 end;
 {$ENDIF}
 
@@ -274,36 +226,26 @@ begin
 end;
 {$ENDIF}
 
-{$IFDEF ELEVATEDB}
-procedure TFluentSQLRegister._RegisterElevateDB;
-begin
-  Self.RegisterSerialize(dbnElevateDB, TFluentSQLSerializeElevateDB.Create);
-  Self.RegisterSelect(dbnElevateDB, TIFluentSQLSelectElevateDB.Create);
-  Self.RegisterFunctions(dbnElevateDB, TFluentSQLFunctionsElevateDB.Create);
-end;
-{$ENDIF}
-
-{$IFDEF NEXUSDB}
-procedure TFluentSQLRegister._RegisterNexusDB;
-begin
-  Self.RegisterSerialize(dbnNexusDB, TFluentSQLSerializeNexusDB.Create);
-  Self.RegisterSelect(dbnNexusDB, TIFluentSQLSelectNexusDB.Create);
-  Self.RegisterFunctions(dbnNexusDB, TFluentSQLFunctionsNexusDB.Create);
-end;
-{$ENDIF}
-
+/// <summary>
+///   ESP-T3: nunca devolve nil. Um dialeto sem funcoes registradas antes voltava
+///   nil e o dereference em FluentSQL.Functions.pas virava EAccessViolation opaca
+///   no consumidor. Agora o erro e nomeado e tratavel.
+/// </summary>
 function TFluentSQLRegister.Functions(const ADriverName: TFluentSQLDriver): IFluentSQLFunctions;
 begin
-  Result := nil;
-  if FCQLFunctions.ContainsKey(TStrDBEngineName[ADriverName]) then
-    Result := FCQLFunctions[TStrDBEngineName[ADriverName]];
+  if not FCQLFunctions.ContainsKey(TStrDBEngineName[ADriverName]) then
+    raise EFluentSQLDriverNotRegistered.Create('As funcoes do banco ' + TStrDBEngineName[ADriverName] +
+      ' nao estao registradas. Ligue o {$DEFINE} correspondente em FluentSQL.inc e ' +
+      'adicione a unit "FluentSQL.Functions???.pas" na clausula USES do seu projeto!');
+
+  Result := FCQLFunctions[TStrDBEngineName[ADriverName]];
 end;
 
 function TFluentSQLRegister.Select(const ADriverName: TFluentSQLDriver): IFluentSQLSelect;
 begin
   Result := nil;
   if not FCQLSelect.ContainsKey(TStrDBEngineName[ADriverName]) then
-    raise Exception.Create('O select do banco ' + TStrDBEngineName[ADriverName] + ' n�o est� registrado, adicione a unit "FluentSQL.Select.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
+    raise EFluentSQLDriverNotRegistered.Create('O select do banco ' + TStrDBEngineName[ADriverName] + ' n�o est� registrado, adicione a unit "FluentSQL.Select.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
 
   Result := FCQLSelect[TStrDBEngineName[ADriverName]];
 end;
@@ -321,11 +263,17 @@ end;
 function TFluentSQLRegister.Serialize(const ADriverName: TFluentSQLDriver): IFluentSQLSerialize;
 begin
   if not FCQLSerialize.ContainsKey(TStrDBEngineName[ADriverName]) then
-    raise Exception.Create('O serialize do banco ' + TStrDBEngineName[ADriverName] + ' n�o est� registrado, adicione a unit "FluentSQL.Serialize.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
+    raise EFluentSQLDriverNotRegistered.Create('O serialize do banco ' + TStrDBEngineName[ADriverName] + ' n�o est� registrado, adicione a unit "FluentSQL.Serialize.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
 
   Result := FCQLSerialize[TStrDBEngineName[ADriverName]];
 end;
 
+/// <summary>
+///   ATENCAO: este getter devolve nil DE PROPOSITO e nao deve virar excecao.
+///   Nenhum _Register* chama RegisterWhere, entao FCQLWhere esta sempre vazio;
+///   FluentSQL.Ast.pas:139-141 testa o nil e cai no TFluentSQLWhere generico.
+///   Fazer isto levantar quebra a construcao de TODA query.
+/// </summary>
 function TFluentSQLRegister.Where(const ADriverName: TFluentSQLDriver): IFluentSQLWhere;
 begin
   Result := nil;

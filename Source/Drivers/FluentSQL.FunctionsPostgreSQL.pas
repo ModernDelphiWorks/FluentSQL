@@ -41,10 +41,8 @@ type
     function CurrentDate: String; override;
     function CurrentTimestamp: String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
-    function Round(const AValue: String; const ADecimals: Integer): String; override;
-    function Floor(const AValue: String): String; override;
+    function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
-    function Abs(const AValue: String): String; override;
   end;
 
 implementation
@@ -153,24 +151,16 @@ begin
   Result := 'MOD(' + AValue + ', ' + ADivisor + ')';
 end;
 
-function TFluentSQLFunctionsPostgreSQL.Round(const AValue: String; const ADecimals: Integer): String;
+// PostgreSQL tem LENGTH e CHAR_LENGTH (equivalentes para tipos texto).
+function TFluentSQLFunctionsPostgreSQL.Length(const AValue: String): String;
 begin
-  Result := 'ROUND(' + AValue + ', ' + IntToStr(ADecimals) + ')';
+  Result := 'LENGTH(' + AValue + ')';
 end;
 
-function TFluentSQLFunctionsPostgreSQL.Floor(const AValue: String): String;
-begin
-  Result := 'FLOOR(' + AValue + ')';
-end;
-
+// PostgreSQL aceita CEIL e CEILING.
 function TFluentSQLFunctionsPostgreSQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEIL(' + AValue + ')';
-end;
-
-function TFluentSQLFunctionsPostgreSQL.Abs(const AValue: String): String;
-begin
-  Result := 'ABS(' + AValue + ')';
 end;
 
 end.

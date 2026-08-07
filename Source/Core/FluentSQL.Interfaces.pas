@@ -21,6 +21,7 @@ unit FluentSQL.Interfaces;
 interface
 
 uses
+  SysUtils,
   System.Classes,
   FluentSQL.Cache.Interfaces;
 
@@ -28,9 +29,29 @@ type
   TExpressionOperation = (opNone, opAND, opOR, opOperation, opFunction);
   TOperator = (opeNone, opeWhere, opeAND, opeOR);
   TOperators = set of TOperator;
+  /// <summary>
+  ///   Dialetos suportados. Todo membro DEVE ter uma implementacao real em
+  ///   Source\Drivers e uma entrada em TStrDBEngineName (FluentSQL.Register.pas),
+  ///   que e declarado como array[TFluentSQLDriver] justamente para que qualquer
+  ///   membro novo quebre a compilacao ate ser nomeado la.
+  /// </summary>
   TFluentSQLDriver = (dbnMSSQL, dbnMySQL, dbnFirebird, dbnSQLite, dbnInterbase, dbnDB2,
-                   dbnOracle, dbnInformix, dbnPostgreSQL, dbnADS, dbnASA,
-                   dbnAbsoluteDB, dbnMongoDB, dbnElevateDB, dbnNexusDB);
+                   dbnOracle, dbnPostgreSQL, dbnMongoDB);
+
+  /// <summary>
+  ///   O dialeto pedido nao tem implementacao registrada. Substitui o retorno
+  ///   nil silencioso que virava EAccessViolation opaca no consumidor.
+  /// </summary>
+  EFluentSQLDriverNotRegistered = class(Exception);
+
+  /// <summary>
+  ///   A funcao existe na API mas o dialeto alvo nao a oferece. Erro honesto e
+  ///   tratavel; e sempre preferivel a emitir SQL/MQL que o motor rejeitaria.
+  /// </summary>
+  EFluentSQLFunctionNotSupported = class(Exception)
+  public
+    constructor Create(const AFunction, ADialect: String); reintroduce;
+  end;
 
   /// <summary>ESP-016: one opt-in fragment registered for a specific engine; not portable SQL.</summary>
   TDialectOnlyFragment = record
@@ -1563,6 +1584,14 @@ type
   end;
 
 implementation
+
+{ EFluentSQLFunctionNotSupported }
+
+constructor EFluentSQLFunctionNotSupported.Create(const AFunction, ADialect: String);
+begin
+  inherited CreateFmt('A funcao "%s" nao existe no dialeto %s. ' +
+    'Use uma expressao equivalente suportada por esse motor.', [AFunction, ADialect]);
+end;
 
 end.
 

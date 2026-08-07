@@ -34,6 +34,8 @@ type
     function Month(const AValue: String): String; override;
     function Year(const AValue: String): String; override;
     function Concat(const AValue: array of String): String; override;
+    function Length(const AValue: String): String; override;
+    function Ceil(const AValue: String): String; override;
   end;
 
 implementation
@@ -96,6 +98,22 @@ end;
 function TFluentSQLFunctionsInterbase.Year(const AValue: String): String;
 begin
   Result := 'EXTRACT(YEAR FROM ' + AValue + ')';
+end;
+
+// Length e Ceil passaram de padrao A para padrao B. Estas duas reproduzem
+// LITERALMENTE o que o core emitia antes para o Interbase, para nao alterar o
+// comportamento de um driver que esta desligado no .inc e que nao consigo
+// exercitar. NAO VERIFIQUEI contra a documentacao do InterBase se LENGTH e CEIL
+// existem nele (o Firebird, de linhagem comum, usa CHAR_LENGTH). Revisar antes
+// de ligar {$DEFINE INTERBASE}.
+function TFluentSQLFunctionsInterbase.Length(const AValue: String): String;
+begin
+  Result := 'LENGTH(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsInterbase.Ceil(const AValue: String): String;
+begin
+  Result := 'CEIL(' + AValue + ')';
 end;
 
 end.

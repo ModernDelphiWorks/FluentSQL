@@ -41,10 +41,8 @@ type
     function CurrentDate: String; override;
     function CurrentTimestamp: String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
-    function Round(const AValue: String; const ADecimals: Integer): String; override;
-    function Floor(const AValue: String): String; override;
+    function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
-    function Abs(const AValue: String): String; override;
   end;
 
 implementation
@@ -157,24 +155,18 @@ begin
   Result := '(' + AValue + ' % ' + ADivisor + ')';
 end;
 
-function TFluentSQLFunctionsMSSQL.Round(const AValue: String; const ADecimals: Integer): String;
+// T-SQL nao tem LENGTH; a funcao de tamanho e LEN (que descarta espacos a
+// direita) - CHAR_LENGTH tambem nao existe.
+function TFluentSQLFunctionsMSSQL.Length(const AValue: String): String;
 begin
-  Result := 'ROUND(' + AValue + ', ' + IntToStr(ADecimals) + ')';
+  Result := 'LEN(' + AValue + ')';
 end;
 
-function TFluentSQLFunctionsMSSQL.Floor(const AValue: String): String;
-begin
-  Result := 'FLOOR(' + AValue + ')';
-end;
-
+// T-SQL nao tem CEIL, so CEILING. Este override existia desde sempre mas era
+// inalcancavel: Ceil estava no padrao A, emitindo CEIL(...) no core.
 function TFluentSQLFunctionsMSSQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEILING(' + AValue + ')';
-end;
-
-function TFluentSQLFunctionsMSSQL.Abs(const AValue: String): String;
-begin
-  Result := 'ABS(' + AValue + ')';
 end;
 
 end.

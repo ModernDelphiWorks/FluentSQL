@@ -55,6 +55,10 @@
 {.$DEFINE FMX}
 
 // Banco de dados utiliza��o
+// Cada simbolo abaixo tem que corresponder a um membro de TFluentSQLDriver
+// (FluentSQL.Interfaces.pas) e a uma implementacao real em Source\Drivers.
+// Informix, ADS, ASA, AbsoluteDB, ElevateDB e NexusDB foram removidos: estavam
+// no enum e no Register sem que as units existissem.
 {$DEFINE FIREBIRD}
 {$DEFINE MSSQL}
 {$DEFINE MYSQL}
@@ -62,14 +66,8 @@
 {.$DEFINE INTERBASE}
 {.$DEFINE DB2}
 {$DEFINE ORACLE}
-{.$DEFINE INFORMIX}
 {$DEFINE POSTGRESQL}
-{.$DEFINE ADS}
-{.$DEFINE ASA}
-{.$DEFINE ABSOLUTEDB}
 {$DEFINE MONGODB}
-{.$DEFINE ELEVATEDB}
-{.$DEFINE NEXUSDB}
 
 
 {$IFDEF FMX}

@@ -41,10 +41,8 @@ type
     function CurrentDate: String; override;
     function CurrentTimestamp: String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
-    function Round(const AValue: String; const ADecimals: Integer): String; override;
-    function Floor(const AValue: String): String; override;
+    function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
-    function Abs(const AValue: String): String; override;
   end;
 
 implementation
@@ -156,24 +154,18 @@ begin
   Result := '(' + AValue + ' % ' + ADivisor + ')';
 end;
 
-function TFluentSQLFunctionsMySQL.Round(const AValue: String; const ADecimals: Integer): String;
+// MySQL tem LENGTH (bytes) e CHAR_LENGTH (caracteres). Mantido LENGTH, que era
+// o que o core ja emitia no padrao A - trocar seria mudanca de comportamento
+// alheia a esta tarefa.
+function TFluentSQLFunctionsMySQL.Length(const AValue: String): String;
 begin
-  Result := 'ROUND(' + AValue + ', ' + IntToStr(ADecimals) + ')';
+  Result := 'LENGTH(' + AValue + ')';
 end;
 
-function TFluentSQLFunctionsMySQL.Floor(const AValue: String): String;
-begin
-  Result := 'FLOOR(' + AValue + ')';
-end;
-
+// MySQL aceita CEIL e CEILING.
 function TFluentSQLFunctionsMySQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEIL(' + AValue + ')';
-end;
-
-function TFluentSQLFunctionsMySQL.Abs(const AValue: String): String;
-begin
-  Result := 'ABS(' + AValue + ')';
 end;
 
 end.

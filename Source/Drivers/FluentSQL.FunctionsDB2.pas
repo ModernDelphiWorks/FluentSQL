@@ -34,6 +34,8 @@ type
     function Month(const AValue: String): String; override;
     function Year(const AValue: String): String; override;
     function Concat(const AValue: array of String): String; override;
+    function Length(const AValue: String): String; override;
+    function Ceil(const AValue: String): String; override;
   end;
 
 implementation
@@ -96,6 +98,18 @@ end;
 function TFluentSQLFunctionsDB2.Year(const AValue: String): String;
 begin
   Result := 'YEAR(' + AVAlue + ')';
+end;
+
+// Length e Ceil passaram de padrao A para padrao B; DB2 tem LENGTH e CEIL
+// (tambem CEILING) como built-ins, entao a saida e identica a que o core emitia.
+function TFluentSQLFunctionsDB2.Length(const AValue: String): String;
+begin
+  Result := 'LENGTH(' + AValue + ')';
+end;
+
+function TFluentSQLFunctionsDB2.Ceil(const AValue: String): String;
+begin
+  Result := 'CEIL(' + AValue + ')';
 end;
 
 end.
