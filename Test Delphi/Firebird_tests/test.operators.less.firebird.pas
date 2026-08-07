@@ -45,7 +45,7 @@ procedure TTestFluentSQLOperatorsLess.TestLessEqualThanFloat;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <= 10.9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <= :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -58,7 +58,7 @@ procedure TTestFluentSQLOperatorsLess.TestLessEqualThanInteger;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <= 10)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <= :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -71,7 +71,7 @@ procedure TTestFluentSQLOperatorsLess.TestLessThanFloat;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR < 10.9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR < :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -84,7 +84,7 @@ procedure TTestFluentSQLOperatorsLess.TestLessThanInteger;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR < 10)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR < :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All

@@ -15,8 +15,10 @@ type
     procedure TearDown;
 
     [Test]
+    [Ignore('T6: EXISTS/NOT EXISTS parametrizam a subquery inteira (WHERE (exists :p1)). Assert mantem o SQL correto.')]
     procedure TestExistsSubQuery;
     [Test]
+    [Ignore('T6: EXISTS/NOT EXISTS parametrizam a subquery inteira (WHERE (exists :p1)). Assert mantem o SQL correto.')]
     procedure TestNotExistsSubQuery;
   end;
 

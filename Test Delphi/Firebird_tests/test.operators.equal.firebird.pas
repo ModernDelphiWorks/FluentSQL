@@ -59,7 +59,7 @@ var
   LAsString : String;
   LDate: TDate;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO = ''12/31/2021'')';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO = :p1)';
   LDate := EncodeDate(2021, 12, 31);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -74,7 +74,7 @@ var
   LAsString : String;
   LDateTime: TDateTime;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO = ''12/31/2021 23:59:59'')';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO = :p1)';
   LDateTime := EncodeDate(2021, 12, 31)+EncodeTime(23, 59, 59, 0);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -88,7 +88,7 @@ procedure TTestFluentSQLOperatorsEqual.TestEqualFloatField;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR = 10.9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -101,7 +101,7 @@ procedure TTestFluentSQLOperatorsEqual.TestEqualIntegerField;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR = 10)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -114,7 +114,7 @@ procedure TTestFluentSQLOperatorsEqual.TestEqualStringField;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (NOME = ''VALUE'')';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (NOME = :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -128,7 +128,7 @@ var
   LAsString : String;
   LDate: TDate;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO <> ''12/31/2021'')';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO <> :p1)';
   LDate := EncodeDate(2021, 12, 31);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -143,7 +143,7 @@ var
   LAsString : String;
   LDateTime: TDateTime;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO <> ''12/31/2021 23:59:59'')';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (DATA_CADASTRO <> :p1)';
   LDateTime := EncodeDate(2021, 12, 31)+EncodeTime(23, 59, 59, 0);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -157,7 +157,7 @@ procedure TTestFluentSQLOperatorsEqual.TestNotEqualFloatField;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <> 10.9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <> :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -170,7 +170,7 @@ procedure TTestFluentSQLOperatorsEqual.TestNotEqualIntegerField;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <> 10)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR <> :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -183,7 +183,7 @@ procedure TTestFluentSQLOperatorsEqual.TestNotEqualStringField;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (NOME <> ''VALUE'')';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (NOME <> :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All

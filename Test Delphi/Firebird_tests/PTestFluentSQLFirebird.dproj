@@ -101,7 +101,22 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="UTestFluentSQLFirebird.pas"/>
+        <DCCReference Include="..\Common_tests\test.core.params.pas"/>
+        <DCCReference Include="test.ddl.firebird.pas"/>
+        <DCCReference Include="test.delete.firebird.pas"/>
+        <DCCReference Include="test.functions.firebird.pas"/>
+        <DCCReference Include="test.insert.firebird.pas"/>
+        <DCCReference Include="test.select.firebird.pas"/>
+        <DCCReference Include="test.update.firebird.pas"/>
+        <DCCReference Include="test.operators.firebird.pas"/>
+        <DCCReference Include="test.operators.equal.firebird.pas"/>
+        <DCCReference Include="test.operators.exists.firebird.pas"/>
+        <DCCReference Include="test.operators.greater.firebird.pas"/>
+        <DCCReference Include="test.operators.isin.firebird.pas"/>
+        <DCCReference Include="test.operators.less.firebird.pas"/>
+        <DCCReference Include="test.operators.like.firebird.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Ast.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Cache.Interfaces.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Cases.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Core.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Delete.pas"/>
@@ -117,6 +132,7 @@
         <DCCReference Include="..\..\Source\Core\FluentSQL.NameValue.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Operators.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.OrderBy.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.Params.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Qualifier.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Register.pas"/>
@@ -124,6 +140,7 @@
         <DCCReference Include="..\..\Source\Core\FluentSQL.Select.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.Serialize.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.DDL.Serialize.pas"/>
+        <DCCReference Include="..\..\Source\Core\FluentSQL.DDL.SerializeAbstract.pas"/>
         <DCCReference Include="..\..\Source\Core\FluentSQL.DDL.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.Firebird.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.MySQL.pas"/>
@@ -136,6 +153,7 @@
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsInterbase.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsMSSQL.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsMySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsMongoDB.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsOracle.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsPostgreSQL.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.FunctionsSQLite.pas"/>
@@ -150,13 +168,13 @@
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.QualifierSQLite.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.SQLite.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectDB2.pas"/>
-        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectFirebird.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.Firebird.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectInterbase.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectMongoDB.pas"/>
-        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectMSSQL.pas"/>
-        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectMySQL.pas"/>
-        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectOracle.pas"/>
-        <DCCReference Include="..\..\Source\Drivers\FluentSQL.SelectPostgreSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.MSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.MySQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.Oracle.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.Select.PostgreSQL.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeDB2.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeFirebird.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeInterbase.pas"/>
@@ -166,6 +184,9 @@
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeOracle.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializePostgreSQL.pas"/>
         <DCCReference Include="..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas"/>
+        <DCCReference Include="..\..\Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

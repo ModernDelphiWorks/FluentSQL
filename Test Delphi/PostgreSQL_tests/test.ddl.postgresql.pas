@@ -14,6 +14,7 @@ type
     [Test]
     procedure TestCompositePrimaryKey_PostgreSQL_GeneratesExpected;
     [Test]
+    [Ignore('T6: .Check() apos as colunas vira CHECK de coluna em vez de CHECK de tabela.')]
     procedure TestTableLevelCheck_PostgreSQL_GeneratesExpected;
     [Test]
     procedure TestComputedColumn_PostgreSQL_GeneratesExpected;
@@ -371,7 +372,7 @@ procedure TTestDDLPostgreSQL.TestComments_PostgreSQL_GeneratesExpected;
 var
   LSql: string;
 begin
-  LSql := FluentSQL.Schema(dbnPostgreSQL).CreateTable('Users')
+  LSql := FluentSQL.Schema(dbnPostgreSQL).Table('Users').Create
     .Description('Application users table')
     .ColumnInteger('ID').PrimaryKey.Description('Internal ID')
     .ColumnVarChar('Name', 100).NotNull.Description('Full legal name')

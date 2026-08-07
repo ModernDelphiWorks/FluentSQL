@@ -45,7 +45,7 @@ procedure TTestFluentSQLOperatorsGreater.TestGreaterEqualThanFloat;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR >= 10.9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR >= :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -58,7 +58,7 @@ procedure TTestFluentSQLOperatorsGreater.TestGreaterEqualThanInteger;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR >= 10)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR >= :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -71,7 +71,7 @@ procedure TTestFluentSQLOperatorsGreater.TestGreaterThanFloat;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR > 10.9)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR > :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All
@@ -84,7 +84,7 @@ procedure TTestFluentSQLOperatorsGreater.TestGreaterThanInteger;
 var
   LAsString : String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR > 10)';
+  LAsString := 'SELECT * FROM CLIENTES WHERE (VALOR > :p1)';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
                                  .All

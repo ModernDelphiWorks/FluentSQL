@@ -63,7 +63,9 @@ begin
   LSql := FluentSQL.Schema(dbnOracle).Table('LOGS').Alter.Column('ID')
     .Identity(disAlways)
     .AsString;
-  Assert.AreEqual('ALTER TABLE "LOGS" MODIFY "ID" GENERATED ALWAYS AS IDENTITY', LSql);
+  // Oracle aceita MODIFY col ... e MODIFY (col ...); a lib emite a forma com
+  // parenteses, valida tambem para coluna unica. Nao e defeito.
+  Assert.AreEqual('ALTER TABLE "LOGS" MODIFY ("ID" GENERATED ALWAYS AS IDENTITY)', LSql);
 end;
 
 initialization

@@ -1,20 +1,33 @@
-program TestFluentSQL_Oracle;
+program TestFluentSQL_Common;
 
 {$IFNDEF TESTINSIGHT}
 {$APPTYPE CONSOLE}
-{$ENDIF}{$STRONGLINKTYPES ON}
+{$ENDIF}
+{$STRONGLINKTYPES ON}
+{$DEFINE FIREBIRD}
+{$DEFINE MSSQL}
+{$DEFINE MYSQL}
+{$DEFINE ORACLE}
+{$DEFINE POSTGRESQL}
+{$DEFINE SQLITE}
 uses
   System.SysUtils,
   {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX,
-  {$ENDIF }
+  {$ELSE}
   DUnitX.Loggers.Console,
   DUnitX.Loggers.Xml.NUnit,
+  {$ENDIF }
   DUnitX.TestFramework,
-  test.functions.oracle in 'test.functions.oracle.pas',
-  test.select.Oracle in 'test.select.Oracle.pas',
-  test.ddl.oracle in 'test.ddl.oracle.pas',
+  test.cache in 'test.cache.pas',
+  test.ddl.identity in 'test.ddl.identity.pas',
+  test.ddl.numeric in 'test.ddl.numeric.pas',
+  test.ddl.procedures in 'test.ddl.procedures.pas',
+  test.ddl.schemas in 'test.ddl.schemas.pas',
+  test.ddl.sequences in 'test.ddl.sequences.pas',
+  test_esp074_unit in 'test_esp074_unit.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
+  FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',
   FluentSQL.Cases in '..\..\Source\Core\FluentSQL.Cases.pas',
   FluentSQL.Core in '..\..\Source\Core\FluentSQL.Core.pas',
   FluentSQL.Delete in '..\..\Source\Core\FluentSQL.Delete.pas',
@@ -40,12 +53,9 @@ uses
   FluentSQL.DDL.Serialize in '..\..\Source\Core\FluentSQL.DDL.Serialize.pas',
   FluentSQL.DDL.SerializeAbstract in '..\..\Source\Core\FluentSQL.DDL.SerializeAbstract.pas',
   FluentSQL.DDL in '..\..\Source\Core\FluentSQL.DDL.pas',
-  FluentSQL.DDL.Serialize.Oracle in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas',
   FluentSQL.DDL.Serialize.Firebird in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Firebird.pas',
-  FluentSQL.DDL.Serialize.MSSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas',
   FluentSQL.DDL.Serialize.MySQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MySQL.pas',
   FluentSQL.DDL.Serialize.PostgreSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.PostgreSQL.pas',
-  FluentSQL.DDL.Serialize.SQLite in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas',
   FluentSQL.Update in '..\..\Source\Core\FluentSQL.Update.pas',
   FluentSQL.Utils in '..\..\Source\Core\FluentSQL.Utils.pas',
   FluentSQL.Where in '..\..\Source\Core\FluentSQL.Where.pas',
@@ -84,17 +94,20 @@ uses
   FluentSQL.SerializeMySQL in '..\..\Source\Drivers\FluentSQL.SerializeMySQL.pas',
   FluentSQL.SerializeOracle in '..\..\Source\Drivers\FluentSQL.SerializeOracle.pas',
   FluentSQL.SerializePostgreSQL in '..\..\Source\Drivers\FluentSQL.SerializePostgreSQL.pas',
-  FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas';
+  FluentSQL.SerializeSQLite in '..\..\Source\Drivers\FluentSQL.SerializeSQLite.pas',
+  FluentSQL.DDL.Serialize.SQLite in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.SQLite.pas',
+  FluentSQL.DDL.Serialize.MSSQL in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.MSSQL.pas',
+  FluentSQL.DDL.Serialize.Oracle in '..\..\Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas';
 
+{ keep comment here to protect the following conditional from being removed by the IDE when adding a unit }
 {$IFNDEF TESTINSIGHT}
 var
-  runner : ITestRunner;
-  results : IRunResults;
-  logger : ITestLogger;
+  runner: ITestRunner;
+  results: IRunResults;
+  logger: ITestLogger;
   nunitLogger : ITestLogger;
 {$ENDIF}
 begin
-  ReportMemoryLeaksOnShutdown := DebugHook <> 0;
 {$IFDEF TESTINSIGHT}
   TestInsight.DUnitX.RunRegisteredTests;
 {$ELSE}
@@ -102,11 +115,16 @@ begin
     TDUnitX.CheckCommandLine;
     runner := TDUnitX.CreateRunner;
     runner.UseRTTI := True;
-    logger := TDUnitXConsoleLogger.Create(true);
-    runner.AddLogger(logger);
+    runner.FailsOnNoAsserts := False;
+
+    if TDUnitX.Options.ConsoleMode <> TDunitXConsoleMode.Off then
+    begin
+      logger := TDUnitXConsoleLogger.Create(TDUnitX.Options.ConsoleMode = TDunitXConsoleMode.Quiet);
+      runner.AddLogger(logger);
+    end;
+    TDUnitX.Options.XMLOutputFile := '.\dunitx-results.xml';
     nunitLogger := TDUnitXXMLNUnitFileLogger.Create(TDUnitX.Options.XMLOutputFile);
     runner.AddLogger(nunitLogger);
-    runner.FailsOnNoAsserts := False;
 
     results := runner.Execute;
     if not results.AllPassed then
@@ -124,5 +142,4 @@ begin
       System.Writeln(E.ClassName, ': ', E.Message);
   end;
 {$ENDIF}
-
 end.
