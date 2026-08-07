@@ -49,7 +49,10 @@ begin
     if LWhere = '' then
       LWhere := TUtils.Concat(['WHERE', '(' + AAST.Select.Qualifiers.SerializePagination + ')'])
     else
-      LWhere := TUtils.Concat([Result, 'AND', '(' + AAST.Select.Qualifiers.SerializePagination + ')']);
+      // O predicado do usuario JA esta em LWhere, com a palavra WHERE incluida.
+      // Encadear a partir de LWhere (e nao de Result, que aqui ainda nem foi
+      // atribuido) e o que preserva o filtro e mantem o WHERE na frente do AND.
+      LWhere := TUtils.Concat([LWhere, 'AND', '(' + AAST.Select.Qualifiers.SerializePagination + ')']);
   end;
   Result := TUtils.Concat([AAST.Select.Serialize,
                            AAST.Delete.Serialize,

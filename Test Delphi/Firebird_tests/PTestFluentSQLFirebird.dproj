@@ -102,6 +102,7 @@
         </DelphiCompile>
         <DCCReference Include="UTestFluentSQLFirebird.pas"/>
         <DCCReference Include="..\Common_tests\test.core.params.pas"/>
+        <DCCReference Include="..\Common_tests\test.pagination.filter.pas"/>
         <DCCReference Include="test.ddl.firebird.pas"/>
         <DCCReference Include="test.delete.firebird.pas"/>
         <DCCReference Include="test.functions.firebird.pas"/>

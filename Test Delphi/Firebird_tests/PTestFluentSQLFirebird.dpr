@@ -23,6 +23,7 @@ uses
   UTestFluentSQLFirebird in 'UTestFluentSQLFirebird.pas',
   test.core.params in '..\Common_tests\test.core.params.pas',
   test.driver.functions.matrix in '..\Common_tests\test.driver.functions.matrix.pas',
+  test.pagination.filter in '..\Common_tests\test.pagination.filter.pas',
   test.ddl.firebird in 'test.ddl.firebird.pas',
   test.delete.firebird in 'test.delete.firebird.pas',
   test.functions.firebird in 'test.functions.firebird.pas',
