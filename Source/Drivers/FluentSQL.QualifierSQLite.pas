@@ -37,25 +37,36 @@ uses
 
 { TFluentSQLSelectQualifiersSQLite }
 
+const
+  /// <summary>
+  ///   No SQLite o OFFSET nao e clausula independente: "the OFFSET clause ... may
+  ///   only follow a LIMIT clause" (sqlite.org/lang_select.html). Skip sem First
+  ///   precisa entao de um LIMIT, e a propria doc define o que significa um LIMIT
+  ///   negativo:
+  ///
+  ///     "If the expression has a negative value, then there is no upper bound
+  ///      on the number of rows returned."
+  ///     https://sqlite.org/lang_select.html
+  ///
+  ///   -1 e o menor negativo e o idioma consagrado. NAO usar a forma com virgula
+  ///   ("LIMIT n, m"): ela existe, mas os operandos vem TROCADOS em relacao a
+  ///   "LIMIT m OFFSET n", e a doc pede para nao usa-la.
+  /// </summary>
+  cSEM_TETO = '-1';
+
+/// <summary>Cauda de paginacao do SQLite: [LIMIT m] [OFFSET n], no FIM da consulta.</summary>
 function TFluentSQLSelectQualifiersSQLite.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
   Result := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['LIMIT', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['OFFSET', IntToStr(FQualifiers[LFor].Value)]);
-      sqDistinct:
-        Continue;
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersSQLite.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  Result := TUtils.Concat([Result, LFirst, LSkip]);
+  LPag := _Pagination('SQLite');
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'LIMIT', IntToStr(LPag.First)])
+  else if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'LIMIT', cSEM_TETO]);
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'OFFSET', IntToStr(LPag.Skip)]);
 end;
 
 end.

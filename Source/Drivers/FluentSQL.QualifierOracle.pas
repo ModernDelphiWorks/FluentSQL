@@ -37,29 +37,37 @@ uses
 
 { TFluentSQLSelectQualifiersOracle }
 
+/// <summary>
+///   Cauda do row_limiting_clause (Oracle 12.1+):
+///   [OFFSET n ROWS] [FETCH NEXT m ROWS ONLY]. Os dois membros sao OPCIONAIS e
+///   independentes na gramatica do SELECT, entao Skip sozinho e First sozinho
+///   saem completos, sem preenchimento artificial - ao contrario do SQL Server,
+///   onde FETCH exige OFFSET.
+///
+///   Substitui o encadeamento ROWNUM/ROWINI que embrulhava a consulta em duas
+///   subconsultas. O que a forma velha fazia de errado, alem de ser mais longa:
+///
+///     1. Skip sem First emitia "...) AND ROWINI > 20" - AND sem WHERE, ORA-00920.
+///     2. "WHERE ROWNUM <= m AND ROWINI > n" depende da ordem em que o otimizador
+///        aplica os predicados, porque ROWNUM so e atribuido a linhas que JA
+///        passaram pelo filtro.
+///     3. O embrulho "SELECT * FROM (SELECT T.*, ...)" quebra com ORA-00918
+///        (column ambiguously defined) sempre que a consulta interna e um join
+///        com nomes de coluna repetidos - defeito que some junto com o embrulho.
+///
+///   A propria doc da Oracle prefere esta forma: o row_limiting_clause "provides
+///   superior support" em relacao ao ROWNUM.
+/// </summary>
 function TFluentSQLSelectQualifiersOracle.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
-  LFirst := '';
-  LSkip := '';
   Result := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['WHERE ROWNUM <=', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['AND ROWINI >', IntToStr(FQualifiers[LFor].Value)]);
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersOracle.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  if (LFirst <> '') or (LSkip <> '') then
-  begin
-    Result := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (%s) T)';
-    Result := TUtils.Concat([Result, LFirst, LSkip]);
-  end;
+  LPag := _Pagination('Oracle');
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'OFFSET', IntToStr(LPag.Skip), 'ROWS']);
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'FETCH NEXT', IntToStr(LPag.First), 'ROWS ONLY']);
 end;
 
 end.

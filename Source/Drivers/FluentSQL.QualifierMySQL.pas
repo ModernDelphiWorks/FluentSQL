@@ -37,23 +37,35 @@ uses
 
 { TFluentSQLSelectQualifiersMySQL }
 
+const
+  /// <summary>
+  ///   No MySQL o OFFSET nao existe sem LIMIT: a gramatica e
+  ///   "LIMIT {[offset,] row_count | row_count OFFSET offset}", entao "OFFSET n"
+  ///   sozinho e erro de sintaxe - era exatamente o que este driver emitia para
+  ///   Skip sem First. O teto usado aqui NAO e invencao: e a receita do proprio
+  ///   manual para "recuperar todas as linhas a partir de um deslocamento".
+  ///
+  ///     "To retrieve all rows from a certain offset up to the end of the result
+  ///      set, you can use some large number for the second parameter."
+  ///     https://dev.mysql.com/doc/refman/8.4/en/select.html
+  ///
+  ///   O valor e 2^64-1, o maior BIGINT UNSIGNED, que e o tipo do row_count.
+  /// </summary>
+  cSEM_TETO = '18446744073709551615';
+
+/// <summary>Cauda de paginacao do MySQL: [LIMIT m] [OFFSET n], no fim da consulta.</summary>
 function TFluentSQLSelectQualifiersMySQL.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
   Result := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['LIMIT', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['OFFSET', IntToStr(FQualifiers[LFor].Value)]);
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersMySQL.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  Result := TUtils.Concat([Result, LFirst, LSkip]);
+  LPag := _Pagination('MySQL');
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'LIMIT', IntToStr(LPag.First)])
+  else if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'LIMIT', cSEM_TETO]);
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'OFFSET', IntToStr(LPag.Skip)]);
 end;
 
 end.

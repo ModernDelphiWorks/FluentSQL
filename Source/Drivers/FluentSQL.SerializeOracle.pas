@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Utils,
   FluentSQL.Register,
   FluentSQL.Interfaces,
   FluentSQL.Serialize;
@@ -35,14 +36,20 @@ implementation
 
 { TFluentSQLSerialize }
 
+/// <summary>
+///   Corpo do nucleo + cauda row_limiting_clause no fim.
+///
+///   Antes a paginacao vinha como TEMPLATE ("SELECT * FROM (SELECT T.*, ROWNUM
+///   AS ROWINI FROM (%s) T) WHERE ROWNUM ...") e este metodo aplicava Format
+///   sobre o corpo, embrulhando a consulta inteira em duas subconsultas. Com
+///   OFFSET/FETCH nao ha embrulho: basta concatenar. Some junto a armadilha do
+///   ORA-00918, em que "SELECT T.*" sobre um join com nomes de coluna repetidos
+///   derruba a consulta com "column ambiguously defined".
+/// </summary>
 function TFluentSQLSerializeOracle.AsString(const AAST: IFluentSQLAST): String;
-var
-  LSerializePagination: String;
 begin
-  Result := ComposeSqlCore(AAST);
-  LSerializePagination := AAST.Select.Qualifiers.SerializePagination;
-  if LSerializePagination <> '' then
-    Result := Format(LSerializePagination, [Result]);
+  Result := TUtils.Concat([ComposeSqlCore(AAST),
+                           AAST.Select.Qualifiers.SerializePagination]);
   Result := Result + DialectOnlySqlSuffix(AAST);
 end;
 

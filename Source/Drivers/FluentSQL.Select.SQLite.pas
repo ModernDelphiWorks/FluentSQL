@@ -46,6 +46,15 @@ begin
   FQualifiers := TFluentSQLSelectQualifiersSQLite.Create;
 end;
 
+/// <summary>
+///   SELECT [DISTINCT] &lt;colunas&gt; FROM &lt;tabelas&gt;, sem paginacao nenhuma.
+///
+///   O LIMIT/OFFSET saia daqui, entre o SELECT e a lista de colunas, produzindo
+///   "SELECT LIMIT 10 OFFSET 20 * FROM T" - posicao errada na gramatica, SQL
+///   invalido em TODA consulta paginada, com ou sem WHERE. No SQLite LIMIT e
+///   OFFSET sao as ULTIMAS clausulas do SELECT; quem as concatena agora e
+///   TFluentSQLSerializerSQLite.AsString.
+/// </summary>
 function TFluentSQLSelectSQLite.Serialize: String;
 begin
   if IsEmpty then
@@ -53,7 +62,6 @@ begin
   else
     Result := TUtils.Concat(['SELECT',
                              FQualifiers.SerializeDistinct,
-                             FQualifiers.SerializePagination,
                              FColumns.Serialize,
                              'FROM',
                              FTableNames.Serialize]);

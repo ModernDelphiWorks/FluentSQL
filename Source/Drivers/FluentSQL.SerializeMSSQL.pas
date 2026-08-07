@@ -30,37 +30,44 @@ type
   TFluentSQLSerializerMSSQL = class(TFluentSQLSerialize)
   strict private
     /// <summary>
-    ///   Janela do ROW_NUMBER() que numera as linhas da paginacao.
+    ///   O ORDER BY que o &lt;offset_fetch&gt; do T-SQL EXIGE, quando o usuario nao
+    ///   pediu nenhum. Devolve '' quando o usuario pediu - nesse caso o ORDER BY
+    ///   dele ja esta no fim do corpo montado por ComposeSqlCore, que e
+    ///   exatamente a posicao de que o OFFSET/FETCH precisa.
     ///
-    ///   Quando o usuario pediu um ORDER BY, a janela TEM que usar a ordenacao
-    ///   dele: e a ordenacao do usuario que define o que e "pagina 2". Numerar
-    ///   por outra coisa e depois ordenar o resultado devolve a pagina errada -
-    ///   SQL valido, dado errado, sem erro nenhum. Este e o unico ponto deste
-    ///   metodo que muda o RESULTADO da consulta.
+    ///   Que a clausula seja obrigatoria e MEDIDO, nao deduzido:
+    ///     SELECT ID FROM T OFFSET 20 ROWS FETCH NEXT 3 ROWS ONLY;
+    ///     -> Msg 102, Incorrect syntax near '20'.  (caso L do .sql)
     ///
-    ///   Sem ORDER BY do usuario sai ORDER BY (SELECT NULL). Isso NAO conserta
-    ///   determinismo, e nao deve ser lido como se consertasse. E preenchimento
-    ///   exigido pela GRAMATICA: no OVER o order_by_clause "is required" e a
-    ///   clausula offset_fetch so existe como sub-clausula do ORDER BY - nao ha
-    ///   como emitir nada. (SELECT NULL) e CURRENT_TIMESTAMP, a forma anterior,
-    ///   empatam TODAS as linhas igualmente e produzem PLANO IDENTICO, sem
-    ///   operador Sort; entre os dois a escolha e de legibilidade, porque
-    ///   CURRENT_TIMESTAMP sugere uma ordenacao que nao existe. NEWID() foi
-    ///   descartado por ser avaliado por linha e custar um Sort sem comprar
-    ///   unicidade em troca.
+    ///   O preenchimento NAO e um so, porque nao existe um que sirva sempre:
     ///
-    ///   O que da paginacao estavel entre execucoes e ordenar por CHAVE UNICA -
-    ///   a doc da Microsoft condiciona a isso, tanto em ROW_NUMBER quanto em
-    ///   OFFSET/FETCH. O FluentSQL NAO impoe unicidade, por decisao de projeto,
-    ///   e tambem nao exige OrderBy para paginar: 6 dos 7 dialetos aceitam
-    ///   paginar sem ordenacao, e exigir seria inventar restricao que os bancos
-    ///   nao tem. Paginar sem ordenar devolve subconjunto arbitrario, o que e
-    ///   semantica do SQL e nao defeito deste driver.
+    ///   - (SELECT NULL) e o preferido. Nao acrescenta operador Sort ao plano -
+    ///     o plano medido e Top(OFFSET/TOP) sobre Compute Scalar(NULL) sobre o
+    ///     scan, sem Sort. Nao conserta determinismo nenhum, e nao deve ser lido
+    ///     como se consertasse: e preenchimento gramatical.
     ///
-    ///   Os quatro planos medidos lado a lado, com as URLs da documentacao:
-    ///   Test Delphi\Common_tests\test.pagination.filter.mssql.sql, caso P.
+    ///   - Com DISTINCT ou com UNION ele NAO e aceito, e a recusa e do motor:
+    ///       SELECT DISTINCT NOME FROM T ORDER BY (SELECT NULL) OFFSET ...
+    ///         -> Msg 145, ORDER BY items must appear in the select list if
+    ///            SELECT DISTINCT is specified.
+    ///       SELECT * FROM T UNION SELECT * FROM U ORDER BY (SELECT NULL) OFFSET ...
+    ///         -> Msg 104, ORDER BY items must appear in the select list if the
+    ///            statement contains a UNION, INTERSECT or EXCEPT operator.
+    ///     Nos dois casos a regra e a mesma: sob DISTINCT/UNION o item do ORDER
+    ///     BY tem que estar na lista de selecao. O unico item que SEMPRE esta e
+    ///     o ordinal, e ORDER BY 1 foi medido valido nos cinco casos (simples,
+    ///     DISTINCT, DISTINCT *, GROUP BY, CTE e UNION).
+    ///
+    ///     ORDER BY 1 CUSTA um operador Sort, e por isso nao vira o preenchimento
+    ///     universal: ele so entra onde (SELECT NULL) e recusado. E tambem impoe
+    ///     uma ordenacao pela primeira coluna que o usuario nao pediu - o que sob
+    ///     DISTINCT/UNION e o preco de a consulta existir, ja que a alternativa e
+    ///     nao emitir paginacao nenhuma.
+    ///
+    ///   Todas as medicoes, com o docker run e a saida bruta:
+    ///   Test Delphi\Common_tests\test.pagination.filter.mssql.sql.
     /// </summary>
-    function PaginationWindow(const AAST: IFluentSQLAST): String;
+    function PaginationOrderBy(const AAST: IFluentSQLAST): String;
   public
     function AsString(const AAST: IFluentSQLAST): String; override;
     function Merge(const ADef: IFluentSQLMergeDef): string; override;
@@ -71,46 +78,48 @@ implementation
 
 { TFluentSQLSerializer }
 
-function TFluentSQLSerializerMSSQL.PaginationWindow(const AAST: IFluentSQLAST): String;
-var
-  LOrderBy: String;
+function TFluentSQLSerializerMSSQL.PaginationOrderBy(const AAST: IFluentSQLAST): String;
 begin
-  LOrderBy := AAST.OrderBy.Serialize;
-  if LOrderBy = '' then
-    LOrderBy := 'ORDER BY (SELECT NULL)';
-  Result := 'ROW_NUMBER() OVER(' + LOrderBy + ') AS ROWNUMBER';
+  if AAST.OrderBy.Serialize <> '' then
+    Exit('');
+  if (AAST.Select.Qualifiers.SerializeDistinct <> '') or (AAST.UnionType <> '') then
+    Result := 'ORDER BY 1'
+  else
+    Result := 'ORDER BY (SELECT NULL)';
 end;
 
+/// <summary>
+///   Corpo montado por ComposeSqlCore + cauda de paginacao.
+///
+///   Este metodo montava o corpo SOZINHO, repetindo a lista de secoes do nucleo
+///   e por isso NUNCA passando por ComposeSqlCore. Duas consequencias, ambas
+///   silenciosas: consulta com Union perdia o UNION e o ramo inteiro, e consulta
+///   com WithAlias perdia a CTE - o SQL saia valido e incompleto, sem erro.
+///   Delegar a ComposeSqlCore devolve as duas de graca.
+///
+///   A paginacao deixou de ser predicado (ROWNUMBER) e virou cauda, entao ela e
+///   concatenada DEPOIS de tudo - inclusive depois do UNION e do SELECT externo
+///   da CTE, que e onde o OFFSET/FETCH pertence.
+///
+///   O que sumiu junto:
+///     - a injecao de "ROW_NUMBER() OVER(...) AS ROWNUMBER" em
+///       AAST.Select.Columns. Era a unica escrita no AST feita durante a
+///       serializacao, e era ela que fazia AsString nao ser idempotente: duas
+///       chamadas na mesma IFluentSQL acumulavam duas colunas ROWNUMBER.
+///     - o encadeamento WHERE/AND, que so existia para pendurar o predicado da
+///       paginacao no filtro do usuario.
+/// </summary>
 function TFluentSQLSerializerMSSQL.AsString(const AAST: IFluentSQLAST): String;
 var
-  LWhere: String;
+  LPagination: String;
 begin
-  if AAST.Select.Qualifiers.ExecutingPagination then
-    AAST.Select.Columns.Add.Name := PaginationWindow(AAST);
-  LWhere := AAST.Where.Serialize;
-  // Gera sintaxe para caso exista comando de paginação.
-  if AAST.Select.Qualifiers.ExecutingPagination then
-  begin
-    if LWhere = '' then
-      LWhere := TUtils.Concat(['WHERE', '(' + AAST.Select.Qualifiers.SerializePagination + ')'])
-    else
-      // O predicado do usuario JA esta em LWhere, com a palavra WHERE incluida.
-      // Encadear a partir de LWhere (e nao de Result, que aqui ainda e '') e o
-      // que preserva o filtro e mantem o WHERE na frente do AND.
-      LWhere := TUtils.Concat([LWhere, 'AND', '(' + AAST.Select.Qualifiers.SerializePagination + ')']);
-  end;
-  Result := TUtils.Concat([AAST.Select.Serialize,
-                           AAST.Delete.Serialize,
-                           AAST.Insert.Serialize,
-                           AAST.Update.Serialize,
-                           AAST.Joins.Serialize,
-                           LWhere,
-                           AAST.GroupBy.Serialize,
-                           AAST.Having.Serialize,
-                           AAST.OrderBy.Serialize]);
-  
-  if Assigned(AAST.Merge) then
-    Result := TUtils.Concat([Result, Merge(AAST.Merge)]);
+  Result := ComposeSqlCore(AAST);
+
+  // O MERGE nao e repetido aqui: ComposeSqlCore ja concatena AAST.Merge.Serialize,
+  // que resolve para este mesmo TFluentSQLSerializerMSSQL.Merge via o Register.
+  LPagination := AAST.Select.Qualifiers.SerializePagination;
+  if LPagination <> '' then
+    Result := TUtils.Concat([Result, PaginationOrderBy(AAST), LPagination]);
 
   Result := Result + DialectOnlySqlSuffix(AAST);
 end;

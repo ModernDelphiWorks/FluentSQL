@@ -32,28 +32,30 @@ type
 
 implementation
 
-uses
-  FluentSQL.Utils;
-
 { TFluentSQLSelectQualifiersMongoDB }
 
+/// <summary>
+///   Vazio DE PROPOSITO, e este comentario existe para que ninguem "conserte"
+///   isto de novo.
+///
+///   O MongoDB nao tem cauda textual de paginacao: nao existe um sufixo para
+///   concatenar num SELECT. Os limites viram campos do documento de comando, e
+///   quem os emite e FluentSQL.SerializeMongoDB.pas, lendo os mesmos
+///   AAST.Select.Qualifiers em duas formas:
+///
+///     - comando "find":     "limit": m, "skip": n
+///     - pipeline "aggregate": {"$skip": n} ANTES de {"$limit": m}
+///
+///   A ordem $skip -> $limit no pipeline nao e estilo: e o que permite ao
+///   otimizador coalescer $sort/$skip/$limit num unico estagio.
+///
+///   O corpo anterior era o laco do Firebird comentado, com tres variaveis
+///   declaradas e nunca usadas (H2164 em toda compilacao) e uma mensagem de erro
+///   citando o driver errado. Parecia paginacao esquecida; nao era.
+/// </summary>
 function TFluentSQLSelectQualifiersMongoDB.SerializePagination: String;
-var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
 begin
   Result := '';
-//  for LFor := 0 to Count -1 do
-//  begin
-//    case FQualifiers[LFor].Qualifier of
-//      sqFirst: LFirst := TUtils.Concat(['FIRST', IntToStr(FQualifiers[LFor].Value)]);
-//      sqSkip:  LSkip  := TUtils.Concat(['SKIP' , IntToStr(FQualifiers[LFor].Value)]);
-//    else
-//      raise Exception.Create('TFluentSQLSelectQualifiersFirebird.SerializeSelectQualifiers: Unknown qualifier');
-//    end;
-//  end;
-//  Result := TUtils.Concat([Result, LFirst, LSkip]);
 end;
 
 end.

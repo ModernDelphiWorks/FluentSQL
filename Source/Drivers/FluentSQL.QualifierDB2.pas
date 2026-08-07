@@ -37,29 +37,23 @@ uses
 
 { TFluentSQLSelectQualifiersDB2 }
 
+/// <summary>
+///   Cauda [OFFSET n ROWS] [FETCH FIRST m ROWS ONLY], a forma do DB2 LUW 11.1+.
+///   Driver DESLIGADO em FluentSQL.inc e, alem disso, esta classe hoje nao chega
+///   a ser instanciada: TFluentSQLSelectDB2 registra TFluentSQLSelectQualifiersOracle.
+///   Fica aqui alinhada com os demais para nao voltar a ser a copia do ROWNUM da
+///   Oracle - que no DB2 nem sequer existe como pseudocoluna.
+/// </summary>
 function TFluentSQLSelectQualifiersDB2.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
-  LFirst := '';
-  LSkip := '';
   Result := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['WHERE ROWNUM <=', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['AND ROWINI >', IntToStr(FQualifiers[LFor].Value)]);
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersOracle.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  if (LFirst <> '') or (LSkip <> '') then
-  begin
-    Result := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (%s) T)';
-    Result := TUtils.Concat([Result, LFirst, LSkip]);
-  end;
+  LPag := _Pagination('DB2');
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'OFFSET', IntToStr(LPag.Skip), 'ROWS']);
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'FETCH FIRST', IntToStr(LPag.First), 'ROWS ONLY']);
 end;
 
 end.

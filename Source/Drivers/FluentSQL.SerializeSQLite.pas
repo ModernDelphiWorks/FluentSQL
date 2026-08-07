@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Utils,
   FluentSQL.Register,
   FluentSQL.Interfaces,
   FluentSQL.Serialize;
@@ -35,9 +36,17 @@ implementation
 
 { TFluentSQLSerializer }
 
+/// <summary>
+///   Corpo do nucleo + cauda LIMIT/OFFSET no fim, que e onde a gramatica do
+///   SQLite as coloca. Antes este metodo nao concatenava paginacao nenhuma: o
+///   LIMIT/OFFSET era emitido por TFluentSQLSelectSQLite.Serialize entre o
+///   SELECT e a lista de colunas.
+/// </summary>
 function TFluentSQLSerializerSQLite.AsString(const AAST: IFluentSQLAST): String;
 begin
-  Result := inherited AsString(AAST);
+  Result := TUtils.Concat([ComposeSqlCore(AAST),
+                           AAST.Select.Qualifiers.SerializePagination]);
+  Result := Result + DialectOnlySqlSuffix(AAST);
 end;
 
 end.

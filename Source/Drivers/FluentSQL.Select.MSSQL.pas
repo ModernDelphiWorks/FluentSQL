@@ -46,35 +46,32 @@ begin
   FQualifiers := TFluentSQLSelectQualifiersMSSQL.Create;
 end;
 
+/// <summary>
+///   SELECT [DISTINCT] &lt;colunas&gt; FROM &lt;tabelas&gt;. Sem embrulho e sem paginacao.
+///
+///   Duas coisas sairam daqui, as duas por causa da migracao para OFFSET/FETCH:
+///
+///   1. O embrulho "SELECT * FROM (%s) AS %s", que existia so para dar escopo ao
+///      predicado sobre a coluna ROWNUMBER. Sem ROW_NUMBER() nao ha coluna a
+///      filtrar, e sem filtro nao ha subconsulta. O embrulho tambem usava
+///      FTableNames[0].Name como alias, o que dava alias repetido em consulta com
+///      join e nome de alias invalido quando a origem era uma subconsulta.
+///
+///   2. O DISTINCT, que vinha DEPOIS da lista de colunas: "SELECT NOME DISTINCT
+///      FROM T". Isso nao dependia de paginacao nenhuma - Select.Distinct sozinho
+///      ja emitia essa forma, que o SQL Server recusa. O DISTINCT antecede a lista
+///      de colunas em T-SQL, como em ANSI.
+/// </summary>
 function TFluentSQLSelectMSSQL.Serialize: String;
-var
-  LFor: Integer;
-
-  function DoSerialize: String;
-  begin
-    Result := TUtils.Concat(['SELECT',
-                             FColumns.Serialize,
-                             FQualifiers.SerializeDistinct,
-                             'FROM',
-                             FTableNames.Serialize]);
-  end;
-
-const
-  cSELECT = 'SELECT * FROM (%s) AS %s';
-
 begin
   if IsEmpty then
     Result := ''
   else
-  begin
-    // A coluna ROWNUMBER e injetada por TFluentSQLSerializerMSSQL.AsString, que e
-    // quem enxerga o ORDER BY do usuario e portanto consegue montar a janela do
-    // ROW_NUMBER() com a ordenacao pedida. Aqui so resta embrulhar.
-    if FQualifiers.ExecutingPagination then
-      Result := Format(cSELECT, [DoSerialize, FTableNames[0].Name])
-    else
-      Result := DoSerialize;
-  end;
+    Result := TUtils.Concat(['SELECT',
+                             FQualifiers.SerializeDistinct,
+                             FColumns.Serialize,
+                             'FROM',
+                             FTableNames.Serialize]);
 end;
 
 end.

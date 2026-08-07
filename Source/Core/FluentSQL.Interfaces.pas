@@ -53,6 +53,17 @@ type
     constructor Create(const AFunction, ADialect: String); reintroduce;
   end;
 
+  /// <summary>
+  ///   Chegou um TSelectQualifierType que o serializador de paginacao do dialeto
+  ///   nao sabe emitir. Antes disso era "raise Exception.Create(...)" cru, em oito
+  ///   copias, com o nome do metodo errado em quatro delas - o consumidor nao tinha
+  ///   como distinguir isso de qualquer outra falha e nao tinha o que capturar.
+  /// </summary>
+  EFluentSQLQualifierNotSupported = class(Exception)
+  public
+    constructor Create(const AQualifier: Integer; const ADialect: String); reintroduce;
+  end;
+
   /// <summary>ESP-016: one opt-in fragment registered for a specific engine; not portable SQL.</summary>
   TDialectOnlyFragment = record
     Dialect: TFluentSQLDriver;
@@ -1591,6 +1602,16 @@ constructor EFluentSQLFunctionNotSupported.Create(const AFunction, ADialect: Str
 begin
   inherited CreateFmt('A funcao "%s" nao existe no dialeto %s. ' +
     'Use uma expressao equivalente suportada por esse motor.', [AFunction, ADialect]);
+end;
+
+{ EFluentSQLQualifierNotSupported }
+
+constructor EFluentSQLQualifierNotSupported.Create(const AQualifier: Integer;
+  const ADialect: String);
+begin
+  inherited CreateFmt('O qualificador de SELECT de ordinal %d nao tem forma ' +
+    'conhecida no dialeto %s. Todo membro novo de TSelectQualifierType precisa ' +
+    'ser tratado no serializador de paginacao de cada driver.', [AQualifier, ADialect]);
 end;
 
 end.

@@ -46,14 +46,20 @@ begin
   FQualifiers := TFluentSQLSelectQualifiersOracle.Create;
 end;
 
+/// <summary>
+///   SELECT [DISTINCT] &lt;colunas&gt; FROM &lt;tabelas&gt;. O DISTINCT vinha DEPOIS da
+///   lista de colunas ("SELECT NOME DISTINCT FROM T"), forma que a Oracle recusa
+///   com ORA-00923. Nao dependia de paginacao: Select.Distinct sozinho ja saia
+///   assim - so nao se via porque SerializePagination levantava excecao antes.
+/// </summary>
 function TFluentSQLSelectOracle.Serialize: String;
 begin
   if IsEmpty then
     Result := ''
   else
     Result := TUtils.Concat(['SELECT',
-                             FColumns.Serialize,
                              FQualifiers.SerializeDistinct,
+                             FColumns.Serialize,
                              'FROM',
                              FTableNames.Serialize]);
 end;

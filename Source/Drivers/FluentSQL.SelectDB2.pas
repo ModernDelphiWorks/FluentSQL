@@ -46,14 +46,19 @@ begin
   FQualifiers := TFluentSQLSelectQualifiersOracle.Create;
 end;
 
+/// <summary>
+///   SELECT [DISTINCT] &lt;colunas&gt; FROM &lt;tabelas&gt;. Mesma correcao de ordem do
+///   Oracle e do MSSQL: o DISTINCT antecede a lista de colunas. Driver DESLIGADO
+///   em FluentSQL.inc.
+/// </summary>
 function TFluentSQLSelectDB2.Serialize: String;
 begin
   if IsEmpty then
     Result := ''
   else
     Result := TUtils.Concat(['SELECT',
-                             FColumns.Serialize,
                              FQualifiers.SerializeDistinct,
+                             FColumns.Serialize,
                              'FROM',
                              FTableNames.Serialize]);
 end;
