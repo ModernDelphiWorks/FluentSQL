@@ -64,12 +64,11 @@ procedure TTestFluentSQLSelect.Test2SelectPagingMSSQL;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * '+
-               'FROM (SELECT ID_CLIENTE, '+
-               'ROW_NUMBER() OVER(ORDER BY ID_CLIENTE ASC) AS ROWNUMBER '+
-               'FROM CLIENTES AS C) AS CLIENTES '+
-               'WHERE (ROWNUMBER > 0 AND ROWNUMBER <= 3) '+
-               'ORDER BY ID_CLIENTE ASC';
+  // Metodo com [Test] COMENTADO - nao roda. A string foi atualizada para a forma
+  // OFFSET/FETCH da T10 assim mesmo, para que a reativacao (T11) nao herde uma
+  // expectativa que descreve um SQL que o driver nao emite mais.
+  LAsString := 'SELECT ID_CLIENTE FROM CLIENTES AS C ORDER BY ID_CLIENTE ASC '+
+               'OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                               .Select
                               .Column('ID_CLIENTE')
@@ -211,7 +210,13 @@ procedure TTestFluentSQLSelect.TestSelectPagingFirebirdDistinct;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT DISTINCT FIRST 3 SKIP 0 CLI.ID_CLIENTE FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE ASC';
+  // A ordem esperada mudou na T10, e quem a mudou foi o MOTOR, nao o gosto:
+  // "SELECT DISTINCT FIRST 3 SKIP 0 ..." - exatamente o que este teste
+  // congelava - e RECUSADO pelo Firebird 5.0.4 com
+  //   -SQL error code = -104 / -Token unknown - line 1, column 23
+  // A gramatica e SELECT [FIRST m] [SKIP n] [{DISTINCT | ALL}] <columns>.
+  // Medicao: Test Delphi\Common_tests\test.pagination.firebird.sql, caso V1.
+  LAsString := 'SELECT FIRST 3 SKIP 0 DISTINCT CLI.ID_CLIENTE FROM CLIENTES AS CLI ORDER BY CLI.ID_CLIENTE ASC';
   TFluentSQL.SetDatabaseDafault(dbnFirebird);
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnFirebird)
                                  .Select
@@ -227,7 +232,10 @@ procedure TTestFluentSQLSelect.TestSelectPagingMSSQL;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY ID_CLIENTE ASC) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE ASC';
+  // T10: ROW_NUMBER() em subconsulta -> OFFSET/FETCH. Skip(3).First(3) e a
+  // segunda pagina de 3, e o OFFSET/FETCH a exprime direto, sem embrulho.
+  // Medicao: Test Delphi\Common_tests\test.pagination.mssql.sql, caso 03.
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC OFFSET 3 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
@@ -255,7 +263,10 @@ procedure TTestFluentSQLSelect.TestSelectPagingOracle;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC) T) WHERE ROWNUM <= 3 AND ROWINI > 0';
+  // T10: encadeamento ROWNUM/ROWINI -> row_limiting_clause. Skip(0) e um pedido
+  // legitimo e sai como "OFFSET 0 ROWS", nao some.
+  // Medicao: Test Delphi\Common_tests\test.pagination.oracle.sql.
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnOracle)
                                       .Select
                                       .All

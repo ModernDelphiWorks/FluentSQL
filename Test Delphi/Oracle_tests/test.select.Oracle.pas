@@ -153,7 +153,17 @@ procedure TTestFluentSQLSelectOracle.TestSelectPagingOracle;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM (SELECT * FROM CLIENTES ORDER BY ID_CLIENTE) T) WHERE ROWNUM <= 3 AND ROWINI > 0';
+  // ESTE TESTE CONTINUA VERMELHO, E DE PROPOSITO. Ele e um dos 8 vermelhos
+  // pre-existentes deste projeto, todos da era pre-parametrizacao: espera
+  // "ORDER BY ID_CLIENTE" e o framework emite "ORDER BY ID_CLIENTE ASC". Corrigir
+  // isso e decisao de convencao do dono, nao da T10.
+  //
+  // O QUE A T10 MUDOU AQUI: so a FORMA da paginacao, de ROWNUM/ROWINI para
+  // row_limiting_clause. Sem esta linha o teste passaria a falhar por DOIS
+  // motivos e a ficar afirmando um SQL que o driver nao emite mais - o vermelho
+  // pre-existente deixaria de ser rastreavel. Com ela, o unico motivo que resta
+  // e o de sempre: o ASC.
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnOracle)
                                       .Select
                                       .All

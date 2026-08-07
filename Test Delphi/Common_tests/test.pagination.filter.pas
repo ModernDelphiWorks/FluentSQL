@@ -36,58 +36,73 @@
        ignoreCase = TRUE, e numa biblioteca cujo produto E texto SQL isso deixa
        passar 'select' virando 'SELECT'.
 
-  O SQLite fica de fora da camada 2 de proposito. Ele emite
-  "SELECT LIMIT 10 OFFSET 20 * FROM T", que nao e SQL valido em SQLite algum
-  (LIMIT/OFFSET vao no fim, nao entre SELECT e a lista de colunas). Congelar
-  essa string aqui seria abencoar o defeito; ele esta catalogado como achado
-  separado. O SQLite continua coberto pela camada 1, que e a regra desta tarefa.
+  O SQLite ficava de fora da camada 2 porque emitia
+  "SELECT LIMIT 10 OFFSET 20 * FROM T", que nao e SQL valido em SQLite algum, e
+  congelar essa string seria abencoar o defeito. A T10 corrigiu a posicao, e o
+  SQLite entrou na camada 2 como todo mundo (TestSqlExatoSQLite).
 
   Dialetos desligados no FluentSQL.inc entram na matriz assim mesmo, exigindo a
   excecao NOMEADA EFluentSQLDriverNotRegistered - nao [Ignore] silencioso. Ligar
   um driver no .inc passa a cobra-lo pela regra, que e o comportamento desejado.
 
   ------------------------------------------------------------------------------
-  ORDENACAO E PAGINACAO: o que este arquivo trava, e o que NAO promete
+  T10: A FORMA MUDOU EM SEIS DIALETOS. O QUE ESTE ARQUIVO PROMETE, NAO.
 
-  Um teste que congela SQL de paginacao convida a leitura de que a paginacao
-  ficou estavel. Nao ficou, e a distincao importa mais que o teste.
+  A camada 1 sobreviveu inteira a T10 sem uma linha alterada - era exatamente
+  para isso que ela existia separada. Foi a camada 2 que teve de ser reescrita,
+  porque e ela que congela forma.
 
-  COM OrderBy do usuario, a janela do ROW_NUMBER() usa ESSE OrderBy. Essa e a
-  correcao de verdade: sem ela o MSSQL numerava por outra coisa e so ordenava no
-  fim, devolvendo OUTRA pagina - SQL valido, dado errado, calado. Travado por
-  TestMSSQLJanelaUsaOrderByDoUsuario.
+  Formas canonicas por dialeto, todas MEDIDAS em motor real (os .sql desta
+  mesma pasta trazem docker run, versao do motor e saida bruta):
 
-    RESSALVA, e ela e do framework inteiro, nao so do MSSQL: a doc da Microsoft
-    condiciona a estabilidade a coluna UNICA -
+    MSSQL       [ORDER BY x |ORDER BY (SELECT NULL)|ORDER BY 1]
+                OFFSET n ROWS [FETCH NEXT m ROWS ONLY]
+    Oracle      [ORDER BY x] [OFFSET n ROWS] [FETCH NEXT m ROWS ONLY]
+    PostgreSQL  [ORDER BY x] [LIMIT m] [OFFSET n]
+    MySQL       [ORDER BY x] LIMIT m [OFFSET n]  - Skip sozinho usa
+                LIMIT 18446744073709551615, receita do manual
+    SQLite      [ORDER BY x] LIMIT m [OFFSET n]  - Skip sozinho usa LIMIT -1,
+                "no upper bound" documentado
+    Firebird    SELECT [FIRST m] [SKIP n] [DISTINCT] <colunas> ...
+    MongoDB     campos "limit"/"skip" no comando find; estagio $skip ANTES do
+                estagio $limit no pipeline (trocar a ordem devolve conjunto
+                vazio, medido)
 
-      "There is no guarantee that the rows returned by a query using
-       ROW_NUMBER() will be ordered exactly the same with each execution unless
-       [...] Values of the ORDER BY columns are unique."
-      https://learn.microsoft.com/en-us/sql/t-sql/functions/row-number-transact-sql
+  ONDE OS DIALETOS DIVERGEM, E POR QUE ISSO E LEGITIMO:
 
-      "The ORDER BY clause contains a column or combination of columns that are
-       guaranteed to be unique."
-      https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql
+  - Skip SEM First. So o PostgreSQL tem OFFSET como clausula independente. No
+    MySQL e no SQLite "OFFSET n" solto e erro de sintaxe, medido nos dois, e por
+    isso os dois emitem um teto. No SQL Server o FETCH exige OFFSET (Msg 153),
+    na Oracle nao. Isso e variacao de SINTAXE, nao de existencia - a API e a
+    mesma nos sete.
 
-    O FluentSQL NAO impoe unicidade, por decisao de projeto. Ordenar por coluna
-    com valores repetidos deixa as linhas empatadas dentro do grupo e a fronteira
-    entre paginas pode variar entre execucoes. Quem precisa de estabilidade
-    ordena por chave unica ou acrescenta uma como desempate.
+  - A clausula ORDER BY do MSSQL. O <offset_fetch> so existe dentro dela
+    (Msg 102 sem ela). Sem OrderBy do usuario entra preenchimento, e ele NAO e
+    um so: (SELECT NULL) e o preferido por nao custar Sort, mas o motor o recusa
+    sob DISTINCT (Msg 145) e sob UNION (Msg 104), porque nesses casos o item do
+    ORDER BY precisa estar na lista de selecao. So ai entra ORDER BY 1, que E
+    aceito nos dois e CUSTA um Sort. Os dois planos medidos lado a lado estao em
+    test.pagination.mssql.sql, caso S.
 
-  SEM OrderBy do usuario sai ORDER BY (SELECT NULL). Isso NAO e conserto de
-  determinismo e o arquivo nao deve ser lido como se fosse. E preenchimento
-  exigido pela GRAMATICA: no OVER o order_by_clause "is required", e
-  <offset_fetch> so existe como sub-clausula do ORDER BY - nao ha como emitir
-  nada. Entre os preenchimentos possiveis, (SELECT NULL) e o unico medido que
-  nao acrescenta operador Sort ao plano. CURRENT_TIMESTAMP, a forma anterior,
-  produz PLANO IDENTICO a (SELECT NULL) - os dois empatam todas as linhas
-  igualmente; a troca foi de idioma, nao de comportamento. NEWID() foi
-  descartado por ser avaliado por linha e custar um Sort sem comprar unicidade.
-  Medido no caso P de test.pagination.filter.mssql.sql, com os planos das quatro
-  formas lado a lado.
+  O QUE ESTE ARQUIVO NAO PROMETE, e a distincao importa mais que o teste:
 
-  PAGINAR SEM NENHUMA ORDENACAO devolve um subconjunto arbitrario. Isso e
-  semantica do SQL e vale nos 7 dialetos, nao e defeito a corrigir aqui:
+  A paginacao NAO ficou estavel entre execucoes, e nenhum assert aqui deve ser
+  lido como se tivesse ficado. A doc da Microsoft condiciona a estabilidade a
+  coluna UNICA, tanto em ROW_NUMBER quanto em OFFSET/FETCH:
+
+    "The ORDER BY clause contains a column or combination of columns that are
+     guaranteed to be unique."
+    https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql
+
+  O FluentSQL NAO impoe unicidade, por decisao de projeto. Ordenar por coluna
+  com valores repetidos deixa linhas empatadas e a fronteira entre paginas pode
+  variar. Quem precisa de estabilidade ordena por chave unica.
+
+  PAGINAR SEM NENHUMA ORDENACAO devolve subconjunto arbitrario. Isso e semantica
+  do SQL, vale nos 7, e foi MEDIDO: no PostgreSQL,
+  "SELECT DISTINCT NOME FROM T LIMIT 3 OFFSET 20" devolveu N043/N060/N009, e nao
+  N021/N022/N023; no MongoDB, duas rodadas do mesmo pipeline devolveram trios
+  diferentes.
 
     "This is not a bug; it is an inherent consequence of the fact that SQL does
      not promise to deliver the results of a query in any particular order
@@ -118,17 +133,14 @@ type
     [Test]
     procedure TestPredicadoSobreviveEmTodaCombinacaoDeTodoDialeto;
     /// <summary>
-    ///   O defeito exato do MSSQL, isolado: com filtro a clausula tem que
-    ///   comecar em WHERE. "AS T AND (" e o SQL que o motor recusa.
+    ///   O defeito exato da T9, isolado: com filtro o predicado tem que
+    ///   sobreviver, e nao pode sobrar um AND pendurado sem WHERE. A T10 trocou
+    ///   a paginacao de predicado para cauda, entao a forma "AS T AND (" nem
+    ///   existe mais - o assert continua valendo e agora e trivialmente
+    ///   verdadeiro, o que e o desfecho certo de um defeito eliminado pela raiz.
     /// </summary>
     [Test]
-    procedure TestMSSQLPaginacaoComFiltroEmiteWhereNaoAnd;
-    /// <summary>
-    ///   Sem filtro o MSSQL ja acertava; fica travado para a correcao do caso
-    ///   com filtro nao quebrar o caso sem filtro.
-    /// </summary>
-    [Test]
-    procedure TestMSSQLPaginacaoSemFiltroContinuaComWhere;
+    procedure TestMSSQLPaginacaoComFiltroPreservaPredicado;
     /// <summary>
     ///   A assimetria que denunciou o defeito: o bind ficou na lista de params
     ///   enquanto o predicado sumia do SQL. Params e texto tem que concordar.
@@ -136,39 +148,81 @@ type
     [Test]
     procedure TestBindEPredicadoNaoDivergem;
     /// <summary>
-    ///   First sozinho e Skip sozinho. Antes da T9 o limite que nao foi pedido
-    ///   saia com lixo de pilha (ROWNUMBER > 4910988), variando a cada execucao;
-    ///   estes dois asserts nao podiam nem ser escritos.
+    ///   First sozinho e Skip sozinho, nos SETE dialetos. Antes da T9 o limite
+    ///   nao pedido saia com lixo de pilha; depois da T10 cada dialeto tem uma
+    ///   forma diferente para "sem teto", porque a gramatica de cada um e
+    ///   diferente. Isto trava as duas coisas.
     /// </summary>
     [Test]
-    procedure TestMSSQLFirstSozinhoNaoInventaLimiteInferior;
+    procedure TestFirstSozinhoEmTodoDialeto;
     [Test]
-    procedure TestMSSQLSkipSozinhoNaoInventaLimiteSuperior;
+    procedure TestSkipSozinhoEmTodoDialeto;
     /// <summary>
-    ///   A CORRECAO DE VERDADE: dado um OrderBy, a janela numera por ele.
-    ///   Numerar por outra coisa e ordenar so no fim nao embaralha a pagina -
-    ///   devolve OUTRA pagina, porque o recorte sai de um conjunto que nao e o
-    ///   que o usuario ordenou. Medido em test.pagination.filter.mssql.sql,
-    ///   casos D2/D2b/D2c, com gabarito independente via OFFSET/FETCH nativo.
-    ///
-    ///   Nao promete estabilidade entre execucoes: para isso a doc da Microsoft
-    ///   exige coluna UNICA, e o framework nao impoe unicidade. Ver o cabecalho.
+    ///   O ORDER BY do usuario vai para a cauda, e o OFFSET/FETCH vem DEPOIS
+    ///   dele - que e a unica posicao valida no T-SQL. Com OrderBy nao entra
+    ///   preenchimento nenhum.
     /// </summary>
     [Test]
-    procedure TestMSSQLJanelaUsaOrderByDoUsuario;
+    procedure TestMSSQLOrderByDoUsuarioPrecedeOffsetFetch;
     /// <summary>
-    ///   Sem OrderBy do usuario sai ORDER BY (SELECT NULL) - preenchimento
-    ///   exigido pela gramatica do T-SQL, ja que o order_by_clause do OVER "is
-    ///   required". NAO e conserto de determinismo: (SELECT NULL) e
-    ///   CURRENT_TIMESTAMP empatam todas as linhas igualmente e dao o MESMO
-    ///   plano, sem Sort (caso P do .sql). O criterio de escolha entre os dois
-    ///   e idioma, e entre eles e NEWID() e custo - NEWID() acrescenta Sort sem
-    ///   comprar unicidade.
-    ///
-    ///   O assert prende a forma emitida, nao uma promessa de ordem.
+    ///   Sem OrderBy do usuario sai ORDER BY (SELECT NULL): preenchimento
+    ///   exigido pela gramatica, ja que "SELECT ID FROM T OFFSET 20 ROWS FETCH
+    ///   NEXT 3 ROWS ONLY" e Msg 102. NAO e conserto de determinismo. Foi
+    ///   escolhido por nao acrescentar operador Sort ao plano - medido no caso S
+    ///   de test.pagination.mssql.sql.
     /// </summary>
     [Test]
-    procedure TestMSSQLJanelaSemOrderByUsaSelectNull;
+    procedure TestMSSQLSemOrderByUsaSelectNull;
+    /// <summary>
+    ///   E onde (SELECT NULL) e RECUSADO pelo motor - sob DISTINCT (Msg 145) e
+    ///   sob UNION (Msg 104) - entra ORDER BY 1. Este teste existe porque a
+    ///   escolha do preenchimento e a unica decisao de projeto da T10 que nao
+    ///   deriva direto da gramatica: deriva de DUAS medicoes conflitantes.
+    /// </summary>
+    [Test]
+    procedure TestMSSQLDistinctEUnionUsamOrdinalPorqueSelectNullERecusado;
+    /// <summary>
+    ///   Paginar nao pode DESCARTAR clausula nenhuma. No MSSQL, antes da T10,
+    ///   Union sumia com o ramo inteiro e WithAlias sumia com a CTE - em
+    ///   silencio, gerando SQL valido e incompleto. Vale para os 7 dialetos que
+    ///   suportam a clausula; onde o dialeto nao suporta, exige excecao NOMEADA.
+    /// </summary>
+    [Test]
+    procedure TestPaginacaoNaoDescartaUnion;
+    [Test]
+    procedure TestPaginacaoNaoDescartaCTE;
+    /// <summary>
+    ///   Distinct + paginacao. Levantava Exception CRUA em MSSQL, MySQL,
+    ///   PostgreSQL e Oracle; no Firebird emitia a ordem que o motor recusa com
+    ///   -104. Nenhum dialeto pode recusar esta combinacao.
+    /// </summary>
+    [Test]
+    procedure TestDistinctComPaginacaoEmTodoDialeto;
+    /// <summary>
+    ///   Distinct SOZINHO, sem paginacao nenhuma. Nao e teste de paginacao - e a
+    ///   prova de que o defeito era do laco de paginacao e nao da combinacao:
+    ///   os mesmos quatro dialetos explodiam sem que houvesse First ou Skip.
+    /// </summary>
+    [Test]
+    procedure TestDistinctSozinhoNaoExplodeEmDialetoNenhum;
+    /// <summary>GroupBy + paginacao, nos 7.</summary>
+    [Test]
+    procedure TestGroupByComPaginacaoEmTodoDialeto;
+    /// <summary>
+    ///   Nenhum dialeto pode recusar paginacao com Exception CRUA. Se recusar,
+    ///   tem que ser com classe NOMEADA - "Exception" pelado nao e contrato,
+    ///   nao ha o que capturar.
+    /// </summary>
+    [Test]
+    procedure TestNenhumDialetoRecusaComExcecaoCrua;
+    /// <summary>
+    ///   AsString chamado duas vezes na MESMA IFluentSQL tem que devolver o
+    ///   mesmo texto. O MSSQL injetava a coluna ROW_NUMBER() no AST durante a
+    ///   serializacao, entao a segunda chamada acumulava uma segunda ROWNUMBER.
+    ///   Sem a injecao, o defeito morreu.
+    /// </summary>
+    [Test]
+    procedure TestAsStringRepetidoNaoDuplicaNadaEmDialetoNenhum;
     /// <summary>Camada 2, string exata e sensivel a caixa, um metodo por dialeto.</summary>
     [Test]
     procedure TestSqlExatoMSSQL;
@@ -181,7 +235,17 @@ type
     [Test]
     procedure TestSqlExatoPostgreSQL;
     [Test]
+    procedure TestSqlExatoSQLite;
+    [Test]
     procedure TestSqlExatoMongoDB;
+    /// <summary>
+    ///   Camada 2 do caso que mais quebrou: Skip SEM First, string exata, um
+    ///   dialeto por linha. E aqui que os tetos do MySQL e do SQLite ficam
+    ///   travados - trocar 18446744073709551615 por outro numero, ou -1 por 0,
+    ///   passa a devolver zero linhas em vez de todas.
+    /// </summary>
+    [Test]
+    procedure TestSqlExatoSkipSozinho;
     /// <summary>
     ///   Dialeto desligado no .inc recusa com excecao NOMEADA. Se o dono ligar o
     ///   driver, este teste fica vermelho e cobra a linha na matriz - que e o
@@ -199,8 +263,16 @@ uses
   FluentSQL.Interfaces;
 
 type
-  /// <summary>As combinacoes de paginacao que a matriz percorre, sempre COM filtro.</summary>
-  TCombinacao = (cbFirst, cbSkip, cbFirstSkip, cbOrderByAsc, cbOrderByDesc, cbDoisTermos);
+  /// <summary>
+  ///   As combinacoes que a matriz percorre. As seis primeiras sao da T9 e tem
+  ///   SEMPRE filtro - e o filtro que a camada 1 verifica. As cinco ultimas
+  ///   entraram na T10 para fechar a classe Take/Skip x Distinct/Union/GroupBy/
+  ///   CTE; essas nao levam Where, porque o que elas verificam e a preservacao da
+  ///   OUTRA clausula.
+  /// </summary>
+  TCombinacao = (cbFirst, cbSkip, cbFirstSkip, cbOrderByAsc, cbOrderByDesc,
+                 cbDoisTermos, cbDistinct, cbDistinctSemPaginacao, cbGroupBy,
+                 cbUnion, cbWith);
 
 const
   cCOMBINACAO: array[TCombinacao] of String = (
@@ -209,7 +281,12 @@ const
     'Where + First + Skip',
     'Where + OrderBy ASC + First + Skip',
     'Where + OrderBy DESC + First + Skip',
-    'Where AND Where + First + Skip'
+    'Where AND Where + First + Skip',
+    'Distinct + First + Skip',
+    'Distinct SEM paginacao',
+    'GroupBy + First + Skip',
+    'Union + First + Skip',
+    'WithAlias + First + Skip'
   );
 
   cDIALETO: array[TFluentSQLDriver] of String = (
@@ -240,6 +317,21 @@ begin
       Result := Query(ADriver).Select.All.From('T')
                   .Where('ATIVO').Equal(1).AndOpe('IDADE').GreaterThan(18)
                   .First(10).Skip(20).AsString;
+    cbDistinct:
+      Result := Query(ADriver).Select.Distinct.Column('NOME').From('T')
+                  .First(10).Skip(20).AsString;
+    cbDistinctSemPaginacao:
+      Result := Query(ADriver).Select.Distinct.Column('NOME').From('T').AsString;
+    cbGroupBy:
+      Result := Query(ADriver).Select.Column('NOME').From('T')
+                  .GroupBy('NOME').First(10).Skip(20).AsString;
+    cbUnion:
+      Result := Query(ADriver).Select.All.From('T')
+                  .Union(Query(ADriver).Select.All.From('U'))
+                  .First(10).Skip(20).AsString;
+    cbWith:
+      Result := Query(ADriver).Select.All.From('T')
+                  .WithAlias('CTE').First(10).Skip(20).AsString;
   else
     raise Exception.Create('Combinacao sem montagem em _Monta. ' +
       'Toda combinacao de TCombinacao precisa estar coberta pela matriz.');
@@ -290,7 +382,10 @@ begin
   begin
     if not _EstaRegistrado(LDriver) then
       Continue;
-    for LComb := Low(TCombinacao) to High(TCombinacao) do
+    // So as combinacoes COM filtro. As da T10 (cbDistinct em diante) nao levam
+    // Where de proposito: o que elas verificam e a preservacao de OUTRA
+    // clausula, e cada uma tem seu proprio teste.
+    for LComb := cbFirst to cbDoisTermos do
     begin
       Inc(LCelulas);
       try
@@ -314,25 +409,19 @@ begin
     ' celulas percorridas:' + LFalhas);
 end;
 
-procedure TTestPaginationWithFilter.TestMSSQLPaginacaoComFiltroEmiteWhereNaoAnd;
+procedure TTestPaginationWithFilter.TestMSSQLPaginacaoComFiltroPreservaPredicado;
 var
   LSql: String;
 begin
   LSql := Query(dbnMSSQL).Select.All.From('T')
             .Where('ATIVO').Equal(1).First(10).Skip(20).AsString;
-  Assert.Contains(LSql, ') AS T WHERE (ATIVO = :p1) AND (ROWNUMBER', False,
-    'O predicado do usuario tem que abrir a clausula WHERE da consulta externa.');
-  Assert.DoesNotContain(LSql, ') AS T AND (', False,
-    'AND sem WHERE na consulta externa: o SQL Server recusa com Msg 156.');
-end;
-
-procedure TTestPaginationWithFilter.TestMSSQLPaginacaoSemFiltroContinuaComWhere;
-var
-  LSql: String;
-begin
-  LSql := Query(dbnMSSQL).Select.All.From('T').First(10).Skip(20).AsString;
-  Assert.Contains(LSql, ') AS T WHERE (ROWNUMBER > 20 AND ROWNUMBER <= 30)', False,
-    'Paginacao sem filtro ja funcionava; a correcao do caso com filtro nao pode quebra-la.');
+  Assert.Contains(LSql, 'WHERE (ATIVO = :p1)', False,
+    'O predicado do usuario tem que sobreviver a paginacao. Era exatamente ele ' +
+    'que sumia antes da T9.');
+  Assert.DoesNotContain(LSql, ' AND (ROWNUMBER', False,
+    'A T10 apagou o predicado ROWNUMBER: a paginacao virou cauda OFFSET/FETCH. ' +
+    'Se ROWNUMBER reaparecer, o driver voltou a subconsulta com ROW_NUMBER().');
+  Assert.Contains(LSql, 'OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY', False);
 end;
 
 procedure TTestPaginationWithFilter.TestBindEPredicadoNaoDivergem;
@@ -350,50 +439,410 @@ begin
     'foi exatamente assim que o defeito passou despercebido.');
 end;
 
-procedure TTestPaginationWithFilter.TestMSSQLFirstSozinhoNaoInventaLimiteInferior;
+/// <summary>
+///   O que cada dialeto emite para First(10) SOZINHO e para Skip(20) SOZINHO,
+///   sempre com o filtro. As duas tabelas sao a forma canonica medida em motor
+///   real; qualquer alteracao aqui tem que vir com uma medicao nova nos .sql.
+/// </summary>
+const
+  cFIRST_SOZINHO: array[TFluentSQLDriver] of String = (
+    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY',
+    {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 10',
+    {dbnFirebird}   'SELECT FIRST 10 * FROM T WHERE (ATIVO = :p1)',
+    {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 10',
+    {dbnInterbase}  '',
+    {dbnDB2}        '',
+    {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) FETCH NEXT 10 ROWS ONLY',
+    {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 10',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"limit":10}'
+  );
+
+  cSKIP_SOZINHO: array[TFluentSQLDriver] of String = (
+    // MSSQL: OFFSET sem FETCH e valido; e o FETCH que exigiria OFFSET, nao o contrario.
+    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 20 ROWS',
+    // MySQL: "OFFSET 20" solto e ERROR 1064. O teto e 2^64-1, o maior aceito.
+    {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 18446744073709551615 OFFSET 20',
+    {dbnFirebird}   'SELECT SKIP 20 * FROM T WHERE (ATIVO = :p1)',
+    // SQLite: "OFFSET 20" solto e syntax error. LIMIT negativo = sem teto.
+    {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT -1 OFFSET 20',
+    {dbnInterbase}  '',
+    {dbnDB2}        '',
+    {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20 ROWS',
+    // PostgreSQL: o unico com OFFSET como clausula independente. Sem teto.
+    {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":20}'
+  );
+
+/// <summary>Percorre os dialetos registrados comparando string exata, com caixa.</summary>
+procedure _ConfereTabela(const ATabela: array of String; const ACombinacao: TCombinacao;
+  const AMensagem: String);
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LObtido: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    Assert.AreNotEqual('', ATabela[Ord(LDriver)],
+      cDIALETO[LDriver] + ' esta registrado mas nao tem linha na tabela: ' +
+      'ligar um driver no .inc passa a cobra-lo por esta regra.');
+    try
+      LObtido := _Monta(LDriver, ACombinacao);
+    except
+      on E: Exception do
+      begin
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] + ' -> levantou ' +
+          E.ClassName + ': ' + E.Message;
+        Continue;
+      end;
+    end;
+    // Comparacao SENSIVEL A CAIXA feita na mao: Assert.AreEqual do DUnitX
+    // ignora caixa por padrao, e numa biblioteca cujo produto E texto SQL isso
+    // deixa 'select' passar por 'SELECT'.
+    if LObtido <> ATabela[Ord(LDriver)] then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        sLineBreak + '    esperado: ' + ATabela[Ord(LDriver)] +
+        sLineBreak + '    obtido  : ' + LObtido;
+  end;
+  Assert.AreEqual('', LFalhas, AMensagem + LFalhas);
+end;
+
+procedure TTestPaginationWithFilter.TestFirstSozinhoEmTodoDialeto;
+begin
+  _ConfereTabela(cFIRST_SOZINHO, cbFirst,
+    'First(10) sem Skip mudou de forma em algum dialeto:');
+end;
+
+procedure TTestPaginationWithFilter.TestSkipSozinhoEmTodoDialeto;
+begin
+  _ConfereTabela(cSKIP_SOZINHO, cbSkip,
+    'Skip(20) sem First mudou de forma em algum dialeto. Este e o caso que ' +
+    'estava quebrado em MSSQL, Oracle, MySQL e SQLite ao mesmo tempo:');
+end;
+
+procedure TTestPaginationWithFilter.TestSqlExatoSkipSozinho;
+begin
+  // Mesma tabela do teste acima, exposta como caso proprio da camada 2 porque e
+  // aqui que os TETOS ficam presos. Trocar 18446744073709551615 por qualquer
+  // outro numero, ou -1 por 0, faz a consulta devolver ZERO linhas em vez de
+  // todas a partir do deslocamento - sem erro nenhum do motor.
+  Assert.AreEqual('SELECT * FROM T WHERE (ATIVO = ?) LIMIT 18446744073709551615 OFFSET 20',
+    _Monta(dbnMySQL, cbSkip), False,
+    'O teto do MySQL e 2^64-1: medido, 2^64 e recusado com ERROR 1064.');
+  Assert.AreEqual('SELECT * FROM T WHERE (ATIVO = :p1) LIMIT -1 OFFSET 20',
+    _Monta(dbnSQLite, cbSkip), False,
+    'LIMIT negativo e o "no upper bound" documentado do SQLite. LIMIT 0 ' +
+    'devolveria conjunto vazio.');
+  Assert.AreEqual('SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20',
+    _Monta(dbnPostgreSQL, cbSkip), False,
+    'O PostgreSQL NAO leva teto: e o unico em que OFFSET e clausula independente.');
+end;
+
+procedure TTestPaginationWithFilter.TestMSSQLOrderByDoUsuarioPrecedeOffsetFetch;
 begin
   Assert.AreEqual(
-    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER ' +
-    'FROM T) AS T WHERE (ATIVO = :p1) AND (ROWNUMBER <= 10)',
-    _Monta(dbnMSSQL, cbFirst), False);
-end;
-
-procedure TTestPaginationWithFilter.TestMSSQLSkipSozinhoNaoInventaLimiteSuperior;
-begin
+    'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY NOME ASC OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
+    _Monta(dbnMSSQL, cbOrderByAsc), False,
+    'O ORDER BY do usuario tem que vir imediatamente antes do OFFSET/FETCH: ' +
+    'e a unica posicao valida da sub-clausula no T-SQL.');
   Assert.AreEqual(
-    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER ' +
-    'FROM T) AS T WHERE (ATIVO = :p1) AND (ROWNUMBER > 20)',
-    _Monta(dbnMSSQL, cbSkip), False);
+    'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY NOME DESC OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
+    _Monta(dbnMSSQL, cbOrderByDesc), False,
+    'DESC do usuario tem que chegar inteiro; e ele que define o que e a pagina 2.');
+  Assert.DoesNotContain(_Monta(dbnMSSQL, cbOrderByAsc), '(SELECT NULL)', False,
+    'Com OrderBy do usuario nao entra preenchimento nenhum.');
 end;
 
-procedure TTestPaginationWithFilter.TestMSSQLJanelaUsaOrderByDoUsuario;
-begin
-  Assert.Contains(_Monta(dbnMSSQL, cbOrderByAsc),
-    'ROW_NUMBER() OVER(ORDER BY NOME ASC) AS ROWNUMBER', False,
-    'A janela tem que numerar pela ordenacao do usuario; e ela que define a pagina.');
-  Assert.Contains(_Monta(dbnMSSQL, cbOrderByDesc),
-    'ROW_NUMBER() OVER(ORDER BY NOME DESC) AS ROWNUMBER', False,
-    'DESC do usuario tem que chegar na janela, nao so no ORDER BY externo.');
-end;
-
-procedure TTestPaginationWithFilter.TestMSSQLJanelaSemOrderByUsaSelectNull;
+procedure TTestPaginationWithFilter.TestMSSQLSemOrderByUsaSelectNull;
 var
   LSql: String;
 begin
   LSql := _Monta(dbnMSSQL, cbFirstSkip);
-  Assert.Contains(LSql, 'ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER', False);
+  Assert.AreEqual(
+    'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
+    LSql, False);
   Assert.DoesNotContain(LSql, 'CURRENT_TIMESTAMP', False,
-    'CURRENT_TIMESTAMP na janela sugere uma ordenacao que nao existe. Nao e ' +
-    'pior que (SELECT NULL) em comportamento - o plano e o mesmo -, e pior em ' +
-    'leitura, e e so isso que este assert prende.');
+    'CURRENT_TIMESTAMP sugere uma ordenacao que nao existe.');
+  Assert.DoesNotContain(LSql, 'NEWID', False,
+    'NEWID() e avaliado por linha e custa um Sort sem comprar unicidade.');
+end;
+
+procedure TTestPaginationWithFilter.TestMSSQLDistinctEUnionUsamOrdinalPorqueSelectNullERecusado;
+var
+  LDistinct: String;
+  LUnion: String;
+begin
+  LDistinct := Query(dbnMSSQL).Select.Distinct.Column('NOME').From('T')
+                 .First(10).Skip(20).AsString;
+  LUnion := Query(dbnMSSQL).Select.All.From('T')
+              .Union(Query(dbnMSSQL).Select.All.From('U'))
+              .First(10).Skip(20).AsString;
+
+  Assert.AreEqual('SELECT DISTINCT NOME FROM T ORDER BY 1 OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
+    LDistinct, False,
+    'Sob DISTINCT o SQL Server recusa ORDER BY (SELECT NULL) com Msg 145 ' +
+    '("ORDER BY items must appear in the select list"). O ordinal e o unico ' +
+    'item que sempre esta na lista de selecao.');
+  Assert.AreEqual('SELECT * FROM T UNION SELECT * FROM U ORDER BY 1 OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
+    LUnion, False,
+    'Sob UNION o SQL Server recusa ORDER BY (SELECT NULL) com Msg 104, pela ' +
+    'mesma regra.');
+
+  // E o contrapeso: fora desses dois casos o ordinal NAO entra, porque ele custa
+  // um operador Sort e (SELECT NULL) nao custa (caso S de test.pagination.mssql.sql).
+  Assert.DoesNotContain(_Monta(dbnMSSQL, cbFirstSkip), 'ORDER BY 1', False,
+    'ORDER BY 1 fora de DISTINCT/UNION acrescentaria um Sort ao plano de toda ' +
+    'consulta paginada sem OrderBy. So entra onde (SELECT NULL) e recusado.');
+end;
+
+/// <summary>
+///   Nome da classe de excecao que o dialeto levantou para a consulta dada, ou
+///   '' se nao levantou. Uma excecao NOMEADA e resposta aceitavel; "Exception"
+///   pelado nao e - nao ha o que capturar nem o que distinguir.
+/// </summary>
+function _ClasseDaExcecao(const ADriver: TFluentSQLDriver;
+  const ACombinacao: TCombinacao): String;
+begin
+  Result := '';
+  try
+    _Monta(ADriver, ACombinacao);
+  except
+    on E: Exception do
+      Result := E.ClassName;
+  end;
+end;
+
+procedure TTestPaginationWithFilter.TestDistinctComPaginacaoEmTodoDialeto;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LClasse: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    LClasse := _ClasseDaExcecao(LDriver, cbDistinct);
+    if LClasse <> '' then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> levantou ' + LClasse;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'Distinct + paginacao levantava Exception CRUA em MSSQL, MySQL, PostgreSQL ' +
+    'e Oracle (os quatro tratavam sqDistinct como qualificador desconhecido ' +
+    'dentro do laco de paginacao). Nenhum dialeto pode recusar esta combinacao:' +
+    LFalhas);
+end;
+
+procedure TTestPaginationWithFilter.TestDistinctSozinhoNaoExplodeEmDialetoNenhum;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LClasse: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    LClasse := _ClasseDaExcecao(LDriver, cbDistinctSemPaginacao);
+    if LClasse <> '' then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> levantou ' + LClasse;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'Select.Distinct SEM First nem Skip. Isto nao e paginacao - e a prova de que ' +
+    'o defeito morava no laco de paginacao e vazava para quem nunca paginou:' +
+    LFalhas);
+  // E a forma tambem estava errada, em tres dialetos, sem paginacao nenhuma:
+  // "SELECT NOME DISTINCT FROM T", com o DISTINCT DEPOIS da lista de colunas.
+  Assert.AreEqual('SELECT DISTINCT NOME FROM T',
+    _Monta(dbnMSSQL, cbDistinctSemPaginacao), False);
+  Assert.AreEqual('SELECT DISTINCT NOME FROM T',
+    _Monta(dbnOracle, cbDistinctSemPaginacao), False);
+end;
+
+procedure TTestPaginationWithFilter.TestGroupByComPaginacaoEmTodoDialeto;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LSql: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    try
+      LSql := _Monta(LDriver, cbGroupBy);
+    except
+      on E: Exception do
+      begin
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+          ' -> levantou ' + E.ClassName + ': ' + E.Message;
+        Continue;
+      end;
+    end;
+    // O MongoDB agrupa via pipeline ($group), nao via a palavra GROUP BY.
+    if LDriver = dbnMongoDB then
+    begin
+      if Pos('"$group"', LSql) = 0 then
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+          ' -> perdeu o estagio $group em: ' + LSql;
+    end
+    else if Pos('GROUP BY NOME', LSql) = 0 then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> perdeu o GROUP BY em: ' + LSql;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'Paginar nao pode descartar o agrupamento:' + LFalhas);
+end;
+
+procedure TTestPaginationWithFilter.TestPaginacaoNaoDescartaUnion;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LSql: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    // O MongoDB nao tem UNION; ele recusa, e a recusa dele nao e materia deste
+    // teste - e do TestNenhumDialetoRecusaComExcecaoCrua.
+    if LDriver = dbnMongoDB then
+      Continue;
+    try
+      LSql := _Monta(LDriver, cbUnion);
+    except
+      on E: Exception do
+      begin
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+          ' -> levantou ' + E.ClassName + ': ' + E.Message;
+        Continue;
+      end;
+    end;
+    if Pos('UNION', LSql) = 0 then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> perdeu o UNION em: ' + LSql;
+    if Pos('FROM U', LSql) = 0 then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> perdeu o ramo direito do UNION em: ' + LSql;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'No MSSQL, ate a T10, paginar DESCARTAVA o UNION e o ramo inteiro EM ' +
+    'SILENCIO: o SQL saia valido e incompleto, sem erro nenhum. A causa era ' +
+    'TFluentSQLSerializerMSSQL.AsString remontar o corpo por conta propria em ' +
+    'vez de delegar a ComposeSqlCore:' + LFalhas);
+end;
+
+procedure TTestPaginationWithFilter.TestPaginacaoNaoDescartaCTE;
+var
+  LDriver: TFluentSQLDriver;
+  LFalhas: String;
+  LSql: String;
+  LClasse: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    if LDriver = dbnMongoDB then
+    begin
+      // O MongoDB nao tem CTE. Aqui a regra nao e "preserve", e "recuse com
+      // classe NOMEADA" - e ele ja recusa assim.
+      LClasse := _ClasseDaExcecao(LDriver, cbWith);
+      if (LClasse = '') or (LClasse = 'Exception') then
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+          ' -> deveria recusar CTE com excecao nomeada, mas devolveu "' + LClasse + '"';
+      Continue;
+    end;
+    try
+      LSql := _Monta(LDriver, cbWith);
+    except
+      on E: Exception do
+      begin
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+          ' -> levantou ' + E.ClassName + ': ' + E.Message;
+        Continue;
+      end;
+    end;
+    if Pos('WITH CTE AS (', LSql) = 0 then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        ' -> perdeu a CTE em: ' + LSql;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'No MSSQL, ate a T10, paginar DESCARTAVA a CTE EM SILENCIO, pela mesma ' +
+    'causa do UNION:' + LFalhas);
+end;
+
+procedure TTestPaginationWithFilter.TestNenhumDialetoRecusaComExcecaoCrua;
+var
+  LDriver: TFluentSQLDriver;
+  LComb: TCombinacao;
+  LFalhas: String;
+  LClasse: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    for LComb := Low(TCombinacao) to High(TCombinacao) do
+    begin
+      LClasse := _ClasseDaExcecao(LDriver, LComb);
+      if LClasse = 'Exception' then
+        LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] + ' / ' +
+          cCOMBINACAO[LComb] + ' -> Exception crua';
+    end;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'Exception pelado nao e contrato: o consumidor nao tem o que capturar nem ' +
+    'como distinguir de qualquer outra falha. Se um dialeto nao suporta uma ' +
+    'combinacao, tem que dizer isso com classe NOMEADA:' + LFalhas);
+end;
+
+procedure TTestPaginationWithFilter.TestAsStringRepetidoNaoDuplicaNadaEmDialetoNenhum;
+var
+  LDriver: TFluentSQLDriver;
+  LQuery: IFluentSQL;
+  LPrimeira: String;
+  LSegunda: String;
+  LFalhas: String;
+begin
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _EstaRegistrado(LDriver) then
+      Continue;
+    LQuery := Query(LDriver).Select.All.From('T')
+                .Where('ATIVO').Equal(1).First(10).Skip(20);
+    LPrimeira := LQuery.AsString;
+    LSegunda := LQuery.AsString;
+    if LPrimeira <> LSegunda then
+      LFalhas := LFalhas + sLineBreak + '  ' + cDIALETO[LDriver] +
+        sLineBreak + '    1a: ' + LPrimeira +
+        sLineBreak + '    2a: ' + LSegunda;
+  end;
+  Assert.AreEqual('', LFalhas,
+    'AsString escreveu no AST. No MSSQL a coluna ROW_NUMBER() era INJETADA em ' +
+    'AAST.Select.Columns durante a serializacao, entao a segunda chamada ' +
+    'acumulava uma segunda ROWNUMBER. Sem a injecao o defeito morreu no MSSQL; ' +
+    'este teste cobre os sete para que ninguem o reintroduza em outro driver:' +
+    LFalhas);
 end;
 
 procedure TTestPaginationWithFilter.TestSqlExatoMSSQL;
 begin
   Assert.AreEqual(
-    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY NOME ASC) AS ROWNUMBER ' +
-    'FROM T) AS T WHERE (ATIVO = :p1) AND (ROWNUMBER > 20 AND ROWNUMBER <= 30) ' +
-    'ORDER BY NOME ASC',
+    'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY NOME ASC ' +
+    'OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
     _Monta(dbnMSSQL, cbOrderByAsc), False);
 end;
 
@@ -414,10 +863,19 @@ end;
 procedure TTestPaginationWithFilter.TestSqlExatoOracle;
 begin
   Assert.AreEqual(
-    'SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI FROM ' +
-    '(SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY NOME ASC) T) ' +
-    'WHERE ROWNUM <= 10 AND ROWINI > 20',
+    'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY NOME ASC ' +
+    'OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
     _Monta(dbnOracle, cbOrderByAsc), False);
+end;
+
+procedure TTestPaginationWithFilter.TestSqlExatoSQLite;
+begin
+  // O SQLite estava FORA da camada 2 ate a T10, porque a string que ele emitia
+  // ("SELECT LIMIT 10 OFFSET 20 * FROM T") nao e SQL valido e congela-la seria
+  // abencoar o defeito. Entrou agora.
+  Assert.AreEqual(
+    'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY NOME ASC LIMIT 10 OFFSET 20',
+    _Monta(dbnSQLite, cbOrderByAsc), False);
 end;
 
 procedure TTestPaginationWithFilter.TestSqlExatoPostgreSQL;
