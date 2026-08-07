@@ -45,6 +45,58 @@
   Dialetos desligados no FluentSQL.inc entram na matriz assim mesmo, exigindo a
   excecao NOMEADA EFluentSQLDriverNotRegistered - nao [Ignore] silencioso. Ligar
   um driver no .inc passa a cobra-lo pela regra, que e o comportamento desejado.
+
+  ------------------------------------------------------------------------------
+  ORDENACAO E PAGINACAO: o que este arquivo trava, e o que NAO promete
+
+  Um teste que congela SQL de paginacao convida a leitura de que a paginacao
+  ficou estavel. Nao ficou, e a distincao importa mais que o teste.
+
+  COM OrderBy do usuario, a janela do ROW_NUMBER() usa ESSE OrderBy. Essa e a
+  correcao de verdade: sem ela o MSSQL numerava por outra coisa e so ordenava no
+  fim, devolvendo OUTRA pagina - SQL valido, dado errado, calado. Travado por
+  TestMSSQLJanelaUsaOrderByDoUsuario.
+
+    RESSALVA, e ela e do framework inteiro, nao so do MSSQL: a doc da Microsoft
+    condiciona a estabilidade a coluna UNICA -
+
+      "There is no guarantee that the rows returned by a query using
+       ROW_NUMBER() will be ordered exactly the same with each execution unless
+       [...] Values of the ORDER BY columns are unique."
+      https://learn.microsoft.com/en-us/sql/t-sql/functions/row-number-transact-sql
+
+      "The ORDER BY clause contains a column or combination of columns that are
+       guaranteed to be unique."
+      https://learn.microsoft.com/en-us/sql/t-sql/queries/select-order-by-clause-transact-sql
+
+    O FluentSQL NAO impoe unicidade, por decisao de projeto. Ordenar por coluna
+    com valores repetidos deixa as linhas empatadas dentro do grupo e a fronteira
+    entre paginas pode variar entre execucoes. Quem precisa de estabilidade
+    ordena por chave unica ou acrescenta uma como desempate.
+
+  SEM OrderBy do usuario sai ORDER BY (SELECT NULL). Isso NAO e conserto de
+  determinismo e o arquivo nao deve ser lido como se fosse. E preenchimento
+  exigido pela GRAMATICA: no OVER o order_by_clause "is required", e
+  <offset_fetch> so existe como sub-clausula do ORDER BY - nao ha como emitir
+  nada. Entre os preenchimentos possiveis, (SELECT NULL) e o unico medido que
+  nao acrescenta operador Sort ao plano. CURRENT_TIMESTAMP, a forma anterior,
+  produz PLANO IDENTICO a (SELECT NULL) - os dois empatam todas as linhas
+  igualmente; a troca foi de idioma, nao de comportamento. NEWID() foi
+  descartado por ser avaliado por linha e custar um Sort sem comprar unicidade.
+  Medido no caso P de test.pagination.filter.mssql.sql, com os planos das quatro
+  formas lado a lado.
+
+  PAGINAR SEM NENHUMA ORDENACAO devolve um subconjunto arbitrario. Isso e
+  semantica do SQL e vale nos 7 dialetos, nao e defeito a corrigir aqui:
+
+    "This is not a bug; it is an inherent consequence of the fact that SQL does
+     not promise to deliver the results of a query in any particular order
+     unless ORDER BY is used."
+    https://www.postgresql.org/docs/current/queries-limit.html
+
+  E por isso que o FluentSQL NAO exige OrderBy para paginar: 6 dos 7 dialetos
+  aceitam paginar sem ordenacao, e exigir seria inventar restricao que os bancos
+  nao tem.
   ------------------------------------------------------------------------------
 }
 
@@ -93,20 +145,27 @@ type
     [Test]
     procedure TestMSSQLSkipSozinhoNaoInventaLimiteSuperior;
     /// <summary>
-    ///   A janela do ROW_NUMBER() usa o ORDER BY do usuario. Numerar por outra
-    ///   coisa e ordenar so no fim nao embaralha a pagina: devolve OUTRA
-    ///   pagina. Ordenar por constante empata todas as linhas, entao quem
-    ///   decide a numeracao passa a ser o plano de execucao, e o recorte sai
-    ///   de um conjunto que nao e o que o usuario ordenou.
-    ///   Medicao repetivel em test.pagination.filter.mssql.sql (casos D2/D2b),
-    ///   com o docker run e a saida bruta.
+    ///   A CORRECAO DE VERDADE: dado um OrderBy, a janela numera por ele.
+    ///   Numerar por outra coisa e ordenar so no fim nao embaralha a pagina -
+    ///   devolve OUTRA pagina, porque o recorte sai de um conjunto que nao e o
+    ///   que o usuario ordenou. Medido em test.pagination.filter.mssql.sql,
+    ///   casos D2/D2b/D2c, com gabarito independente via OFFSET/FETCH nativo.
+    ///
+    ///   Nao promete estabilidade entre execucoes: para isso a doc da Microsoft
+    ///   exige coluna UNICA, e o framework nao impoe unicidade. Ver o cabecalho.
     /// </summary>
     [Test]
     procedure TestMSSQLJanelaUsaOrderByDoUsuario;
     /// <summary>
-    ///   Sem ORDER BY do usuario a janela usa o idioma T-SQL (SELECT NULL).
-    ///   CURRENT_TIMESTAMP e aceito pelo motor mas finge uma ordenacao que nao
-    ///   existe - toda linha recebe o mesmo valor e empata com todas as outras.
+    ///   Sem OrderBy do usuario sai ORDER BY (SELECT NULL) - preenchimento
+    ///   exigido pela gramatica do T-SQL, ja que o order_by_clause do OVER "is
+    ///   required". NAO e conserto de determinismo: (SELECT NULL) e
+    ///   CURRENT_TIMESTAMP empatam todas as linhas igualmente e dao o MESMO
+    ///   plano, sem Sort (caso P do .sql). O criterio de escolha entre os dois
+    ///   e idioma, e entre eles e NEWID() e custo - NEWID() acrescenta Sort sem
+    ///   comprar unicidade.
+    ///
+    ///   O assert prende a forma emitida, nao uma promessa de ordem.
     /// </summary>
     [Test]
     procedure TestMSSQLJanelaSemOrderByUsaSelectNull;
@@ -324,7 +383,9 @@ begin
   LSql := _Monta(dbnMSSQL, cbFirstSkip);
   Assert.Contains(LSql, 'ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER', False);
   Assert.DoesNotContain(LSql, 'CURRENT_TIMESTAMP', False,
-    'CURRENT_TIMESTAMP na janela finge uma ordenacao que nao existe.');
+    'CURRENT_TIMESTAMP na janela sugere uma ordenacao que nao existe. Nao e ' +
+    'pior que (SELECT NULL) em comportamento - o plano e o mesmo -, e pior em ' +
+    'leitura, e e so isso que este assert prende.');
 end;
 
 procedure TTestPaginationWithFilter.TestSqlExatoMSSQL;
