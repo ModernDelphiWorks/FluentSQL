@@ -11,8 +11,14 @@
   a palavra WHERE por AND.
 
     ce9efd0:  ... FROM T) AS T AND (ROWNUMBER > 20 AND ROWNUMBER <= 30)
-              (o ATIVO = :p1 nao esta em lugar nenhum; o SQL Server responde
-               "Msg 156, Incorrect syntax near the keyword 'AND'")
+              (o ATIVO = :p1 nao esta em lugar nenhum)
+
+  ONDE CONFERIR O QUE O MOTOR REALMENTE FAZ: test.pagination.filter.mssql.sql,
+  nesta mesma pasta. Este arquivo .pas afirma coisas sobre o comportamento do
+  SQL Server - que forma ele recusa, que forma devolve a pagina certa - e
+  afirmacao dessas nao pode viver so no comentario de quem mediu. O .sql traz o
+  docker run exato (nao exige SQL Server instalado), o SQL submetido e a saida
+  bruta transcrita, para qualquer um repetir ou contestar.
 
   REGRA QUE ESTE ARQUIVO TRAVA: consulta filtrada e paginada preserva o filtro.
   Vale para TODO dialeto, em TODA combinacao de First/Skip/OrderBy. Nao e uma
@@ -88,8 +94,12 @@ type
     procedure TestMSSQLSkipSozinhoNaoInventaLimiteSuperior;
     /// <summary>
     ///   A janela do ROW_NUMBER() usa o ORDER BY do usuario. Numerar por outra
-    ///   coisa e ordenar so no fim devolve OUTRA pagina: medido no SQL Server
-    ///   2022, "pagina 2 de 10 por NOME" dava K..T em vez de B..K.
+    ///   coisa e ordenar so no fim nao embaralha a pagina: devolve OUTRA
+    ///   pagina. Ordenar por constante empata todas as linhas, entao quem
+    ///   decide a numeracao passa a ser o plano de execucao, e o recorte sai
+    ///   de um conjunto que nao e o que o usuario ordenou.
+    ///   Medicao repetivel em test.pagination.filter.mssql.sql (casos D2/D2b),
+    ///   com o docker run e a saida bruta.
     /// </summary>
     [Test]
     procedure TestMSSQLJanelaUsaOrderByDoUsuario;
@@ -367,14 +377,11 @@ end;
 procedure TTestPaginationWithFilter.TestDialetoDesligadoRecusaComExcecaoNomeada;
 var
   LDriver: TFluentSQLDriver;
-  LDesligados: Integer;
 begin
-  LDesligados := 0;
   for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
   begin
     if _EstaRegistrado(LDriver) then
       Continue;
-    Inc(LDesligados);
     Assert.WillRaise(
       procedure
       begin
@@ -384,7 +391,6 @@ begin
       cDIALETO[LDriver] + ' esta desligado no .inc: tem que recusar com a ' +
       'excecao nomeada, nunca com EAccessViolation nem Exception crua.');
   end;
-  Assert.IsTrue(LDesligados >= 0, 'Sonda estrutural; sem dialeto desligado o teste e trivial.');
 end;
 
 initialization
