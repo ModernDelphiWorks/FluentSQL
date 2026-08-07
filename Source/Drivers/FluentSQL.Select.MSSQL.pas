@@ -61,17 +61,40 @@ end;
 ///      FROM T". Isso nao dependia de paginacao nenhuma - Select.Distinct sozinho
 ///      ja emitia essa forma, que o SQL Server recusa. O DISTINCT antecede a lista
 ///      de colunas em T-SQL, como em ANSI.
+///
+///   UMA coisa VOLTOU para ca, e so uma: o "TOP 0" de First(0). Ele nao e
+///   embrulho nem subconsulta - e uma palavra na lista de selecao -, entao nao
+///   traz de volta o acoplamento que fazia UNION e CTE sumirem. Vai DEPOIS do
+///   DISTINCT, porque a ordem inversa e recusada:
+///
+///     SELECT DISTINCT TOP 0 NOME FROM T   -> aceito, 0 linhas
+///     SELECT TOP 0 DISTINCT NOME FROM T   -> Msg 156, Incorrect syntax near
+///                                            the keyword 'DISTINCT'
+///
+///   Nao ha cauda OFFSET/FETCH junto: o FETCH nao aceita zero (Msg 10744) e o TOP
+///   nao coexiste com OFFSET (Msg 10741). Descartar o Skip(n) do usuario aqui e
+///   CORRETO - pular n linhas de um conjunto vazio da o mesmo conjunto vazio -, e
+///   de quebra dispensa a clausula ORDER BY de preenchimento, que so existia para
+///   hospedar o OFFSET/FETCH.
+///
+///   Medido em test.pagination.mssql.sql, parte Z: o TOP 0 NAO LE a tabela -
+///   zero leituras logicas, contra 767 da forma com OFFSET, em 200 mil linhas.
 /// </summary>
 function TFluentSQLSelectMSSQL.Serialize: String;
+var
+  LTop: String;
 begin
   if IsEmpty then
-    Result := ''
-  else
-    Result := TUtils.Concat(['SELECT',
-                             FQualifiers.SerializeDistinct,
-                             FColumns.Serialize,
-                             'FROM',
-                             FTableNames.Serialize]);
+    Exit('');
+  LTop := '';
+  if FQualifiers.RequestsZeroRows then
+    LTop := 'TOP 0';
+  Result := TUtils.Concat(['SELECT',
+                           FQualifiers.SerializeDistinct,
+                           LTop,
+                           FColumns.Serialize,
+                           'FROM',
+                           FTableNames.Serialize]);
 end;
 
 end.

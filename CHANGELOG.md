@@ -37,16 +37,21 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   | Dialeto | Antes | Depois |
   |---|---|---|
-  | MSSQL | `... OFFSET 0 ROWS FETCH NEXT 0 ROWS ONLY` — **`Msg 10744`**, recusado | `... OFFSET 9223372036854775807 ROWS` → 0 linhas |
+  | MSSQL | `... OFFSET 0 ROWS FETCH NEXT 0 ROWS ONLY` — **`Msg 10744`**, recusado | `SELECT TOP 0 ...` → 0 linhas |
+  | MSSQL, com `UNION`/`UNION ALL`/`EXCEPT`/`INTERSECT` | idem | `... ORDER BY 1 OFFSET 9223372036854775807 ROWS` → 0 linhas |
   | MongoDB (`find`) | `"limit":0` — **devolvia a coleção INTEIRA**, em silêncio | `"skip":9223372036854775807` → 0 documentos |
   | MongoDB (`aggregate`) | `{"$limit":0}` — `the limit must be positive` | `{"$skip":9223372036854775807}` → 0 documentos |
   | Firebird / MySQL / SQLite / PostgreSQL / Oracle | já corretos | inalterados |
 
   No MongoDB `limit: 0` significa **sem limite** — o usuário pedia nada e recebia tudo, sem erro. Era o único dos sete em que `First(0)` falhava calado, e os dois caminhos do próprio driver (`find` e `aggregate`) discordavam entre si sobre o que `First(0)` queria dizer.
 
-  No SQL Server a restrição é do **literal**, não da semântica: o mesmo `FETCH` com o contador vindo de uma variável `BIGINT` valendo `0` é aceito e devolve zero linhas. Duas alternativas mais baratas foram medidas e **recusadas**: `SELECT TOP 0` não coexiste com `OFFSET` (`Msg 10741`) e num `UNION` limita apenas o primeiro ramo, devolvendo o outro inteiro; `FETCH NEXT (SELECT 0) ROWS ONLY` só é aceito quando o `OFFSET` é o literal `0`. A forma escolhida **custa uma varredura completa** — 767 leituras lógicas contra 0 do `TOP 0` numa tabela de 200 mil linhas —, preço aceito em troca de correção uniforme em todas as combinações. Medições em `test.pagination.mssql.sql`, parte Z.
+  No SQL Server a restrição é do **literal**, não da semântica: o mesmo `FETCH` com o contador vindo de uma variável `BIGINT` valendo `0` é aceito e devolve zero linhas. A forma usada é `SELECT TOP 0`, e ela **descarta o `Skip(n)`** do usuário — pular *n* linhas de um conjunto vazio dá o mesmo conjunto vazio, e é esse descarte que evita o `Msg 10741` (`TOP` não coexiste com `OFFSET`). De quebra, dispensa a cláusula `ORDER BY` de preenchimento, que só existia para hospedar o `OFFSET/FETCH`.
 
-  Onde MSSQL e MongoDB precisam do "pula tudo", o `Skip(n)` do usuário é **absorvido** (`First(0).Skip(20)` emite só o "pula tudo"): zero linhas é zero linhas com ou sem salto. Os outros cinco preservam os dois números.
+  A **única** combinação em que `TOP 0` não serve é a operação de conjunto: o `TOP` pertence a uma *query specification* e limita só o ramo em que está escrito — medido, `SELECT TOP 0 * FROM T UNION SELECT * FROM U` devolve as 60 linhas de `U`. Só aí entra a cauda `OFFSET 9223372036854775807 ROWS`, que **custa uma varredura completa**: 767 leituras lógicas contra **zero** do `TOP 0` em 200 mil linhas, e com `ORDER BY` mais 13 scans e uma *Worktable*. O custo ficou confinado a esse caso em vez de valer para todo `First(0)` — `First(pageSize)` com `pageSize` zerado dentro de um laço, numa tabela grande, é incidente de produção.
+
+  Também medido e recusado: `FETCH NEXT (SELECT 0) ROWS ONLY`, aceito e barato, mas só quando o `OFFSET` é o literal `0`. Todas as medições estão em `test.pagination.mssql.sql`, parte Z — **inclusive os caminhos não seguidos**, para que quem pensar em `TOP 0` ou em `(SELECT 0)` encontre a medição pronta em vez de refazê-la.
+
+  No MongoDB o `Skip(n)` também é descartado, pelo mesmo motivo. Os outros cinco dialetos preservam os dois números, porque conseguem exprimir o zero pelo limite.
 
   **`Skip(0)` foi medido correto nos 7 antes e depois** e não mudou — é "não pule nada", não "sem `Skip`".
 
@@ -60,6 +65,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
 - `EFluentSQLQualifierNotSupported` em `FluentSQL.Interfaces.pas`. Substitui oito cópias de `raise Exception.Create('... Unknown qualifier')` — quatro delas nomeando o driver errado na mensagem.
+- `IFluentSQLSelectQualifiers.RequestsZeroRows` — "o usuário pediu `First(0)`?". É pergunta sobre a coleção de qualificadores, não sobre dialeto: a **forma** de exprimir zero linhas varia (`TOP 0`, `LIMIT 0`, `FIRST 0`, pular tudo), o **pedido** é o mesmo nos sete. Não é `First = 0`, é `HasFirst and (First = 0)` — "não pediu `First`" e "pediu `First(0)`" são coisas diferentes e só a primeira devolve o conjunto todo.
 - Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4.
 - Matriz de teste `Test Delphi\Common_tests\test.pagination.filter.pas` foi de **15 para 28 testes**, e a contagem merece o detalhe porque `+13` esconde o que aconteceu: **6 removidos, 19 acrescentados**. Os 6 removidos descreviam a janela `ROW_NUMBER()` que deixou de existir, e cada um tem substituto:
 

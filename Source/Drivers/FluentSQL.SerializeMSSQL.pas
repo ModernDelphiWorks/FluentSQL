@@ -80,6 +80,23 @@ type
 
 implementation
 
+const
+  /// <summary>
+  ///   Deslocamento que pula TUDO. Usado SO para First(0) em consulta com
+  ///   operacao de conjunto (UNION/UNION ALL/EXCEPT/INTERSECT), onde o TOP 0 nao
+  ///   serve porque limita apenas UM ramo - medido, "SELECT TOP 0 * FROM T UNION
+  ///   SELECT * FROM U" devolve as 60 linhas de U.
+  ///
+  ///   E o maior BIGINT: 2^63 e recusado com "Msg 8115, Arithmetic overflow",
+  ///   o que prova que este e o teto. Mesmo idioma que o QualifierMySQL usa em
+  ///   sentido inverso (LIMIT 2^64-1 para "sem teto").
+  ///
+  ///   CUSTA uma varredura completa - 767 leituras logicas em 200 mil linhas,
+  ///   contra zero do TOP 0. O preco fica confinado a este caso: consulta com
+  ///   operacao de conjunto E First(0). Fora dele vale o TOP 0.
+  /// </summary>
+  cPULA_TUDO = 'OFFSET 9223372036854775807 ROWS';
+
 { TFluentSQLSerializer }
 
 function TFluentSQLSerializerMSSQL.PaginationOrderBy(const AAST: IFluentSQLAST): String;
@@ -122,6 +139,18 @@ begin
   // O MERGE nao e repetido aqui: ComposeSqlCore ja concatena AAST.Merge.Serialize,
   // que resolve para este mesmo TFluentSQLSerializerMSSQL.Merge via o Register.
   LPagination := AAST.Select.Qualifiers.SerializePagination;
+
+  // First(0) sai como "SELECT TOP 0" pela clausula SELECT, e nao precisa de
+  // cauda nenhuma - EXCETO quando ha operacao de conjunto. O TOP pertence a UMA
+  // query specification e limita so o ramo em que esta escrito; medido, o outro
+  // ramo vem inteiro. Aqui e o unico ponto que enxerga o UNION, entao e aqui que
+  // a cauda cara entra.
+  //
+  // O TOP 0 do primeiro ramo continua no texto e nao atrapalha: medido, ele
+  // COEXISTE com o OFFSET de nivel de UNION sem disparar o Msg 10741, porque os
+  // dois nao estao na mesma query specification.
+  if AAST.Select.Qualifiers.RequestsZeroRows and (AAST.UnionType <> '') then
+    LPagination := cPULA_TUDO;
   if LPagination <> '' then
     Result := TUtils.Concat([Result, PaginationOrderBy(AAST), LPagination]);
 

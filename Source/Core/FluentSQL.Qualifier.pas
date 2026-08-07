@@ -78,6 +78,7 @@ type
     procedure Add(AQualifier: IFluentSQLSelectQualifier); overload;
     procedure Clear;
     function ExecutingPagination: Boolean;
+    function RequestsZeroRows: Boolean;
     function Count: Integer;
     function IsEmpty: Boolean;
     function SerializePagination: String; virtual; abstract;
@@ -135,6 +136,22 @@ end;
 function TFluentSQLSelectQualifiers._GetQualifier(AIdx: Integer): IFluentSQLSelectQualifier;
 begin
   Result := FQualifiers[AIdx];
+end;
+
+/// <summary>
+///   Nao usa _Pagination de proposito: _Pagination levanta para qualificador
+///   desconhecido, e esta pergunta e feita durante a montagem do SELECT, antes
+///   de o driver decidir o que sabe emitir. Aqui so interessa saber se existe um
+///   sqFirst valendo zero.
+/// </summary>
+function TFluentSQLSelectQualifiers.RequestsZeroRows: Boolean;
+var
+  LFor: Integer;
+begin
+  Result := False;
+  for LFor := 0 to Count - 1 do
+    if (FQualifiers[LFor].Qualifier = sqFirst) and (FQualifiers[LFor].Value = 0) then
+      Exit(True);
 end;
 
 function TFluentSQLSelectQualifiers._Pagination(const ADialect: String): TFluentSQLPagination;

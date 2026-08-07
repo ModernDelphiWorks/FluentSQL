@@ -648,18 +648,22 @@ end;
 ///   First(0) por dialeto. Cada linha foi MEDIDA devolvendo zero linhas no
 ///   motor real - ver test.pagination.&lt;dialeto&gt;.sql, parte Z.
 ///
-///   Os dois numeros gigantes nao sao truque: sao o maior inteiro que cada
-///   motor aceita no deslocamento, usados para exprimir "pule tudo" = "devolva
-///   nada". Sao necessarios porque nesses dois dialetos NAO existe forma
-///   literal de pedir zero linhas pelo limite:
-///     MSSQL   "FETCH NEXT 0 ROWS ONLY" -> Msg 10744 (restricao do LITERAL: a
-///             mesma consulta com variavel BIGINT = 0 e aceita)
-///     MongoDB "limit":0 -> SEM LIMITE, devolve a colecao inteira; {"$limit":0}
-///             -> "the limit must be positive"
+///   O MSSQL usa TOP 0, a forma T-SQL de pedir o conjunto vazio, e NAO leva
+///   cauda: o FETCH nao aceita zero (Msg 10744) e o TOP nao coexiste com OFFSET
+///   (Msg 10741). Descartar o Skip do usuario aqui e correto - pular n linhas de
+///   um conjunto vazio da o mesmo conjunto vazio - e sai de graca: medido, o
+///   TOP 0 NAO LE a tabela (zero leituras logicas contra 767 da forma com
+///   OFFSET, em 200 mil linhas).
+///
+///   O numero gigante do MongoDB nao e truque: e o maior inteiro que o servidor
+///   aceita no "skip", usado para exprimir "pule tudo" = "devolva nada". E
+///   necessario porque ali NAO existe forma de pedir zero documentos pelo
+///   limite - "limit":0 significa SEM LIMITE e devolve a colecao inteira, e
+///   {"$limit":0} e recusado com "the limit must be positive".
 /// </summary>
 const
   cFIRST_ZERO: array[TFluentSQLDriver] of String = (
-    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS',
+    {dbnMSSQL}      'SELECT TOP 0 * FROM T WHERE (ATIVO = :p1)',
     {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 0',
     {dbnFirebird}   'SELECT FIRST 0 * FROM T WHERE (ATIVO = :p1)',
     {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0',
@@ -685,11 +689,11 @@ const
 
   /// <summary>
   ///   First(0) + Skip(20). Zero linhas e zero linhas com ou sem salto, entao
-  ///   MSSQL e MongoDB ABSORVEM o deslocamento do usuario no "pula tudo". Os
-  ///   outros cinco preservam os dois numeros porque conseguem exprimir o zero.
+  ///   MSSQL e MongoDB DESCARTAM o deslocamento do usuario. Os outros cinco
+  ///   preservam os dois numeros porque conseguem exprimir o zero pelo limite.
   /// </summary>
   cFIRST_ZERO_SKIP20: array[TFluentSQLDriver] of String = (
-    {dbnMSSQL}      'SELECT * FROM T WHERE (ATIVO = :p1) ORDER BY (SELECT NULL) OFFSET 9223372036854775807 ROWS',
+    {dbnMSSQL}      'SELECT TOP 0 * FROM T WHERE (ATIVO = :p1)',
     {dbnMySQL}      'SELECT * FROM T WHERE (ATIVO = ?) LIMIT 0 OFFSET 20',
     {dbnFirebird}   'SELECT FIRST 0 SKIP 20 * FROM T WHERE (ATIVO = :p1)',
     {dbnSQLite}     'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0 OFFSET 20',
@@ -779,15 +783,29 @@ begin
     end;
   end;
   Assert.AreEqual('', LFalhas,
-    'First(0) tem que valer em toda combinacao. E aqui que "SELECT TOP 0", a ' +
-    'alternativa obvia e mais barata no MSSQL, foi recusada: num UNION ela ' +
-    'limita so o primeiro ramo e devolve o outro inteiro:' + LFalhas);
-  // O UNION e o caso que derrubou o TOP 0. Prende a forma emitida.
+    'First(0) tem que valer em toda combinacao:' + LFalhas);
+
+  // O UNION e a UNICA combinacao em que o MSSQL nao pode usar TOP 0, e este
+  // assert e o que prende essa fronteira. O TOP pertence a UMA query
+  // specification: "SELECT TOP 0 * FROM T UNION SELECT * FROM U" devolve as 60
+  // linhas de U - medido. Por isso, e SO aqui, entra a cauda de "pular tudo",
+  // que custa uma varredura completa. O TOP 0 do primeiro ramo continua no texto
+  // e nao atrapalha: medido, ele coexiste com o OFFSET de nivel de UNION sem
+  // disparar o Msg 10741, porque os dois nao estao na mesma query specification.
   Assert.AreEqual(
-    'SELECT * FROM T UNION SELECT * FROM U ORDER BY 1 OFFSET 9223372036854775807 ROWS',
+    'SELECT TOP 0 * FROM T UNION SELECT * FROM U ORDER BY 1 OFFSET 9223372036854775807 ROWS',
     _Monta(dbnMSSQL, cbUnionFirstZero), False,
-    'A cauda tem que recortar o UNION INTEIRO. "SELECT TOP 0 * FROM T UNION ' +
-    'SELECT * FROM U" devolve as 60 linhas de U - medido.');
+    'Com operacao de conjunto a cauda tem que recortar o UNION INTEIRO.');
+  // E o contrapeso: FORA do UNION nao pode sobrar cauda nenhuma, senao o custo
+  // da varredura volta para o caso comum - que e o defeito que a terceira via
+  // veio consertar.
+  Assert.DoesNotContain(_Monta(dbnMSSQL, cbFirstZero), 'OFFSET', False,
+    'Sem operacao de conjunto, First(0) e so "SELECT TOP 0": zero leituras ' +
+    'logicas. A cauda com OFFSET custa varredura completa (767 leituras em ' +
+    '200 mil linhas) e nao pode vazar para o caso comum.');
+  Assert.DoesNotContain(_Monta(dbnMSSQL, cbFirstZero), 'ORDER BY', False,
+    'Sem OFFSET/FETCH nao ha o que hospedar: a clausula ORDER BY de ' +
+    'preenchimento tambem desaparece.');
 end;
 
 procedure TTestPaginationWithFilter.TestMSSQLOrderByDoUsuarioPrecedeOffsetFetch;

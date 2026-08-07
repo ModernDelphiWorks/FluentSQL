@@ -449,6 +449,17 @@ type
     procedure Add(AQualifier: IFluentSQLSelectQualifier); overload;
     procedure Clear;
     function ExecutingPagination: Boolean;
+    /// <summary>
+    ///   O usuario pediu First(0) - o conjunto VAZIO. E pergunta sobre a colecao
+    ///   de qualificadores, nao sobre dialeto, e por isso mora aqui e nao num
+    ///   driver: a FORMA de exprimir zero linhas varia (TOP 0 no T-SQL, LIMIT 0
+    ///   na maioria, FIRST 0 no Firebird, pular tudo no MongoDB), mas o PEDIDO e
+    ///   o mesmo nos sete.
+    ///
+    ///   NAO e (First = 0): e HasFirst AND (First = 0). "Nao pediu First" e
+    ///   "pediu First(0)" sao coisas diferentes, e so a primeira devolve tudo.
+    /// </summary>
+    function RequestsZeroRows: Boolean;
     function Count: Integer;
     function IsEmpty: Boolean;
     function SerializePagination: String;
