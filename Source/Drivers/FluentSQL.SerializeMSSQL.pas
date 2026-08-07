@@ -28,6 +28,22 @@ uses
 
 type
   TFluentSQLSerializerMSSQL = class(TFluentSQLSerialize)
+  strict private
+    /// <summary>
+    ///   Janela do ROW_NUMBER() que numera as linhas da paginacao.
+    ///
+    ///   Quando o usuario pediu um ORDER BY, a janela TEM que usar a ordenacao
+    ///   dele: e a ordenacao do usuario que define o que e "pagina 2". Numerar
+    ///   por outra coisa e depois ordenar o resultado devolve a pagina errada -
+    ///   SQL valido, dado errado, sem erro nenhum.
+    ///
+    ///   Sem ORDER BY do usuario nao existe ordem definida a respeitar; sai
+    ///   ORDER BY (SELECT NULL), que e o idioma T-SQL para "nao me importo".
+    ///   OVER(ORDER BY CURRENT_TIMESTAMP), a forma anterior, e aceita pelo
+    ///   motor mas sugere uma ordenacao que nao existe: como toda linha recebe
+    ///   o mesmo valor, empatam todas e a numeracao fica a criterio do plano.
+    /// </summary>
+    function PaginationWindow(const AAST: IFluentSQLAST): String;
   public
     function AsString(const AAST: IFluentSQLAST): String; override;
     function Merge(const ADef: IFluentSQLMergeDef): string; override;
@@ -38,10 +54,22 @@ implementation
 
 { TFluentSQLSerializer }
 
+function TFluentSQLSerializerMSSQL.PaginationWindow(const AAST: IFluentSQLAST): String;
+var
+  LOrderBy: String;
+begin
+  LOrderBy := AAST.OrderBy.Serialize;
+  if LOrderBy = '' then
+    LOrderBy := 'ORDER BY (SELECT NULL)';
+  Result := 'ROW_NUMBER() OVER(' + LOrderBy + ') AS ROWNUMBER';
+end;
+
 function TFluentSQLSerializerMSSQL.AsString(const AAST: IFluentSQLAST): String;
 var
   LWhere: String;
 begin
+  if AAST.Select.Qualifiers.ExecutingPagination then
+    AAST.Select.Columns.Add.Name := PaginationWindow(AAST);
   LWhere := AAST.Where.Serialize;
   // Gera sintaxe para caso exista comando de paginação.
   if AAST.Select.Qualifiers.ExecutingPagination then
@@ -50,8 +78,8 @@ begin
       LWhere := TUtils.Concat(['WHERE', '(' + AAST.Select.Qualifiers.SerializePagination + ')'])
     else
       // O predicado do usuario JA esta em LWhere, com a palavra WHERE incluida.
-      // Encadear a partir de LWhere (e nao de Result, que aqui ainda nem foi
-      // atribuido) e o que preserva o filtro e mantem o WHERE na frente do AND.
+      // Encadear a partir de LWhere (e nao de Result, que aqui ainda e '') e o
+      // que preserva o filtro e mantem o WHERE na frente do AND.
       LWhere := TUtils.Concat([LWhere, 'AND', '(' + AAST.Select.Qualifiers.SerializePagination + ')']);
   end;
   Result := TUtils.Concat([AAST.Select.Serialize,

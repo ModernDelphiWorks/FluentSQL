@@ -67,11 +67,11 @@ begin
     Result := ''
   else
   begin
+    // A coluna ROWNUMBER e injetada por TFluentSQLSerializerMSSQL.AsString, que e
+    // quem enxerga o ORDER BY do usuario e portanto consegue montar a janela do
+    // ROW_NUMBER() com a ordenacao pedida. Aqui so resta embrulhar.
     if FQualifiers.ExecutingPagination then
-    begin
-      FColumns.Add.Name := 'ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER';
-      Result := Format(cSELECT, [DoSerialize, FTableNames[0].Name]);
-    end
+      Result := Format(cSELECT, [DoSerialize, FTableNames[0].Name])
     else
       Result := DoSerialize;
   end;

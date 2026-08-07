@@ -153,7 +153,7 @@ procedure TTestFluentSQLSelectDB2.TestSelectPagingDB2;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE';
+  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY ID_CLIENTE ASC) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All

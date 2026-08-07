@@ -77,6 +77,20 @@ type
     /// </summary>
     [Test]
     procedure TestBindEPredicadoNaoDivergem;
+    /// <summary>
+    ///   A janela do ROW_NUMBER() usa o ORDER BY do usuario. Numerar por outra
+    ///   coisa e ordenar so no fim devolve OUTRA pagina: medido no SQL Server
+    ///   2022, "pagina 2 de 10 por NOME" dava K..T em vez de B..K.
+    /// </summary>
+    [Test]
+    procedure TestMSSQLJanelaUsaOrderByDoUsuario;
+    /// <summary>
+    ///   Sem ORDER BY do usuario a janela usa o idioma T-SQL (SELECT NULL).
+    ///   CURRENT_TIMESTAMP e aceito pelo motor mas finge uma ordenacao que nao
+    ///   existe - toda linha recebe o mesmo valor e empata com todas as outras.
+    /// </summary>
+    [Test]
+    procedure TestMSSQLJanelaSemOrderByUsaSelectNull;
     /// <summary>Camada 2, string exata e sensivel a caixa, um metodo por dialeto.</summary>
     [Test]
     procedure TestSqlExatoMSSQL;
@@ -258,10 +272,30 @@ begin
     'foi exatamente assim que o defeito passou despercebido.');
 end;
 
+procedure TTestPaginationWithFilter.TestMSSQLJanelaUsaOrderByDoUsuario;
+begin
+  Assert.Contains(_Monta(dbnMSSQL, cbOrderByAsc),
+    'ROW_NUMBER() OVER(ORDER BY NOME ASC) AS ROWNUMBER', False,
+    'A janela tem que numerar pela ordenacao do usuario; e ela que define a pagina.');
+  Assert.Contains(_Monta(dbnMSSQL, cbOrderByDesc),
+    'ROW_NUMBER() OVER(ORDER BY NOME DESC) AS ROWNUMBER', False,
+    'DESC do usuario tem que chegar na janela, nao so no ORDER BY externo.');
+end;
+
+procedure TTestPaginationWithFilter.TestMSSQLJanelaSemOrderByUsaSelectNull;
+var
+  LSql: String;
+begin
+  LSql := _Monta(dbnMSSQL, cbFirstSkip);
+  Assert.Contains(LSql, 'ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS ROWNUMBER', False);
+  Assert.DoesNotContain(LSql, 'CURRENT_TIMESTAMP', False,
+    'CURRENT_TIMESTAMP na janela finge uma ordenacao que nao existe.');
+end;
+
 procedure TTestPaginationWithFilter.TestSqlExatoMSSQL;
 begin
   Assert.AreEqual(
-    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY CURRENT_TIMESTAMP) AS ROWNUMBER ' +
+    'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY NOME ASC) AS ROWNUMBER ' +
     'FROM T) AS T WHERE (ATIVO = :p1) AND (ROWNUMBER > 20 AND ROWNUMBER <= 30) ' +
     'ORDER BY NOME ASC',
     _Monta(dbnMSSQL, cbOrderByAsc), False);
