@@ -100,20 +100,31 @@ begin
   Result := 'EXTRACT(YEAR FROM ' + AValue + ')';
 end;
 
-// Length e Ceil passaram de padrao A para padrao B. Estas duas reproduzem
-// LITERALMENTE o que o core emitia antes para o Interbase, para nao alterar o
-// comportamento de um driver que esta desligado no .inc e que nao consigo
-// exercitar. NAO VERIFIQUEI contra a documentacao do InterBase se LENGTH e CEIL
-// existem nele (o Firebird, de linhagem comum, usa CHAR_LENGTH). Revisar antes
-// de ligar {$DEFINE INTERBASE}.
+// Length e Ceil passaram de padrao A para padrao B (antes o core emitia
+// LENGTH(...) e CEIL(...) para todo dialeto).
+//
+// NAO CONSIGO DEFENDER NENHUMA DAS DUAS FORMAS PARA O INTERBASE. O InterBase
+// divergiu do tronco comum antes de o Firebird 2.1 introduzir CHAR_LENGTH e
+// CEIL/CEILING; no InterBase, funcoes de tamanho e arredondamento vinham
+// historicamente da UDF ib_udf, que so existe se o administrador a tiver
+// declarado no banco. Emitir LENGTH(...) ou CEIL(...) aqui seria repetir
+// exatamente o defeito do CEIL no MSSQL que a T3 existiu para matar - SQL que
+// o motor rejeita, gerado em silencio.
+//
+// Ate alguem verificar contra a documentacao do InterBase e implementar a forma
+// real, estas duas levantam erro nomeado. Erro honesto e melhor que SQL
+// indefensavel, ainda mais agora que a documentacao ensina a ligar
+// {$DEFINE INTERBASE}.
 function TFluentSQLFunctionsInterbase.Length(const AValue: String): String;
 begin
-  Result := 'LENGTH(' + AValue + ')';
+  raise EFluentSQLFunctionNotSupported.Create('Length',
+    'InterBase (forma correta nao verificada; Firebird usa CHAR_LENGTH)');
 end;
 
 function TFluentSQLFunctionsInterbase.Ceil(const AValue: String): String;
 begin
-  Result := 'CEIL(' + AValue + ')';
+  raise EFluentSQLFunctionNotSupported.Create('Ceil',
+    'InterBase (forma correta nao verificada; Firebird usa CEIL desde a 2.1)');
 end;
 
 end.

@@ -14,16 +14,27 @@
       sobrescrevia o metodo, entao caia no corpo de
       FluentSQL.FunctionsAbstract.pas que levanta.
 
-  A regra que estes testes travam e simples e vale para TODO dialeto do enum:
+  Sao DUAS regras, e a segunda e a que realmente trava a regressao.
 
-      chamar qualquer funcao de IFluentSQLFunctions ou devolve SQL, ou levanta
-      UMA das duas excecoes nomeadas do FluentSQL. Nunca EAbstractError, nunca
-      EAccessViolation, nunca Exception crua.
+  REGRA 1 - nada explode de forma opaca. Chamar qualquer funcao de
+  IFluentSQLFunctions ou devolve SQL, ou levanta UMA das duas excecoes nomeadas
+  do FluentSQL. Nunca EAbstractError, nunca EAccessViolation, nunca Exception
+  crua.
+
+  REGRA 2 - a matriz bate com a TABELA DE SUPORTE (_FuncoesNaoSuportadas).
+  A regra 1 sozinha e fraca demais: ela aceita que um driver troque o corpo de
+  uma funcao que hoje funciona por um raise nomeado, porque isso continua sendo
+  "uma das duas excecoes". A matriz seria rebaixada em silencio e a suite ficaria
+  verde - a regressao que esta tarefa consertou poderia voltar sem barulho. Por
+  isso cada par (dialeto, funcao) tem valor esperado declarado, e o desvio e
+  vermelho NOS DOIS SENTIDOS: suportado que parou de responder, e nao-suportado
+  que voltou a responder.
 
   Adicionou uma funcao nova em IFluentSQLFunctions? Acrescente-a em _Invoke e em
   cFUNCTIONS. Se ela for do padrao B (delega ao driver), a matriz vai ficar
   vermelha ate voce implementa-la em CADA Source\Drivers\FluentSQL.Functions*.pas
-  - que e exatamente o ponto deste arquivo.
+  ou declara-la em _FuncoesNaoSuportadas com justificativa de dialeto escrita no
+  driver - que e exatamente o ponto deste arquivo.
   ------------------------------------------------------------------------------
 }
 
@@ -50,6 +61,17 @@ type
     /// <summary>Toda celula que responde tem que devolver texto nao vazio.</summary>
     [Test]
     procedure TestCelulaQueRespondeNaoDevolveVazio;
+    /// <summary>
+    ///   A trava de regressao de verdade: confronta a matriz observada com a
+    ///   TABELA DE SUPORTE declarada em _FuncoesNaoSuportadas. Sem isto, um
+    ///   driver pode rebaixar em silencio uma funcao que hoje funciona, trocando
+    ///   o corpo por um raise, e a suite fica verde.
+    /// </summary>
+    [Test]
+    procedure TestMatrizBateComATabelaDeSuporte;
+    /// <summary>A tabela de suporte so pode citar funcoes que existem.</summary>
+    [Test]
+    procedure TestTabelaDeSuporteNaoCitaFuncaoInexistente;
     /// <summary>Trava do defeito do CEIL: T-SQL so tem CEILING.</summary>
     [Test]
     procedure TestCeilRespeitaODialeto;
@@ -57,9 +79,10 @@ type
     [Test]
     procedure TestLengthRespeitaODialeto;
     /// <summary>
-    ///   TStrDBEngineName e indexado posicionalmente pelo enum. Se as duas
-    ///   listas sairem de sincronia, o Register devolve o driver do vizinho, em
-    ///   silencio. Estas assercoes de assinatura por dialeto detectam isso.
+    ///   Pega COLISAO de nome em TStrDBEngineName (duas entradas iguais fazem um
+    ///   driver sobrescrever o outro no registo). Nao pega permutacao, que e
+    ///   invisivel por o array ser chave simetrica; cardinalidade e pega pelo
+    ///   compilador via array[TFluentSQLDriver]. Detalhe no corpo do metodo.
     /// </summary>
     [Test]
     procedure TestEnumEArrayDeNomesEstaoAlinhados;
@@ -116,6 +139,73 @@ begin
   else
     raise Exception.Create('Funcao "' + AName + '" ausente de _Invoke. ' +
       'Toda funcao de IFluentSQLFunctions tem que estar coberta pela matriz.');
+end;
+
+/// <summary>
+///   TABELA DE SUPORTE: dialeto x funcao -> suportado / nao suportado.
+///
+///   Esta e a trava de regressao da matriz. Cada par (dialeto, funcao) tem um
+///   valor esperado definido: as funcoes NOMEADAS aqui devem levantar
+///   EFluentSQLFunctionNotSupported; TODAS as outras de cFUNCTIONS devem
+///   devolver SQL. TestMatrizBateComATabelaDeSuporte verifica as DUAS direcoes:
+///
+///     * celula marcada suportada que levanta ......... VERMELHO (regressao)
+///     * celula marcada nao-suportada que devolve SQL .. VERMELHO (tabela podre)
+///
+///   Consequencia pratica: rebaixar uma funcao que hoje funciona - trocando o
+///   corpo do driver por um raise - NAO passa despercebido. Exige acrescentar o
+///   nome dela aqui, que e uma linha de diff que um revisor humano ve.
+///
+///   ATENCAO: esta tabela e o CONTRATO, nao um retrato da implementacao. Uma
+///   celula marcada suportada que levanta e um DEFEITO A CORRIGIR no driver, nao
+///   um convite a mover a funcao para a lista de nao-suportadas. Mover so se
+///   houver justificativa de dialeto, escrita no driver.
+///
+///   Dialetos desligados no FluentSQL.inc nao sao verificados contra a tabela
+///   (levantam EFluentSQLDriverNotRegistered antes de chegar ao driver), mas a
+///   linha deles fica declarada para valer no dia em que forem ligados.
+/// </summary>
+function _FuncoesNaoSuportadas(const ADriver: TFluentSQLDriver): TArray<String>;
+begin
+  case ADriver of
+    dbnMSSQL:      Result := [];
+    dbnMySQL:      Result := [];
+    dbnFirebird:   Result := [];
+    dbnSQLite:     Result := [];
+    dbnOracle:     Result := [];
+    dbnPostgreSQL: Result := [];
+
+    // Desligado no .inc. Length e Ceil nao tem forma verificada no InterBase
+    // (ver comentario em FluentSQL.FunctionsInterbase.pas). As demais funcoes do
+    // padrao B continuam marcadas como suportadas de proposito: o driver ainda
+    // nao as implementa, e ligar {$DEFINE INTERBASE} deve mesmo acusar isso.
+    dbnInterbase:  Result := ['Length', 'Ceil'];
+
+    // Desligado no .inc. Mesma situacao do Interbase para as demais do padrao B.
+    dbnDB2:        Result := [];
+
+    // Deliberado, nao e driver incompleto: o SerializeMongoDB so consome nome de
+    // campo ou marcador de agregacao. Ver FluentSQL.FunctionsMongoDB.pas.
+    // As agregacoes (Count/Sum/Min/Max/Average) e as escalares que o core emite
+    // em ANSI (Abs/Cast/Upper/Lower/Round/Floor) continuam funcionando.
+    dbnMongoDB:    Result := ['Year', 'Month', 'Day', 'Date', 'Length', 'Trim',
+                              'LTrim', 'RTrim', 'Concat', 'SubString', 'Ceil',
+                              'Modulus', 'Coalesce', 'CurrentDate',
+                              'CurrentTimestamp'];
+  else
+    raise Exception.Create('Dialeto sem linha na TABELA DE SUPORTE. ' +
+      'Todo membro de TFluentSQLDriver precisa declarar o que suporta.');
+  end;
+end;
+
+function _EhNaoSuportada(const ADriver: TFluentSQLDriver; const AName: String): Boolean;
+var
+  LName: String;
+begin
+  Result := False;
+  for LName in _FuncoesNaoSuportadas(ADriver) do
+    if LName = AName then
+      Exit(True);
 end;
 
 /// <summary>
@@ -292,6 +382,91 @@ begin
   Assert.AreEqual('', LFalhas, 'Celulas devolveram string vazia:' + LFalhas);
 end;
 
+procedure TTestDriverFunctionsMatrix.TestMatrizBateComATabelaDeSuporte;
+var
+  LRegister: TFluentSQLRegister;
+  LFunctions: IFluentSQLFunctions;
+  LDriver: TFluentSQLDriver;
+  LIdx: Integer;
+  LEsperadoSuportado: Boolean;
+  LObtidoSuportado: Boolean;
+  LSql: String;
+  LVerificadas: Integer;
+  LFalhas: String;
+begin
+  LVerificadas := 0;
+  LFalhas := '';
+  LRegister := TFluentSQLRegister.Create;
+  try
+    for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+    begin
+      if not _EstaRegistrado(LRegister, LDriver) then
+        Continue;
+      LFunctions := TFluentSQLFunctions.Create(LDriver, LRegister);
+      for LIdx := Low(cFUNCTIONS) to High(cFUNCTIONS) do
+      begin
+        Inc(LVerificadas);
+        LEsperadoSuportado := not _EhNaoSuportada(LDriver, cFUNCTIONS[LIdx]);
+
+        LObtidoSuportado := True;
+        LSql := '';
+        try
+          LSql := _Invoke(LFunctions, cFUNCTIONS[LIdx]);
+        except
+          on E: EFluentSQLFunctionNotSupported do
+            LObtidoSuportado := False;
+        end;
+        if Trim(LSql) = '' then
+          LObtidoSuportado := False;
+
+        if LEsperadoSuportado and (not LObtidoSuportado) then
+          LFalhas := LFalhas + sLineBreak +
+            '  REGRESSAO: driver ' + IntToStr(Ord(LDriver)) + '/' + cFUNCTIONS[LIdx] +
+            ' era suportado e parou de responder. Conserte o driver; nao mova a ' +
+            'funcao para _FuncoesNaoSuportadas sem justificativa de dialeto.'
+        else if (not LEsperadoSuportado) and LObtidoSuportado then
+          LFalhas := LFalhas + sLineBreak +
+            '  TABELA PODRE: driver ' + IntToStr(Ord(LDriver)) + '/' + cFUNCTIONS[LIdx] +
+            ' passou a devolver "' + LSql + '". Remova o nome de _FuncoesNaoSuportadas.';
+      end;
+      LFunctions := nil;
+    end;
+  finally
+    LRegister.Free;
+  end;
+
+  Assert.IsTrue(LVerificadas >= 7 * 26,
+    'Esperado ao menos 7 dialetos x 26 funcoes verificados contra a tabela, obtido ' +
+    IntToStr(LVerificadas));
+  Assert.AreEqual('', LFalhas, 'Matriz divergiu da TABELA DE SUPORTE:' + LFalhas);
+end;
+
+procedure TTestDriverFunctionsMatrix.TestTabelaDeSuporteNaoCitaFuncaoInexistente;
+var
+  LDriver: TFluentSQLDriver;
+  LName: String;
+  LIdx: Integer;
+  LExiste: Boolean;
+  LFalhas: String;
+begin
+  // Um nome com typo em _FuncoesNaoSuportadas ('Trimm') abriria um buraco mudo:
+  // a entrada nao casaria com nada e a funcao de verdade passaria a ser cobrada
+  // como suportada sem ninguem notar a intencao contraria.
+  LFalhas := '';
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+    for LName in _FuncoesNaoSuportadas(LDriver) do
+    begin
+      LExiste := False;
+      for LIdx := Low(cFUNCTIONS) to High(cFUNCTIONS) do
+        if cFUNCTIONS[LIdx] = LName then
+          LExiste := True;
+      if not LExiste then
+        LFalhas := LFalhas + sLineBreak + '  driver ' + IntToStr(Ord(LDriver)) +
+          ' cita "' + LName + '", que nao esta em cFUNCTIONS';
+    end;
+  Assert.AreEqual('', LFalhas, 'TABELA DE SUPORTE cita funcao inexistente:' + LFalhas);
+end;
+
 procedure TTestDriverFunctionsMatrix.TestCeilRespeitaODialeto;
 var
   LRegister: TFluentSQLRegister;
@@ -346,9 +521,20 @@ var
 begin
   LRegister := TFluentSQLRegister.Create;
   try
-    // Cada dialeto abaixo tem uma assinatura de saida que NENHUM vizinho no enum
-    // produz. Se TStrDBEngineName sair de sincronia com TFluentSQLDriver, o
-    // Register entrega o driver errado e estas igualdades quebram.
+    // O QUE ESTAS ASSERCOES PEGAM, e o que NAO pegam.
+    //
+    // Cada dialeto abaixo tem uma assinatura de saida que nenhum outro produz.
+    // Isso pega COLISAO DE NOME em TStrDBEngineName: se dois membros do enum
+    // mapearem para a mesma string, o segundo RegisterFunctions sobrescreve a
+    // entrada do primeiro no dicionario e um dos dois passa a devolver o driver
+    // do outro - aqui vira desigualdade.
+    //
+    // NAO pega PERMUTACAO. Trocar duas entradas de lugar no array e invisivel,
+    // porque o array e chave simetrica: registro e consulta usam o MESMO indice,
+    // entao o par (dbnX -> "Nome errado") continua interno e consistente. Quem
+    // pega desalinhamento de CARDINALIDADE e o compilador: o array e declarado
+    // array[TFluentSQLDriver], entao membro adicionado ou removido do enum para
+    // a build com E2072 antes de qualquer teste rodar.
     LFn := TFluentSQLFunctions.Create(dbnMSSQL, LRegister);
     Assert.AreEqual('CONCAT(A, B)', LFn.Concat(['A', 'B']), 'dbnMSSQL');
     LFn := TFluentSQLFunctions.Create(dbnMySQL, LRegister);
