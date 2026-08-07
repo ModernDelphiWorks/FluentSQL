@@ -30,6 +30,24 @@
   vermelho NOS DOIS SENTIDOS: suportado que parou de responder, e nao-suportado
   que voltou a responder.
 
+  ATE ONDE A REGRA 2 ALCANCA - leia antes de confiar na tabela.
+
+  A tabela so tem poder real sobre as funcoes do PADRAO B, as que delegam ao
+  driver (ver o bloco de padroes em Source\Core\FluentSQL.Functions.pas). Para as
+  do PADRAO A - Count, Sum, Min, Max, Average, Abs, Cast, Upper, Lower, Round,
+  Floor - o core emite SQL ANSI fixo SEM consultar o driver, entao a chamada
+  sempre devolve texto e a tabela as marca "suportado" TRIVIALMENTE, para todo
+  dialeto. Isso nao e evidencia de que o SQL gerado seja valido naquele motor.
+
+  A tabela NAO detecta divergencia de dialeto no padrao A. Foi exatamente esse o
+  buraco por onde CEIL(...) chegou ao MSSQL e LENGTH(...) ao Firebird; o conserto
+  foi mover as duas para o padrao B, nao ajustar teste. Caso vivo hoje: no
+  MongoDB, Abs/Cast/Upper/Lower/Round/Floor nao levantam e mesmo assim produzem
+  MQL invalido - a coluna e descartada em silencio (ver o comentario da linha
+  dbnMongoDB na tabela, e a divida no CHANGELOG). Suspeita de divergencia numa
+  funcao do padrao A se investiga lendo a documentacao do dialeto, nao rodando
+  esta suite.
+
   Adicionou uma funcao nova em IFluentSQLFunctions? Acrescente-a em _Invoke e em
   cFUNCTIONS. Se ela for do padrao B (delega ao driver), a matriz vai ficar
   vermelha ate voce implementa-la em CADA Source\Drivers\FluentSQL.Functions*.pas
@@ -181,13 +199,35 @@ begin
     // nao as implementa, e ligar {$DEFINE INTERBASE} deve mesmo acusar isso.
     dbnInterbase:  Result := ['Length', 'Ceil'];
 
-    // Desligado no .inc. Mesma situacao do Interbase para as demais do padrao B.
+    // Desligado no .inc. Lista VAZIA, ao contrario da do Interbase logo acima, e
+    // a assimetria e proposital: o DB2 implementa Length e Ceil (LENGTH/CEIL sao
+    // built-ins documentados), enquanto no InterBase nenhuma das duas formas foi
+    // verificada. As demais funcoes do padrao B o DB2 tambem nao implementa, e
+    // seguem marcadas suportadas pela mesma razao do Interbase: ligar
+    // {$DEFINE DB2} deve mesmo acusar a lacuna, nao abenco-la.
     dbnDB2:        Result := [];
 
     // Deliberado, nao e driver incompleto: o SerializeMongoDB so consome nome de
     // campo ou marcador de agregacao. Ver FluentSQL.FunctionsMongoDB.pas.
-    // As agregacoes (Count/Sum/Min/Max/Average) e as escalares que o core emite
-    // em ANSI (Abs/Cast/Upper/Lower/Round/Floor) continuam funcionando.
+    //
+    // As agregacoes (Count/Sum/Min/Max/Average) funcionam DE VERDADE: o
+    // serializador reconhece os prefixos ANSI 'SUM(' / 'COUNT(' / ... e monta o
+    // $project. Sonda ponta a ponta:
+    //   Sum   -> {"aggregate":"t","pipeline":[{"$project":{"x":1,"_id":0}}],...}
+    //
+    // JA Abs/Cast/Upper/Lower/Round/Floor NAO produzem MQL valido. Elas apenas
+    // NAO LEVANTAM, porque sao do padrao A - o core emite ANSI sem consultar o
+    // driver, e o serializador nao reconhece 'UPPER(' / 'ROUND(' / 'ABS(' /
+    // 'CAST(' / 'FLOOR(' / 'LOWER('. A coluna cai em NormalizeFieldName e e
+    // DESCARTADA EM SILENCIO. Sonda ponta a ponta:
+    //   Round -> {"find":"t","filter":{},"projection":{}}      <- a coluna sumiu
+    //   Upper -> {"find":"t","filter":{},"projection":{}}      <- a coluna sumiu
+    //
+    // Nao da para corrigir aqui: marcar essas 6 como nao-suportadas deixa o
+    // TestMatrizBateComATabelaDeSuporte vermelho com TABELA PODRE, porque o core
+    // responde em ANSI antes de qualquer consulta ao driver. E o ponto cego do
+    // padrao A descrito no cabecalho deste arquivo. Divida registrada no
+    // CHANGELOG, seccao [Unreleased].
     dbnMongoDB:    Result := ['Year', 'Month', 'Day', 'Date', 'Length', 'Trim',
                               'LTrim', 'RTrim', 'Concat', 'SubString', 'Ceil',
                               'Modulus', 'Coalesce', 'CurrentDate',

@@ -27,6 +27,10 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - Implementações em falta de `Trim`, `LTrim`, `RTrim`, `Coalesce`, `Modulus`, `CurrentDate` e `CurrentTimestamp` nos drivers **Firebird**, **SQLite** e **Oracle**.
 - Funções escalares do **MongoDB** passam a levantar `EFluentSQLFunctionNotSupported` em vez de `EAbstractError`. As agregações (`Count`, `Sum`, `Min`, `Max`, `Average`) não mudaram.
 
+### Known issues
+
+- **MongoDB — `Abs`, `Cast`, `Upper`, `Lower`, `Round` e `Floor` geram MQL inválido em silêncio.** Essas seis são do "padrão A" (o núcleo emite SQL ANSI sem consultar o driver), e `FluentSQL.SerializeMongoDB.pas` só reconhece nome de campo e os prefixos de agregação (`AGG:`, `SUM(`, `COUNT(`, `MIN(`, `MAX(`, `AVG(`, `AVERAGE(`). O resultado é que a coluna é **descartada sem exceção**: `.Column(Fun.Round('v',2))` produz `{"find":"t","filter":{},"projection":{}}` — a projeção sai vazia — enquanto `.Column(Fun.Sum('v'))` produz corretamente `{"aggregate":"t","pipeline":[{"$project":{"x":1,"_id":0}}],...}`. É o mesmo modo de falha que foi corrigido para `Ceil` e `Length`, e sobrevive nestas seis. **Não corrigido nesta entrega** — o conserto exige mover as seis para o "padrão B" (implementação por driver nos 9 dialetos) ou ensinar o serializador MongoDB a montar `$project` com expressão, e nenhum dos dois cabia no escopo. Registrado como dívida; até lá, não use funções escalares na projeção com `dbnMongoDB`.
+
 ## [1.5.1] — 2026-04-20
 
 ### Fixed
