@@ -28,6 +28,39 @@ uses
 
 type
   TFluentSQLSerializerMSSQL = class(TFluentSQLSerialize)
+  strict private
+    /// <summary>
+    ///   Janela do ROW_NUMBER() que numera as linhas da paginacao.
+    ///
+    ///   Quando o usuario pediu um ORDER BY, a janela TEM que usar a ordenacao
+    ///   dele: e a ordenacao do usuario que define o que e "pagina 2". Numerar
+    ///   por outra coisa e depois ordenar o resultado devolve a pagina errada -
+    ///   SQL valido, dado errado, sem erro nenhum. Este e o unico ponto deste
+    ///   metodo que muda o RESULTADO da consulta.
+    ///
+    ///   Sem ORDER BY do usuario sai ORDER BY (SELECT NULL). Isso NAO conserta
+    ///   determinismo, e nao deve ser lido como se consertasse. E preenchimento
+    ///   exigido pela GRAMATICA: no OVER o order_by_clause "is required" e a
+    ///   clausula offset_fetch so existe como sub-clausula do ORDER BY - nao ha
+    ///   como emitir nada. (SELECT NULL) e CURRENT_TIMESTAMP, a forma anterior,
+    ///   empatam TODAS as linhas igualmente e produzem PLANO IDENTICO, sem
+    ///   operador Sort; entre os dois a escolha e de legibilidade, porque
+    ///   CURRENT_TIMESTAMP sugere uma ordenacao que nao existe. NEWID() foi
+    ///   descartado por ser avaliado por linha e custar um Sort sem comprar
+    ///   unicidade em troca.
+    ///
+    ///   O que da paginacao estavel entre execucoes e ordenar por CHAVE UNICA -
+    ///   a doc da Microsoft condiciona a isso, tanto em ROW_NUMBER quanto em
+    ///   OFFSET/FETCH. O FluentSQL NAO impoe unicidade, por decisao de projeto,
+    ///   e tambem nao exige OrderBy para paginar: 6 dos 7 dialetos aceitam
+    ///   paginar sem ordenacao, e exigir seria inventar restricao que os bancos
+    ///   nao tem. Paginar sem ordenar devolve subconjunto arbitrario, o que e
+    ///   semantica do SQL e nao defeito deste driver.
+    ///
+    ///   Os quatro planos medidos lado a lado, com as URLs da documentacao:
+    ///   Test Delphi\Common_tests\test.pagination.filter.mssql.sql, caso P.
+    /// </summary>
+    function PaginationWindow(const AAST: IFluentSQLAST): String;
   public
     function AsString(const AAST: IFluentSQLAST): String; override;
     function Merge(const ADef: IFluentSQLMergeDef): string; override;
@@ -38,10 +71,22 @@ implementation
 
 { TFluentSQLSerializer }
 
+function TFluentSQLSerializerMSSQL.PaginationWindow(const AAST: IFluentSQLAST): String;
+var
+  LOrderBy: String;
+begin
+  LOrderBy := AAST.OrderBy.Serialize;
+  if LOrderBy = '' then
+    LOrderBy := 'ORDER BY (SELECT NULL)';
+  Result := 'ROW_NUMBER() OVER(' + LOrderBy + ') AS ROWNUMBER';
+end;
+
 function TFluentSQLSerializerMSSQL.AsString(const AAST: IFluentSQLAST): String;
 var
   LWhere: String;
 begin
+  if AAST.Select.Qualifiers.ExecutingPagination then
+    AAST.Select.Columns.Add.Name := PaginationWindow(AAST);
   LWhere := AAST.Where.Serialize;
   // Gera sintaxe para caso exista comando de paginação.
   if AAST.Select.Qualifiers.ExecutingPagination then
@@ -49,7 +94,10 @@ begin
     if LWhere = '' then
       LWhere := TUtils.Concat(['WHERE', '(' + AAST.Select.Qualifiers.SerializePagination + ')'])
     else
-      LWhere := TUtils.Concat([Result, 'AND', '(' + AAST.Select.Qualifiers.SerializePagination + ')']);
+      // O predicado do usuario JA esta em LWhere, com a palavra WHERE incluida.
+      // Encadear a partir de LWhere (e nao de Result, que aqui ainda e '') e o
+      // que preserva o filtro e mantem o WHERE na frente do AND.
+      LWhere := TUtils.Concat([LWhere, 'AND', '(' + AAST.Select.Qualifiers.SerializePagination + ')']);
   end;
   Result := TUtils.Concat([AAST.Select.Serialize,
                            AAST.Delete.Serialize,
