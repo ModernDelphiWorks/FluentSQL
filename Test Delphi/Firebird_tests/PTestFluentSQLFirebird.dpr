@@ -21,7 +21,7 @@ uses
   {$ENDIF }
   DUnitX.TestFramework,
   UTestFluentSQLFirebird in 'UTestFluentSQLFirebird.pas',
-  test.core.params in '..\test.core.params.pas',
+  test.core.params in '..\Common_tests\test.core.params.pas',
   test.ddl.firebird in 'test.ddl.firebird.pas',
   test.operators.isin.firebird in 'test.operators.isin.firebird.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
