@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Utils,
   FluentSQL.Register,
   FluentSQL.Interfaces,
   FluentSQL.Serialize;
@@ -35,14 +36,15 @@ implementation
 
 { TFluentSQLSerialize }
 
+/// <summary>
+///   Corpo do nucleo + cauda de paginacao no fim. Driver DESLIGADO em
+///   FluentSQL.inc; segue a Oracle porque TFluentSQLSelectDB2 registra o
+///   qualificador da Oracle, e o template com Format deixou de existir la.
+/// </summary>
 function TFluentSQLSerializeDB2.AsString(const AAST: IFluentSQLAST): String;
-var
-  LSerializePagination: String;
 begin
-  Result := ComposeSqlCore(AAST);
-  LSerializePagination := AAST.Select.Qualifiers.SerializePagination;
-  if LSerializePagination <> '' then
-    Result := Format(LSerializePagination, [Result]);
+  Result := TUtils.Concat([ComposeSqlCore(AAST),
+                           AAST.Select.Qualifiers.SerializePagination]);
   Result := Result + DialectOnlySqlSuffix(AAST);
 end;
 

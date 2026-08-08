@@ -42,6 +42,36 @@ implementation
 type
   EFluentSQLMongoDBSerialize = class(Exception);
 
+const
+  /// <summary>
+  ///   Deslocamento que pula TUDO, usado para exprimir First(0) - "me devolva
+  ///   zero documentos".
+  ///
+  ///   No MongoDB "limit" NAO significa o que parece quando vale zero:
+  ///
+  ///     {"find":"T","filter":{},"limit":0}   -> 60 documentos de 60
+  ///
+  ///   limit:0 quer dizer SEM LIMITE. Emitir First(0) como "limit":0 devolvia a
+  ///   colecao INTEIRA em vez do conjunto vazio - sem erro, sem aviso, dado
+  ///   errado. Era o pior modo de falha dos sete dialetos, e o unico silencioso.
+  ///   No pipeline o mesmo pedido falha alto: {"$limit":0} devolve
+  ///   "the limit must be positive".
+  ///
+  ///   2^63-1 e o maior inteiro de 64 bits que o servidor aceita nos dois
+  ///   caminhos - medido com o TEXTO do comando (que e o que o FluentSQL
+  ///   produz e o que um driver real entrega ao servidor), tanto em "skip"
+  ///   quanto em {"$skip":...}. Pular 2^63-1 documentos devolve o conjunto
+  ///   vazio em qualquer colecao concebivel.
+  ///
+  ///   RESSALVA de quem repetir a medicao no mongosh: escrever este numero
+  ///   direto num literal JavaScript NAO funciona - o mongosh o converte para
+  ///   double e o servidor recusa com "Cannot represent as a 64-bit integer:
+  ///   $skip: 9.223372036854776e+18". Isso e do console, nao do servidor: com
+  ///   EJSON.parse do texto, ou com NumberLong, os dois caminhos devolvem zero
+  ///   documentos. Medicao completa em test.pagination.mongodb.js, parte Z.
+  /// </summary>
+  cMONGO_PULA_TUDO = '9223372036854775807';
+
 function EscapeJson(const AValue: String): String;
 var
   LIdx: Integer;
@@ -808,10 +838,18 @@ begin
         sqSkip: LSkip := AAST.Select.Qualifiers[LIdx].Value;
       end;
 
-    if LSkip >= 0 then
-      LPipeline.Add('{"$skip":' + IntToStr(LSkip) + '}');
-    if LLimit >= 0 then
-      LPipeline.Add('{"$limit":' + IntToStr(LLimit) + '}');
+    // First(0) pede o conjunto vazio. {"$limit":0} nao exprime isso - o servidor
+    // recusa com "the limit must be positive" -, entao vira um $skip que pula
+    // tudo, e o $skip do usuario e absorvido (zero e zero com ou sem salto).
+    if LLimit = 0 then
+      LPipeline.Add('{"$skip":' + cMONGO_PULA_TUDO + '}')
+    else
+    begin
+      if LSkip >= 0 then
+        LPipeline.Add('{"$skip":' + IntToStr(LSkip) + '}');
+      if LLimit > 0 then
+        LPipeline.Add('{"$limit":' + IntToStr(LLimit) + '}');
+    end;
 
     Result := '[';
     for LIdx := 0 to LPipeline.Count - 1 do
@@ -1082,10 +1120,18 @@ begin
 
     if LSort <> '' then
       Result := Result + ',' + JsonString('sort') + ':' + LSort;
-    if LLimit >= 0 then
-      Result := Result + ',' + JsonString('limit') + ':' + IntToStr(LLimit);
-    if LSkip >= 0 then
-      Result := Result + ',' + JsonString('skip') + ':' + IntToStr(LSkip);
+    // First(0) pede o conjunto vazio, e "limit":0 significa SEM LIMITE no
+    // MongoDB - devolvia a colecao inteira, em silencio. Vira um skip que pula
+    // tudo, absorvendo o skip do usuario (zero e zero com ou sem salto).
+    if LLimit = 0 then
+      Result := Result + ',' + JsonString('skip') + ':' + cMONGO_PULA_TUDO
+    else
+    begin
+      if LLimit > 0 then
+        Result := Result + ',' + JsonString('limit') + ':' + IntToStr(LLimit);
+      if LSkip >= 0 then
+        Result := Result + ',' + JsonString('skip') + ':' + IntToStr(LSkip);
+    end;
 
     Result := Result + '}';
   end;

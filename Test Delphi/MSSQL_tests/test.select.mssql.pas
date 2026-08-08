@@ -155,7 +155,9 @@ procedure TTestFluentSQLSelectMSSQL.TestSelectPagingMSSQL;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM (SELECT *, ROW_NUMBER() OVER(ORDER BY ID_CLIENTE ASC) AS ROWNUMBER FROM CLIENTES) AS CLIENTES WHERE (ROWNUMBER > 3 AND ROWNUMBER <= 6) ORDER BY ID_CLIENTE ASC';
+  // T10: ROW_NUMBER() em subconsulta -> OFFSET/FETCH, a forma canonica do
+  // SQL Server 2012+. Medida em Test Delphi\Common_tests\test.pagination.mssql.sql.
+  LAsString := 'SELECT * FROM CLIENTES ORDER BY ID_CLIENTE ASC OFFSET 3 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                                       .Select
                                       .All
@@ -170,12 +172,11 @@ procedure TTestFluentSQLSelectMSSQL.Test2SelectPagingMSSQL;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * '+
-               'FROM (SELECT ID_CLIENTE, '+
-               'ROW_NUMBER() OVER(ORDER BY ID_CLIENTE ASC) AS ROWNUMBER '+
-               'FROM CLIENTES AS C) AS CLIENTES '+
-               'WHERE (ROWNUMBER > 0 AND ROWNUMBER <= 3) '+
-               'ORDER BY ID_CLIENTE';
+  // Metodo com [Test] COMENTADO (linha 33) - nao roda. A string foi atualizada
+  // para a forma OFFSET/FETCH da T10 assim mesmo, para que a reativacao (T11)
+  // nao herde uma expectativa que descreve um SQL que o driver nao emite mais.
+  LAsString := 'SELECT ID_CLIENTE FROM CLIENTES AS C ORDER BY ID_CLIENTE ASC '+
+               'OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnMSSQL)
                               .Select
                               .Column('ID_CLIENTE')

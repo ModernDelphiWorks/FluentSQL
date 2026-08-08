@@ -37,23 +37,23 @@ uses
 
 { TFluentSQLSelectQualifiersPostgreSQL }
 
+/// <summary>
+///   Cauda de paginacao do PostgreSQL: [LIMIT m] [OFFSET n], nesta ordem, no fim
+///   da consulta. E o unico dos sete em que LIMIT e OFFSET sao clausulas de fato
+///   INDEPENDENTES - "OFFSET n" sozinho e valido e o manual o documenta assim
+///   ("The OFFSET clause ... it is possible to use both"). Por isso Skip sem
+///   First nao precisa de teto artificial, ao contrario do MySQL e do SQLite.
+/// </summary>
 function TFluentSQLSelectQualifiersPostgreSQL.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
   Result := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['LIMIT', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['OFFSET', IntToStr(FQualifiers[LFor].Value)]);
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersPostgreSQL.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  Result := TUtils.Concat([Result, LFirst, LSkip]);
+  LPag := _Pagination('PostgreSQL');
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'LIMIT', IntToStr(LPag.First)]);
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'OFFSET', IntToStr(LPag.Skip)]);
 end;
 
 end.

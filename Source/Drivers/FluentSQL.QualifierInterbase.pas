@@ -37,23 +37,21 @@ uses
 
 { TFluentSQLSelectQualifiersinterbase }
 
+/// <summary>
+///   Prefixo FIRST/SKIP, mesma gramatica do Firebird de que o Interbase descende.
+///   Driver DESLIGADO em FluentSQL.inc; acompanha a forma canonica do Firebird
+///   para nao divergir em silencio quando alguem o religar.
+/// </summary>
 function TFluentSQLSelectQualifiersinterbase.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
   Result := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['FIRST', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['SKIP' , IntToStr(FQualifiers[LFor].Value)]);
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersFirebird.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  Result := TUtils.Concat([Result, LFirst, LSkip]);
+  LPag := _Pagination('Interbase');
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'FIRST', IntToStr(LPag.First)]);
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'SKIP', IntToStr(LPag.Skip)]);
 end;
 
 end.

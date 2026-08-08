@@ -47,14 +47,20 @@ begin
   FQualifiers := TFluentSQLSelectQualifiersInterbase.Create;
 end;
 
+/// <summary>
+///   SELECT [FIRST m] [SKIP n] [DISTINCT] &lt;colunas&gt; FROM &lt;tabelas&gt;, a mesma
+///   ordem gramatical do Firebird de que o Interbase descende. Driver DESLIGADO
+///   em FluentSQL.inc; acompanha o Firebird para nao ficar com a ordem que
+///   aquele motor recusa com -104.
+/// </summary>
 function TFluentSQLSelectInterbase.Serialize: String;
 begin
   if IsEmpty then
     Result := ''
   else
     Result := TUtils.Concat(['SELECT',
-                             FQualifiers.SerializeDistinct,
                              FQualifiers.SerializePagination,
+                             FQualifiers.SerializeDistinct,
                              FColumns.Serialize,
                              'FROM',
                              FTableNames.Serialize]);

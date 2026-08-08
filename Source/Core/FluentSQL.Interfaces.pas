@@ -53,6 +53,17 @@ type
     constructor Create(const AFunction, ADialect: String); reintroduce;
   end;
 
+  /// <summary>
+  ///   Chegou um TSelectQualifierType que o serializador de paginacao do dialeto
+  ///   nao sabe emitir. Antes disso era "raise Exception.Create(...)" cru, em oito
+  ///   copias, com o nome do metodo errado em quatro delas - o consumidor nao tinha
+  ///   como distinguir isso de qualquer outra falha e nao tinha o que capturar.
+  /// </summary>
+  EFluentSQLQualifierNotSupported = class(Exception)
+  public
+    constructor Create(const AQualifier: Integer; const ADialect: String); reintroduce;
+  end;
+
   /// <summary>ESP-016: one opt-in fragment registered for a specific engine; not portable SQL.</summary>
   TDialectOnlyFragment = record
     Dialect: TFluentSQLDriver;
@@ -438,6 +449,17 @@ type
     procedure Add(AQualifier: IFluentSQLSelectQualifier); overload;
     procedure Clear;
     function ExecutingPagination: Boolean;
+    /// <summary>
+    ///   O usuario pediu First(0) - o conjunto VAZIO. E pergunta sobre a colecao
+    ///   de qualificadores, nao sobre dialeto, e por isso mora aqui e nao num
+    ///   driver: a FORMA de exprimir zero linhas varia (TOP 0 no T-SQL, LIMIT 0
+    ///   na maioria, FIRST 0 no Firebird, pular tudo no MongoDB), mas o PEDIDO e
+    ///   o mesmo nos sete.
+    ///
+    ///   NAO e (First = 0): e HasFirst AND (First = 0). "Nao pediu First" e
+    ///   "pediu First(0)" sao coisas diferentes, e so a primeira devolve tudo.
+    /// </summary>
+    function RequestsZeroRows: Boolean;
     function Count: Integer;
     function IsEmpty: Boolean;
     function SerializePagination: String;
@@ -1591,6 +1613,16 @@ constructor EFluentSQLFunctionNotSupported.Create(const AFunction, ADialect: Str
 begin
   inherited CreateFmt('A funcao "%s" nao existe no dialeto %s. ' +
     'Use uma expressao equivalente suportada por esse motor.', [AFunction, ADialect]);
+end;
+
+{ EFluentSQLQualifierNotSupported }
+
+constructor EFluentSQLQualifierNotSupported.Create(const AQualifier: Integer;
+  const ADialect: String);
+begin
+  inherited CreateFmt('O qualificador de SELECT de ordinal %d nao tem forma ' +
+    'conhecida no dialeto %s. Todo membro novo de TSelectQualifierType precisa ' +
+    'ser tratado no serializador de paginacao de cada driver.', [AQualifier, ADialect]);
 end;
 
 end.

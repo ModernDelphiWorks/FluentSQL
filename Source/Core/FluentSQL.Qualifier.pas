@@ -25,6 +25,25 @@ uses
   FluentSQL.Interfaces;
 
 type
+  /// <summary>
+  ///   Os limites de paginacao que o usuario pediu, ja separados do sqDistinct e
+  ///   ja distinguindo "pediu zero" de "nao pediu". Existe porque os nove drivers
+  ///   repetiam o mesmo laco sobre FQualifiers, cada um com um bug diferente:
+  ///   quatro esqueciam o sqDistinct e levantavam excecao crua ao ver DISTINCT
+  ///   (MySQL, PostgreSQL, Oracle e DB2 explodiam ate SEM paginacao nenhuma),
+  ///   tres nao inicializavam as variaveis e liam lixo de pilha, e as mensagens de
+  ///   erro citavam o nome de outro driver.
+  ///
+  ///   HasFirst/HasSkip nao sao (First &lt;&gt; 0): First(0) e Skip(0) sao pedidos
+  ///   legitimos e diferentes de "sem clausula".
+  /// </summary>
+  TFluentSQLPagination = record
+    HasFirst: Boolean;
+    HasSkip: Boolean;
+    First: Integer;
+    Skip: Integer;
+  end;
+
   TFluentSQLSelectQualifier = class(TInterfacedObject, IFluentSQLSelectQualifier)
   strict private
     FQualifier: TSelectQualifierType;
@@ -43,6 +62,15 @@ type
     FExecutingPagination: Boolean;
     FQualifiers: TList<IFluentSQLSelectQualifier>;
     function _GetQualifier(AIdx: Integer): IFluentSQLSelectQualifier;
+    /// <summary>
+    ///   Le a lista de qualificadores uma unica vez e devolve os limites pedidos.
+    ///   sqDistinct e ignorado DE PROPOSITO: quem o emite e SerializeDistinct, e
+    ///   tratar DISTINCT como qualificador desconhecido aqui era o que fazia
+    ///   Select.Distinct levantar excecao em quatro dialetos.
+    ///   Qualquer outro membro do enum vira EFluentSQLQualifierNotSupported, com
+    ///   o nome do dialeto que recusou.
+    /// </summary>
+    function _Pagination(const ADialect: String): TFluentSQLPagination;
   public
     constructor Create;
     destructor Destroy; override;
@@ -50,6 +78,7 @@ type
     procedure Add(AQualifier: IFluentSQLSelectQualifier); overload;
     procedure Clear;
     function ExecutingPagination: Boolean;
+    function RequestsZeroRows: Boolean;
     function Count: Integer;
     function IsEmpty: Boolean;
     function SerializePagination: String; virtual; abstract;
@@ -107,6 +136,52 @@ end;
 function TFluentSQLSelectQualifiers._GetQualifier(AIdx: Integer): IFluentSQLSelectQualifier;
 begin
   Result := FQualifiers[AIdx];
+end;
+
+/// <summary>
+///   Nao usa _Pagination de proposito: _Pagination levanta para qualificador
+///   desconhecido, e esta pergunta e feita durante a montagem do SELECT, antes
+///   de o driver decidir o que sabe emitir. Aqui so interessa saber se existe um
+///   sqFirst valendo zero.
+/// </summary>
+function TFluentSQLSelectQualifiers.RequestsZeroRows: Boolean;
+var
+  LFor: Integer;
+begin
+  Result := False;
+  for LFor := 0 to Count - 1 do
+    if (FQualifiers[LFor].Qualifier = sqFirst) and (FQualifiers[LFor].Value = 0) then
+      Exit(True);
+end;
+
+function TFluentSQLSelectQualifiers._Pagination(const ADialect: String): TFluentSQLPagination;
+var
+  LFor: Integer;
+begin
+  Result.HasFirst := False;
+  Result.HasSkip := False;
+  Result.First := 0;
+  Result.Skip := 0;
+  for LFor := 0 to Count - 1 do
+  begin
+    case FQualifiers[LFor].Qualifier of
+      sqFirst:
+        begin
+          Result.First := FQualifiers[LFor].Value;
+          Result.HasFirst := True;
+        end;
+      sqSkip:
+        begin
+          Result.Skip := FQualifiers[LFor].Value;
+          Result.HasSkip := True;
+        end;
+      sqDistinct:
+        Continue;
+    else
+      raise EFluentSQLQualifierNotSupported.Create(
+        Ord(FQualifiers[LFor].Qualifier), ADialect);
+    end;
+  end;
 end;
 
 function TFluentSQLSelectQualifiers.IsEmpty: Boolean;

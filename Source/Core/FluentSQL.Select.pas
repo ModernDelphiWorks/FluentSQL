@@ -88,6 +88,17 @@ begin
   Result := FQualifiers;
 end;
 
+/// <summary>
+///   Forma neutra: SELECT [DISTINCT] &lt;colunas&gt; FROM &lt;tabelas&gt;.
+///
+///   NAO chama SerializePagination. Emitir a paginacao entre o SELECT e a lista
+///   de colunas so e gramatical no Firebird e no Interbase, e esses dois montam
+///   a propria forma. Nos outros seis dialetos a paginacao e CAUDA, concatenada
+///   pelo serializador depois de tudo. Este metodo carregava o prefixo do
+///   Firebird como se fosse regra geral, e foi copiado assim para o SQLite -
+///   onde produzia "SELECT LIMIT 10 OFFSET 20 * FROM T", que nenhum SQLite
+///   aceita, com ou sem filtro.
+/// </summary>
 function TFluentSQLSelect.Serialize: String;
 begin
   if IsEmpty then
@@ -95,7 +106,6 @@ begin
   else
     Result := TUtils.Concat(['SELECT',
                              FQualifiers.SerializeDistinct,
-                             FQualifiers.SerializePagination,
                              FColumns.Serialize,
                              'FROM',
                              FTableNames.Serialize]);

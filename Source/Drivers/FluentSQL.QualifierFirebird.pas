@@ -37,27 +37,27 @@ uses
 
 { TFluentSQLSelectQualifiersFirebird }
 
+/// <summary>
+///   O Firebird e o unico dos sete que NAO migrou para OFFSET/FETCH, e a decisao
+///   e deliberada: FIRST/SKIP funciona em toda versao - inclusive 2.5, onde
+///   OFFSET/FETCH nao existe - e aceita EXPRESSAO, enquanto o OFFSET/FETCH do
+///   Firebird so aceita literal ou parametro. Trocar seria perder alcance sem
+///   ganhar nada.
+///
+///   Fragmento de PREFIXO, nao de cauda: a gramatica do Firebird e
+///   SELECT [FIRST m] [SKIP n] [DISTINCT|ALL] &lt;colunas&gt; - FIRST/SKIP vem antes
+///   do DISTINCT, nao depois. Quem monta nessa ordem e TFluentSQLSelectFirebird.
+/// </summary>
 function TFluentSQLSelectQualifiersFirebird.SerializePagination: String;
 var
-  LFor: Integer;
-  LFirst: String;
-  LSkip: String;
+  LPag: TFluentSQLPagination;
 begin
   Result := '';
-  LFirst := '';
-  LSkip := '';
-  for LFor := 0 to Count -1 do
-  begin
-    case FQualifiers[LFor].Qualifier of
-      sqFirst: LFirst := TUtils.Concat(['FIRST', IntToStr(FQualifiers[LFor].Value)]);
-      sqSkip:  LSkip  := TUtils.Concat(['SKIP' , IntToStr(FQualifiers[LFor].Value)]);
-      sqDistinct:
-        Continue;
-    else
-      raise Exception.Create('TFluentSQLSelectQualifiersFirebird.SerializeSelectQualifiers: Unknown qualifier');
-    end;
-  end;
-  Result := TUtils.Concat([Result, LFirst, LSkip]);
+  LPag := _Pagination('Firebird');
+  if LPag.HasFirst then
+    Result := TUtils.Concat([Result, 'FIRST', IntToStr(LPag.First)]);
+  if LPag.HasSkip then
+    Result := TUtils.Concat([Result, 'SKIP', IntToStr(LPag.Skip)]);
 end;
 
 end.
