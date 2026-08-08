@@ -263,10 +263,44 @@ begin
   Result := FTargetTable = '';
 end;
 
+/// <summary>
+///   Um MERGE sem NENHUMA clausula WHEN nao e serializavel: sai so o cabecalho,
+///   "MERGE INTO [T] AS [t] USING [S] AS [s] ON (...);", que e a instrucao pela
+///   metade. Saia calado - o erro so aparecia no banco do consumidor.
+///
+///   Medido em execucao real antes de decidir a forma, e nenhum motor aceita:
+///     SQL Server 2022 16.0.4265.3  Msg 102, Incorrect syntax near ';'
+///     Oracle Free 23               ORA-02000: missing WHEN keyword
+///     PostgreSQL 16.14             syntax error at or near ";"
+///     Firebird 5.0.4               -104 Unexpected end of command
+///     MySQL 8.4.11 / SQLite 3.53.4 recusam a palavra MERGE, que nao existe la
+///   Controle: o MESMO texto com "WHEN MATCHED THEN UPDATE SET D = 'z'" e
+///   aceito por MSSQL, Oracle, PostgreSQL e Firebird - logo a recusa e da
+///   forma sem WHEN, nao do MERGE.
+///
+///   A guarda fica AQUI, no nucleo, e nao no serializador do MSSQL, porque a
+///   regra e da instrucao e nao do dialeto: os quatro motores que tem MERGE
+///   exigem ao menos uma clausula. No driver ela teria de ser repetida em cada
+///   dialeto que ganhasse serializador de MERGE - a mesma armadilha de "N
+///   pontos de toque" que ja custa caro nesta base.
+///
+///   CONSEQUENCIA DE ORDEM, declarada de proposito: como isto roda ANTES do
+///   despacho por dialeto, um MERGE sem WHEN montado sobre MySQL recebe esta
+///   excecao e nao a EFluentSQLStatementNotSupported. As duas sao verdadeiras;
+///   esta e a que aponta a linha que o consumidor escreveu.
+/// </summary>
 function TFluentSQLMerge.Serialize: string;
 var
   LReg: TFluentSQLRegister;
 begin
+  if (FTargetTable <> '') and (FMatchedClauses.Count = 0) then
+    raise EArgumentException.Create(
+      'MERGE sem nenhuma clausula WHEN nao e serializavel: sairia so o ' +
+      'cabecalho "MERGE INTO ... USING ... ON (...);", que e a instrucao pela ' +
+      'metade. Nenhum motor com MERGE aceita essa forma (SQL Server Msg 102, ' +
+      'Oracle ORA-02000 missing WHEN keyword). Acrescente ao menos um ' +
+      '.WhenMatched.Update([...]) / .Delete ou .WhenNotMatched.Insert([...]).');
+
   LReg := TFluentSQLRegister.Create;
   try
     Result := LReg.Serialize(FDialect).Merge(Self);

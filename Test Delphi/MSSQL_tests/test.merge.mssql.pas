@@ -99,6 +99,13 @@ type
     [Test]
     procedure TestMerge_RaisedGuard_LeavesNoHalfClauseInSql;
 
+    { ---- MERGE sem NENHUMA clausula WHEN: cabecalho solto, invalido ---- }
+
+    [Test]
+    procedure TestMerge_NoWhenClause_RaisesInsteadOfEmittingHeaderOnly;
+    [Test]
+    procedure TestMerge_OneWhenClause_DoesNotRaise;
+
     { ---- nil em posicao de valor: levantar, nunca gravar '00000000' ---- }
 
     [Test]
@@ -523,16 +530,27 @@ end;
 procedure TTestMergeMSSQL.TestMerge_RaisedGuard_LeavesNoHalfClauseInSql;
 var
   LQuery: IFluentSQL;
+  LMerge: IFluentSQLMerge;
   LSql: string;
   LRaised: Boolean;
 begin
   // A clausula e registrada no MERGE apenas em _Apply, DEPOIS da validacao
   // (FluentSQL.Merge.pas). Se voltar a ser registrada em WhenMatched, quem
   // engolir a excecao ve "WHEN MATCHED THEN" pela metade no texto emitido.
+  //
+  // A clausula VALIDA que vem depois nao e enfeite: sem ela o MERGE ficaria
+  // com ZERO clausulas e o AsString levantaria a guarda de "MERGE sem WHEN"
+  // (TestMerge_NoWhenClause_...), o que impediria esta celula de olhar o
+  // TEXTO emitido - que e exatamente o que ela existe para olhar.
+  //
+  // A referencia LMerge tem de ser guardada: TFluentSQL.Merge (FluentSQL.pas:1257)
+  // CONSTROI um MERGE novo a cada chamada e o instala no AST, entao um segundo
+  // LQuery.Merge descartaria o primeiro em silencio.
   LQuery := FluentSQL.Query(dbnMSSQL);
+  LMerge := LQuery.Merge;
   LRaised := False;
   try
-    LQuery.Merge
+    LMerge
       .Into('TARGET', 't')
       .Using('SOURCE', 's')
       .On('t.ID = s.ID')
@@ -544,11 +562,68 @@ begin
   end;
   Assert.IsTrue(LRaised, 'a guarda tinha de ter levantado');
 
+  LMerge.WhenNotMatched.Insert(['ID', 1]);
+
   LSql := LQuery.AsString;
   Assert.IsFalse(LSql.Contains('WHEN MATCHED'),
     'a clausula recusada nao pode aparecer no SQL. SQL=' + LSql);
   Assert.IsFalse(LSql.Contains('UPDATE SET'),
     'nao pode sobrar UPDATE SET pela metade. SQL=' + LSql);
+  Assert.IsTrue(LSql.Contains('WHEN NOT MATCHED THEN INSERT ([ID]) VALUES (:p1)'),
+    'a clausula valida seguinte tem de aparecer inteira. SQL=' + LSql);
+end;
+
+{ ---------------------------------------------------------------------------
+  MERGE SEM NENHUMA CLAUSULA WHEN
+
+  Sai so o cabecalho - "MERGE INTO [T] AS [t] USING [S] AS [s] ON (...);" - que
+  e a instrucao pela metade, e saia CALADO. Medido em execucao real, nenhum
+  motor aceita:
+    SQL Server 2022 16.0.4265.3  Msg 102, Incorrect syntax near ';'
+    Oracle Free 23               ORA-02000: missing WHEN keyword
+    PostgreSQL 16.14             syntax error at or near ";"
+    Firebird 5.0.4               -104 Unexpected end of command
+    MySQL 8.4.11 / SQLite 3.53.4 recusam a palavra MERGE, que nao existe la
+  Controle: o MESMO texto com "WHEN MATCHED THEN UPDATE SET D = 'z'" e aceito
+  por MSSQL, Oracle, PostgreSQL e Firebird - logo a recusa e da forma sem WHEN.
+  --------------------------------------------------------------------------- }
+
+procedure TTestMergeMSSQL.TestMerge_NoWhenClause_RaisesInsteadOfEmittingHeaderOnly;
+begin
+  // Antes: 'MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID);'
+  // com zero parametros, sem aviso nenhum.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .AsString;
+    end,
+    EArgumentException,
+    'MERGE sem WHEN emitia so o cabecalho, que nenhum motor executa');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_OneWhenClause_DoesNotRaise;
+var
+  LQuery: IFluentSQL;
+begin
+  // Controle da celula acima: UMA clausula basta, e o SQL sai inteiro. Sem
+  // este controle, a guarda poderia estar recusando MERGE valido tambem.
+  LQuery := FluentSQL.Query(dbnMSSQL);
+  LQuery.Merge
+    .Into('TARGET', 't')
+    .Using('SOURCE', 's')
+    .On('t.ID = s.ID')
+    .WhenMatched
+      .Delete;
+
+  Assert.AreEqual(
+    'MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)' +
+    ' WHEN MATCHED THEN DELETE;',
+    LQuery.AsString, False, 'uma clausula basta, texto exato');
 end;
 
 { ---------------------------------------------------------------------------
