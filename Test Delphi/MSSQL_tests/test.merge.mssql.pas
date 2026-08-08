@@ -81,6 +81,30 @@ type
     procedure TestMerge_InsertOddArray_RaisesInsteadOfEmittingBrokenSql;
     [Test]
     procedure TestMerge_EvenArray_DoesNotRaise;
+
+    { ---- Lista VAZIA e forma SEM ARGUMENTOS: as duas emitiam SQL invalido ---- }
+
+    [Test]
+    procedure TestMerge_UpdateEmptyArray_RaisesInsteadOfEmittingUpdateSetSemicolon;
+    [Test]
+    procedure TestMerge_InsertEmptyArray_RaisesInsteadOfEmittingBareInsert;
+    [Test]
+    procedure TestMerge_UpdateNoArgs_RaisesInsteadOfEmittingUpdateSetSemicolon;
+    [Test]
+    procedure TestMerge_InsertNoArgs_RaisesInsteadOfEmittingBareInsert;
+    /// <summary>
+    ///   A guarda tem de levantar ANTES de registrar a clausula no MERGE: quem
+    ///   engolir a excecao e chamar AsString nao pode encontrar meia clausula.
+    /// </summary>
+    [Test]
+    procedure TestMerge_RaisedGuard_LeavesNoHalfClauseInSql;
+
+    { ---- nil em posicao de valor: levantar, nunca gravar '00000000' ---- }
+
+    [Test]
+    procedure TestMerge_UpdateNilValue_RaisesInsteadOfCorruptingDataAsHexString;
+    [Test]
+    procedure TestMerge_InsertNilValue_RaisesInsteadOfCorruptingDataAsHexString;
   end;
 
 implementation
@@ -137,39 +161,56 @@ procedure TTestMergeMSSQL.TestMerge_BasicSyntax_GeneratesMSSQL;
 var
   LSql: string;
 begin
+  // ATENCAO - este teste passava sobre SQL INVALIDO. Usava ".Update" e ".Insert"
+  // sem argumentos, forma que emite "UPDATE SET ;" e "INSERT;" - recusada por
+  // todo motor com MERGE (ver test.merge.mssql.sql, secao LISTA VAZIA / FORMA
+  // SEM ARGUMENTOS). Passava porque assertava com Pos() sobre PREFIXOS
+  // ('WHEN MATCHED THEN UPDATE' casa em 'UPDATE SET ;' tao bem quanto em
+  // 'UPDATE SET [X] = :p1'), e prefixo nao sabe distinguir SQL valido de
+  // truncado. Foi essa fragilidade que deixou uma forma quebrada atravessar a
+  // suite verde por completo.
+  //
+  // Agora: forma VALIDA, e uma unica assercao de SQL INTEIRO, case-sensitive
+  // (Assert.AreEqual do DUnitX e case-insensitive por omissao; numa biblioteca
+  // cujo produto e texto SQL isso deixa passar regressao de caixa).
   LSql := FluentSQL.Query(dbnMSSQL)
     .Merge
       .Into('TARGET', 't')
       .Using('SOURCE', 's')
       .On('t.ID = s.ID')
       .WhenMatched
-        .Update
+        .Update(['VALOR', 10])
       .WhenNotMatched
-        .Insert
+        .Insert(['ID', 1])
     .AsString;
 
-  Assert.IsTrue(Pos('MERGE INTO [TARGET] AS [t]', LSql) > 0, 'Should contain MERGE INTO TARGET');
-  Assert.IsTrue(Pos('USING [SOURCE] AS [s]', LSql) > 0, 'Should contain USING SOURCE');
-  Assert.IsTrue(Pos('ON (t.ID = s.ID)', LSql) > 0, 'Should contain ON condition');
-  Assert.IsTrue(Pos('WHEN MATCHED THEN UPDATE', LSql) > 0, 'Should contain WHEN MATCHED');
-  Assert.IsTrue(Pos('WHEN NOT MATCHED THEN INSERT', LSql) > 0, 'Should contain WHEN NOT MATCHED');
-  Assert.IsTrue(LSql.EndsWith(';'), 'Should end with semicolon');
+  Assert.AreEqual(
+    'MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)' +
+    ' WHEN MATCHED THEN UPDATE SET [VALOR] = :p1' +
+    ' WHEN NOT MATCHED THEN INSERT ([ID]) VALUES (:p2);',
+    LSql, False, 'MERGE completo do MSSQL, texto exato');
 end;
 
 procedure TTestMergeMSSQL.TestMerge_WithArrayOfConstCondition_GeneratesExpected;
 var
   LSql: string;
 begin
+  // Idem: usava ".Update" sem argumentos e assertava por Pos() so no trecho do ON.
   LSql := FluentSQL.Query(dbnMSSQL)
     .Merge
       .Into('TARGET')
       .Using('SOURCE')
       .On(['ID =', 100])
       .WhenMatched
-        .Update
+        .Update(['NOME', 'ana'])
     .AsString;
 
-  Assert.IsTrue(Pos('ON (ID = :p1)', LSql) > 0, 'Should contain formatted ON condition');
+  // O 100 do On vira :p1 (escalar numerico em posicao de expressao ja
+  // parametrizava) e o 'ana' do Update vira :p2, na ordem de construcao.
+  Assert.AreEqual(
+    'MERGE INTO [TARGET] USING [SOURCE] ON (ID = :p1)' +
+    ' WHEN MATCHED THEN UPDATE SET [NOME] = :p2;',
+    LSql, False, 'ON(array of const) + UPDATE, texto exato');
 end;
 
 procedure TTestMergeMSSQL.TestMerge_WithSourceQuery_GeneratesMSSQL;
@@ -177,6 +218,8 @@ var
   LSource: IFluentSQL;
   LSql: string;
 begin
+  // Idem: usava ".Update"/".Insert" sem argumentos e assertava por Pos() so no
+  // trecho do USING.
   LSource := FluentSQL.Query(dbnMSSQL).Select('ID').Column('NOME').From('PESSOAS');
 
   LSql := FluentSQL.Query(dbnMSSQL)
@@ -185,11 +228,17 @@ begin
       .Using(LSource, 's')
       .On('t.ID = s.ID')
       .WhenMatched
-        .Update
+        .Update(['VALOR', 10])
       .WhenNotMatched
-        .Insert
+        .Insert(['ID', 1])
     .AsString;
-  Assert.IsTrue(Pos('USING (SELECT ID, NOME FROM PESSOAS) AS [s]', LSql) > 0, 'Should contain subquery in USING clause');
+
+  Assert.AreEqual(
+    'MERGE INTO [TARGET] AS [t] USING (SELECT ID, NOME FROM PESSOAS) AS [s]' +
+    ' ON (t.ID = s.ID)' +
+    ' WHEN MATCHED THEN UPDATE SET [VALOR] = :p1' +
+    ' WHEN NOT MATCHED THEN INSERT ([ID]) VALUES (:p2);',
+    LSql, False, 'USING (subconsulta), texto exato');
 end;
 
 procedure TTestMergeMSSQL.TestMerge_UpdateWithValues_GeneratesMSSQL;
@@ -367,8 +416,11 @@ var
   LQuery: IFluentSQL;
   LSql: string;
 begin
-  // A guarda so pode pegar contagem IMPAR. Contagem par - inclusive a lista
-  // vazia, que equivale a .Update sem argumentos - tem de passar limpo.
+  // Contagem par e NAO VAZIA passa limpo. A versao anterior deste comentario
+  // afirmava que a lista vazia tambem passava, "porque e par" - afirmacao falsa:
+  // zero pares serializa como "UPDATE SET ;" / "INSERT;", que e o MESMO SQL
+  // invalido que a guarda existe para impedir. A lista vazia tem teste proprio,
+  // e ele afirma que ela LEVANTA.
   LQuery := FluentSQL.Query(dbnMSSQL);
   LQuery.Merge
     .Into('TARGET', 't')
@@ -381,6 +433,165 @@ begin
   Assert.IsTrue(LSql.Contains('([ID], [NOME]) VALUES (:p1, :p2)'),
     'contagem par continua serializando normalmente. SQL=' + LSql);
   Assert.AreEqual(2, LQuery.Params.Count, 'dois valores, dois parametros');
+end;
+
+{ ---------------------------------------------------------------------------
+  LISTA VAZIA e FORMA SEM ARGUMENTOS
+
+  As duas produzem o MESMO texto - zero pares nome/valor -, e por isso o mesmo
+  SQL invalido:
+
+    .Update([])  e  .Update   ->  ... WHEN MATCHED THEN UPDATE SET ;
+    .Insert([])  e  .Insert   ->  ... WHEN NOT MATCHED THEN INSERT;
+
+  Medido em motor real: nenhum dos motores com MERGE aceita nenhuma das duas.
+  Oraculo com container, versao e saida bruta em
+  Test Delphi\Common_tests\test.merge.mssql.sql, secao
+  LISTA VAZIA / FORMA SEM ARGUMENTOS.
+  --------------------------------------------------------------------------- }
+
+procedure TTestMergeMSSQL.TestMerge_UpdateEmptyArray_RaisesInsteadOfEmittingUpdateSetSemicolon;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenMatched
+            .Update([]);
+    end,
+    EArgumentException,
+    'Lista vazia tem de levantar, nao emitir "UPDATE SET ;"');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_InsertEmptyArray_RaisesInsteadOfEmittingBareInsert;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenNotMatched
+            .Insert([]);
+    end,
+    EArgumentException,
+    'Lista vazia tem de levantar, nao emitir "INSERT;"');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_UpdateNoArgs_RaisesInsteadOfEmittingUpdateSetSemicolon;
+begin
+  // Esta e a forma que o guia dml-merge.md ENSINAVA ate esta revisao, como
+  // resposta a "quero copiar coluna a coluna da fonte". Ela nunca funcionou.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenMatched
+            .Update;
+    end,
+    EArgumentException,
+    '.Update sem argumentos tem de levantar, nao emitir "UPDATE SET ;"');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_InsertNoArgs_RaisesInsteadOfEmittingBareInsert;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenNotMatched
+            .Insert;
+    end,
+    EArgumentException,
+    '.Insert sem argumentos tem de levantar, nao emitir "INSERT;"');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_RaisedGuard_LeavesNoHalfClauseInSql;
+var
+  LQuery: IFluentSQL;
+  LSql: string;
+  LRaised: Boolean;
+begin
+  // A clausula e registrada no MERGE apenas em _Apply, DEPOIS da validacao
+  // (FluentSQL.Merge.pas). Se voltar a ser registrada em WhenMatched, quem
+  // engolir a excecao ve "WHEN MATCHED THEN" pela metade no texto emitido.
+  LQuery := FluentSQL.Query(dbnMSSQL);
+  LRaised := False;
+  try
+    LQuery.Merge
+      .Into('TARGET', 't')
+      .Using('SOURCE', 's')
+      .On('t.ID = s.ID')
+      .WhenMatched
+        .Update(['NOME']);   // impar: levanta
+  except
+    on E: EArgumentException do
+      LRaised := True;
+  end;
+  Assert.IsTrue(LRaised, 'a guarda tinha de ter levantado');
+
+  LSql := LQuery.AsString;
+  Assert.IsFalse(LSql.Contains('WHEN MATCHED'),
+    'a clausula recusada nao pode aparecer no SQL. SQL=' + LSql);
+  Assert.IsFalse(LSql.Contains('UPDATE SET'),
+    'nao pode sobrar UPDATE SET pela metade. SQL=' + LSql);
+end;
+
+{ ---------------------------------------------------------------------------
+  nil EM POSICAO DE VALOR
+
+  O par nome/valor nao exprime NULL. Antes, o `nil` escrito no array chegava
+  como vtPointer, _VarRecToString o mapeava por IntToHex e o valor gravado na
+  coluna era a STRING '00000000' - dado corrompido, em silencio, sem erro em
+  lugar nenhum. Entre gravar lixo calado e recusar a chamada, recusa.
+  --------------------------------------------------------------------------- }
+
+procedure TTestMergeMSSQL.TestMerge_UpdateNilValue_RaisesInsteadOfCorruptingDataAsHexString;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenMatched
+            .Update(['NOME', nil]);
+    end,
+    EArgumentException,
+    'nil em posicao de valor tem de levantar, nao gravar a string ''00000000''');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_InsertNilValue_RaisesInsteadOfCorruptingDataAsHexString;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenNotMatched
+            .Insert(['NOME', nil]);
+    end,
+    EArgumentException,
+    'nil em posicao de valor tem de levantar, nao gravar a string ''00000000''');
 end;
 
 initialization

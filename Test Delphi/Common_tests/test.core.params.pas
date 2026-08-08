@@ -45,6 +45,18 @@ type
     procedure TestDialectOnlyEmittedForTargetDialect;
     [Test]
     procedure TestDialectOnlyArrayOfConstBindsParams;
+    /// <summary>
+    ///   SetValue/Values(array of const) e posicao de VALOR - o lado direito de
+    ///   "COLUNA = ...". Ali a RN-P3 nao vale: string tambem tem de virar :pN.
+    ///   Antes, o numerico parametrizava e a string ia VERBATIM para o texto do
+    ///   SQL, sem aspas e sem escape, dentro do MESMO slot.
+    /// </summary>
+    [Test]
+    procedure TestSetValueArrayOfConstStringBecomesParam;
+    [Test]
+    procedure TestValuesArrayOfConstStringBecomesParam;
+    [Test]
+    procedure TestSetValueArrayOfConstHostileStringNeverReachesSqlText;
   end;
 
 implementation
@@ -363,6 +375,81 @@ begin
   Assert.AreEqual(2, LQuery.Params.Count);
   Assert.AreEqual(1, Integer(LQuery.Params[0].Value));
   Assert.AreEqual(0, Integer(LQuery.Params[1].Value));
+end;
+
+{ ---------------------------------------------------------------------------
+  SetValue / Values (array of const) - SLOT DE VALOR
+
+  Estes tres travam a correcao de um defeito de ASSIMETRIA: no MESMO slot,
+  .Values('NIVEL', [7]) ja saia como :p1 (ver TestInsertValuesArrayOfConst
+  acima) enquanto .SetValue('NOME', ['TESTE']) saia como o texto TESTE cru,
+  sem aspas e sem escape. Numerico parametrizava, string nao.
+
+  Nao e caso de RN-P3: a RN-P3 deixa string literal quando o array of const
+  esta em posicao de EXPRESSAO (Where, Column, Having, CaseExpr, Merge.On), onde
+  a string pode legitimamente ser fragmento de SQL. Aqui o array e o lado
+  DIREITO de "COLUNA = ..." - o proprio _InternalSet o afirma com
+  _AssertSection([secInsert, secUpdate]) - e nessa posicao string nao tem como
+  ser fragmento, so pode ser dado.
+  --------------------------------------------------------------------------- }
+
+procedure TTestCoreParams.TestSetValueArrayOfConstStringBecomesParam;
+var
+  LQuery: IFluentSQL;
+begin
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
+    .Insert
+    .Into('USUARIOS')
+    .SetValue('NOME', ['TESTE'])
+    .SetValue('NIVEL', [7]);
+
+  // Antes: 'INSERT INTO USUARIOS (NOME, NIVEL) VALUES (TESTE, :p1)' com 1
+  // parametro - a string ia verbatim e o PostgreSQL a leria como identificador.
+  Assert.AreEqual('INSERT INTO USUARIOS (NOME, NIVEL) VALUES (:p1, :p2)',
+    LQuery.AsString, False, 'string e numero, o MESMO slot, os DOIS parametrizados');
+  Assert.AreEqual(2, LQuery.Params.Count);
+  Assert.AreEqual('TESTE', String(LQuery.Params[0].Value));
+  Assert.AreEqual(7, Integer(LQuery.Params[1].Value));
+end;
+
+procedure TTestCoreParams.TestValuesArrayOfConstStringBecomesParam;
+var
+  LQuery: IFluentSQL;
+begin
+  // Values e o mesmo caminho de SetValue (ambos chamam _InternalSet); esta
+  // celula existe para que renomear ou redirecionar um dos dois nao passe.
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
+    .Insert
+    .Into('USUARIOS')
+    .Values('NOME', ['ANA']);
+
+  Assert.AreEqual('INSERT INTO USUARIOS (NOME) VALUES (:p1)',
+    LQuery.AsString, False, 'Values(array of const) tambem parametriza string');
+  Assert.AreEqual(1, LQuery.Params.Count);
+  Assert.AreEqual('ANA', String(LQuery.Params[0].Value));
+end;
+
+procedure TTestCoreParams.TestSetValueArrayOfConstHostileStringNeverReachesSqlText;
+const
+  HOSTILE = 'x''; DROP TABLE USERS; --';
+var
+  LQuery: IFluentSQL;
+  LSql: string;
+begin
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
+    .Insert
+    .Into('USUARIOS')
+    .SetValue('NOME', [HOSTILE]);
+  LSql := LQuery.AsString;
+
+  // Antes: 'INSERT INTO USUARIOS (NOME) VALUES (x''; DROP TABLE USERS; --)'
+  // com ZERO parametros - o payload era texto do SQL, nao dado.
+  Assert.IsFalse(LSql.Contains(HOSTILE),
+    'o valor hostil vazou para o texto do SQL. SQL=' + LSql);
+  Assert.AreEqual('INSERT INTO USUARIOS (NOME) VALUES (:p1)', LSql, False);
+  Assert.AreEqual(1, LQuery.Params.Count);
+  Assert.AreEqual(HOSTILE, String(LQuery.Params[0].Value),
+    'o valor tem de chegar INTACTO na lista de parametros');
 end;
 
 initialization
