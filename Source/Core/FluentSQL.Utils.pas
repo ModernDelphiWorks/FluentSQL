@@ -347,11 +347,38 @@ var
   LValue: string;
 begin
   if not Assigned(APairs) then exit;
+
+  // O array e uma lista de PARES: nome, valor, nome, valor... Contagem impar
+  // significa um nome sem valor, e isso nao tem serializacao possivel - saia
+  // "VALUES (:p1, )" ou "SET [NOME] = ", ambos recusados pelo motor
+  // (SQL Server 2022: Msg 102, Incorrect syntax near ')' e near ';').
+  //
+  // E erro de programacao do chamador, nao dado do usuario, entao a resposta
+  // certa e falhar alto e cedo. Emitir SQL quebrado em silencio nao sobrevive
+  // ao padrao desta biblioteca: ela gera 100% texto, e texto invalido so
+  // aparece no motor do consumidor, longe da linha que o causou.
+  //
+  // EArgumentException e a mesma classe que FluentSQL.DDL.pas ja usa para
+  // chamada malformada (DDL.pas:908 e :915) - nao inventa vocabulario novo.
+  if Odd(Length(AParams)) then
+    raise EArgumentException.CreateFmt(
+      'Lista de pares nome/valor malformada: %d elementos. ' +
+      'A lista tem de alternar nome e valor (''COLUNA'', <valor>, ...), ' +
+      'portanto a contagem tem de ser par. O ultimo nome ficou sem valor.',
+      [Length(AParams)]);
+
   I := Low(AParams);
   while I <= High(AParams) do
   begin
     // Slot IMPAR: nome de coluna. E identificador, nunca parametro - um :pN aqui
     // produziria SQL sintaticamente invalido. Segue literal, como em SetValue.
+    //
+    // FRONTEIRA CONHECIDA: por ser identificador, este slot NAO passa por
+    // parametro, e o delimitador do dialeto nao e escapado pelos QuotedName /
+    // Quote atuais. Medido em SQL Server 2022 com nome de coluna
+    // "NOME] = 'x'; DROP TABLE USERS; --": a tabela foi dropada. Vale igual na
+    // base e nesta branch - nao e regressao. Escape de identificador e decisao
+    // de arquitetura propria e esta fora do escopo aqui.
     LName := _VarRecToString(AParams[I]);
     Inc(I);
     if I <= High(AParams) then
@@ -372,8 +399,9 @@ begin
       Inc(I);
     end
     else
-      // Array de tamanho impar: nome sem valor. Preserva o comportamento anterior
-      // (par com valor vazio) em vez de inventar um parametro nulo.
+      // Inalcancavel: a guarda de contagem impar no topo ja saiu com excecao.
+      // Fica como rede, e nao como comportamento - se algum dia esta linha
+      // executar, e porque a guarda foi removida por engano.
       LValue := '';
 
     with APairs.Add do

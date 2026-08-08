@@ -72,6 +72,15 @@ type
     procedure TestMerge_MixedTypes_AllValuesParameterizedInOrder;
     [Test]
     procedure TestMerge_ColumnNamesStayLiteral_OnlyValuesBecomeParams;
+
+    { ---- Lista de pares malformada: falhar alto, nao emitir SQL quebrado ---- }
+
+    [Test]
+    procedure TestMerge_UpdateOddArray_RaisesInsteadOfEmittingBrokenSql;
+    [Test]
+    procedure TestMerge_InsertOddArray_RaisesInsteadOfEmittingBrokenSql;
+    [Test]
+    procedure TestMerge_EvenArray_DoesNotRaise;
   end;
 
 implementation
@@ -312,6 +321,66 @@ begin
   Assert.IsTrue(LSql.Contains('UPDATE SET [NOME] = :p1, [IDADE] = :p2'),
     'nomes literais, valores parametrizados. SQL=' + LSql);
   Assert.AreEqual(2, LQuery.Params.Count, 'so os dois VALORES viram parametro');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_UpdateOddArray_RaisesInsteadOfEmittingBrokenSql;
+begin
+  // Antes: .Update(['NOME']) emitia "UPDATE SET [NOME] = ;", que o SQL Server 2022
+  // recusa com Msg 102, Incorrect syntax near ';'. Falha longe da linha que a
+  // causou. Agora falha na chamada.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenMatched
+            .Update(['NOME']);
+    end,
+    EArgumentException,
+    'Lista de pares com contagem impar tem de levantar, nao emitir SET [NOME] = ;');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_InsertOddArray_RaisesInsteadOfEmittingBrokenSql;
+begin
+  // Antes: .Insert(['ID', 1, 'NOME']) emitia "VALUES (:p1, )", recusado com
+  // Msg 102, Incorrect syntax near ')'.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenNotMatched
+            .Insert(['ID', 1, 'NOME']);
+    end,
+    EArgumentException,
+    'Lista de pares com contagem impar tem de levantar, nao emitir VALUES (:p1, )');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_EvenArray_DoesNotRaise;
+var
+  LQuery: IFluentSQL;
+  LSql: string;
+begin
+  // A guarda so pode pegar contagem IMPAR. Contagem par - inclusive a lista
+  // vazia, que equivale a .Update sem argumentos - tem de passar limpo.
+  LQuery := FluentSQL.Query(dbnMSSQL);
+  LQuery.Merge
+    .Into('TARGET', 't')
+    .Using('SOURCE', 's')
+    .On('t.ID = s.ID')
+    .WhenNotMatched
+      .Insert(['ID', 1, 'NOME', 'ana']);
+  LSql := LQuery.AsString;
+
+  Assert.IsTrue(LSql.Contains('([ID], [NOME]) VALUES (:p1, :p2)'),
+    'contagem par continua serializando normalmente. SQL=' + LSql);
+  Assert.AreEqual(2, LQuery.Params.Count, 'dois valores, dois parametros');
 end;
 
 initialization
