@@ -159,10 +159,48 @@
       entrada nao confiavel.
 
   (2) array of const em posicao de EXPRESSAO segue interpolando string verbatim,
-      de proposito: Where, Column, Having, OnCond, CaseExpr e Merge.On. La a
-      string PODE ser fragmento de SQL (identificador, operador, trecho), e por
-      isso a regra e outra. So SetValue/Values e .Update/.Insert do MERGE
-      mudaram, porque nesses o array e comprovadamente uma lista de VALORES.
+      de proposito - la a string PODE ser fragmento de SQL (identificador,
+      operador, trecho). Isso NAO vale para meia duzia de metodos: vale para
+      TODO array of const que nao seja um dos quatro slots de VALOR. Hoje sao
+      17 pontos de entrada publicos; uma versao anterior desta secao listava 6,
+      omitindo 11 - entre eles AndOpe, que e a forma mais comum da API logo
+      depois do Where.
+
+      REGRA (audite isto, nao a lista):
+        passa por TUtils.SqlArrayOfConstToParameterizedSql   -> string LITERAL
+        passa por TUtils.SqlArrayOfConstToParameterizedValue -> string vira :pN
+      Nao ha terceiro caminho.
+
+      Os 17 literais, conferidos no codigo e executados um a um:
+
+        IFluentSQL                    Where          FluentSQL.pas:1422
+                                      AndOpe         FluentSQL.pas:367
+                                      OrOpe          FluentSQL.pas:372
+                                      Column         FluentSQL.pas:664
+                                      Having         FluentSQL.pas:968
+                                      OnCond         FluentSQL.pas:420
+                                      CaseExpr       FluentSQL.pas:342
+                                      ForDialectOnly FluentSQL.pas:325
+                                      Expression     FluentSQL.pas:873
+        IFluentSQLCriteriaExpression  AndOpe         FluentSQL.Expression.pas:261
+                                      OrOpe          FluentSQL.Expression.pas:344
+                                      Ope            FluentSQL.Expression.pas:358
+                                      Fun            FluentSQL.Expression.pas:318
+        IFluentSQLCriteriaCase        When           FluentSQL.Cases.pas:346
+                                      AndOpe         FluentSQL.Cases.pas:267
+                                      OrOpe          FluentSQL.Cases.pas:317
+        IFluentSQLMerge               On             FluentSQL.Merge.pas:342
+
+      Amostra do emitido, payload  x'; DROP TABLE U; --  :
+
+        AndOpe(array)         => SELECT * FROM T WHERE (A = :p1) AND (NOME = x'; DROP TABLE U; --)   params=1
+        OrOpe(array)          => SELECT * FROM T WHERE ((A = :p1) OR (NOME = x'; DROP TABLE U; --))  params=1
+        Expression(array)     => SELECT * FROM T WHERE NOME = x'; DROP TABLE U; --                   params=0
+        ForDialectOnly(array) => SELECT * FROM TOPTION(x'; DROP TABLE U; --)                         params=0
+
+      Os quatro slots de VALOR - os unicos que mudaram - sao SetValue, Values,
+      Merge.Update e Merge.Insert, porque neles o array e comprovadamente uma
+      lista de valores.
       A distincao valor x expressao e tarefa de arquitetura propria.
 
   (3) nil em posicao de valor NAO virou NULL: passou a LEVANTAR. Ver a secao

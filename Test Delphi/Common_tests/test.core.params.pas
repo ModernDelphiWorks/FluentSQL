@@ -386,7 +386,13 @@ end;
   sem aspas e sem escape. Numerico parametrizava, string nao.
 
   Nao e caso de RN-P3: a RN-P3 deixa string literal quando o array of const
-  esta em posicao de EXPRESSAO (Where, Column, Having, CaseExpr, Merge.On), onde
+  esta em posicao de EXPRESSAO - o que vale para os 17 pontos de entrada
+  publicos que passam por TUtils.SqlArrayOfConstToParameterizedSql, e nao so
+  para a meia duzia que se costuma citar (Where, Column, Having, CaseExpr,
+  Merge.On). Os 11 que essa lista curta omite incluem AndOpe, OrOpe,
+  Expression, ForDialectOnly e os builders de IFluentSQLCriteriaCase e
+  IFluentSQLCriteriaExpression; a lista completa com arquivo:linha esta na
+  secao FRONTEIRA item (2) de test.setvalue.mssql.sql. Nesses 17
   a string pode legitimamente ser fragmento de SQL. Aqui o array e o lado
   DIREITO de "COLUNA = ..." - o proprio _InternalSet o afirma com
   _AssertSection([secInsert, secUpdate]) - e nessa posicao string nao tem como

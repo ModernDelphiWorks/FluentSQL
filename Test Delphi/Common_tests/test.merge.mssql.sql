@@ -359,6 +359,15 @@
       so a string e que segue literal. A distincao valor x expressao por tras
       disso e tarefa de arquitetura propria.
 
+      E NAO SO O Merge.On: este e apenas o ponto que aparece dentro do MERGE.
+      Todo array of const que nao seja um dos quatro slots de VALOR interpola
+      string verbatim - hoje 17 pontos de entrada publicos, inclusive AndOpe e
+      OrOpe, que sao a forma mais comum da API logo depois do Where. A lista
+      completa, com arquivo:linha, esta na secao FRONTEIRA item (2) de
+      test.setvalue.mssql.sql, e a regra mecanica e: passa por
+      SqlArrayOfConstToParameterizedSql -> literal; passa por
+      SqlArrayOfConstToParameterizedValue -> :pN. Nao ha terceiro caminho.
+
   (3) OS OUTROS OITO DIALETOS nao tem oraculo porque nenhum deles emite MERGE:
       cinco levantavam EStackOverflow antes desta branch e agora levantam
       EFluentSQLStatementNotSupported, dois nao estao compilados no .inc, e o

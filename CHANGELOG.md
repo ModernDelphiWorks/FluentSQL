@@ -78,7 +78,41 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   A regra é a que o overload tipado `SetValue(const AColumnName, AColumnValue: String)` já seguia: no array de `.Update`/`.Insert` os slots ímpares são **nomes de coluna** (identificadores, seguem literais) e os pares são **valores** (sempre `:pN`).
 
-  A fronteira exata, agora que o overload `array of const` de `SetValue`/`Values` também mudou (entrada abaixo): **parametrizam string** os slots que são comprovadamente *valor* — `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`. **Continuam literais** os que estão em posição de *expressão* — `Where`, `Column`, `Having`, `OnCond`, `CaseExpr` e `Merge.On`, onde a string pode legitimamente ser fragmento de SQL.
+  A fronteira, agora que o overload `array of const` de `SetValue`/`Values` também mudou (entrada abaixo), é uma **regra**, não uma lista curta:
+
+  - **Parametrizam string** os **quatro** pontos em que o `array of const` é comprovadamente uma lista de *valores*: `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`. Esses quatro, e só esses, passam por `TUtils.SqlArrayOfConstToParameterizedValue`.
+  - **Continuam literais** — string interpolada verbatim no texto do SQL — **todos os demais `array of const`, sem exceção**, porque todos estão em posição de *expressão*, onde a string pode legitimamente ser fragmento de SQL (identificador, operador, trecho). O critério mecânico é: passa por `TUtils.SqlArrayOfConstToParameterizedSql`. **Hoje são 17**, e a versão anterior desta entrada listava só 6 — omitia 11, entre eles `AndOpe`, que é a forma mais comum da API logo depois do `Where`. A lista completa, conferida no código e **executada** uma a uma:
+
+  | # | Ponto de entrada | Declarado em |
+  |---|---|---|
+  | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1422` |
+  | 2 | `IFluentSQL.AndOpe(array)` | `FluentSQL.pas:367` |
+  | 3 | `IFluentSQL.OrOpe(array)` | `FluentSQL.pas:372` |
+  | 4 | `IFluentSQL.Column(array)` | `FluentSQL.pas:664` |
+  | 5 | `IFluentSQL.Having(array)` | `FluentSQL.pas:968` |
+  | 6 | `IFluentSQL.OnCond(array)` | `FluentSQL.pas:420` |
+  | 7 | `IFluentSQL.CaseExpr(array)` | `FluentSQL.pas:342` |
+  | 8 | `IFluentSQL.ForDialectOnly(dialeto, array)` | `FluentSQL.pas:325` |
+  | 9 | `IFluentSQL.Expression(array)` | `FluentSQL.pas:873` |
+  | 10 | `IFluentSQLCriteriaExpression.AndOpe(array)` | `FluentSQL.Expression.pas:261` |
+  | 11 | `IFluentSQLCriteriaExpression.OrOpe(array)` | `FluentSQL.Expression.pas:344` |
+  | 12 | `IFluentSQLCriteriaExpression.Ope(array)` | `FluentSQL.Expression.pas:358` |
+  | 13 | `IFluentSQLCriteriaExpression.Fun(array)` | `FluentSQL.Expression.pas:318` |
+  | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:346` |
+  | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:267` |
+  | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:317` |
+  | 17 | `IFluentSQLMerge.On(array)` | `FluentSQL.Merge.pas:342` |
+
+  Quatro amostras do que os 11 omitidos emitem de fato, medidas com o payload `x'; DROP TABLE U; --`:
+
+  ```
+  AndOpe(array)         => SELECT * FROM T WHERE (A = :p1) AND (NOME = x'; DROP TABLE U; --)   params=1
+  OrOpe(array)          => SELECT * FROM T WHERE ((A = :p1) OR (NOME = x'; DROP TABLE U; --))  params=1
+  Expression(array)     => SELECT * FROM T WHERE NOME = x'; DROP TABLE U; --                   params=0
+  ForDialectOnly(array) => SELECT * FROM TOPTION(x'; DROP TABLE U; --)                         params=0
+  ```
+
+  **Se você audita a fronteira, audite a regra, não a lista:** qualquer `array of const` que não seja um dos quatro slots de valor acima interpola string verbatim. **Não passe entrada não confiável por nenhum deles.** O caminho seguro para expressão está sob tarefa própria.
 
 - **BREAKING CHANGE (SQL emitido) — `SetValue(nome, array of const)` e `Values(nome, array of const)` passaram a parametrizar valores string.** É o mesmo defeito da entrada acima, no `INSERT`/`UPDATE` comum em vez do `MERGE`, e a régua é a mesma: string deixou de ir verbatim e passou a `:pN`. Quem compara o SQL gerado com string fixa **precisa atualizar as expectativas**:
 
@@ -170,7 +204,11 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - **MongoDB — `Union` levanta `EIntfCastError`,** com ou sem paginação. Não é defeito de paginação; o MongoDB não tem `UNION` e deveria recusar com exceção nomeada, como já faz para CTE (`EFluentSQLMongoDBSerialize`).
 - **MongoDB — `MERGE` é descartado em silêncio.** `FluentSQL.SerializeMongoDB.pas` sobrescreve `AsString` por inteiro e nunca chega à seção de `MERGE`, então a cláusula some e a saída é `{}`. **Não vaza valor do usuário**, mas também não avisa — é o único dos nove que não levanta nem emite. Como a parametrização acontece na construção, antes da serialização, o valor ainda entra em `Params`: `Params.Count = 1` referenciado por nada no MQL. Não corrigido nesta entrega: exige decidir se o MongoDB recusa `MERGE` com exceção nomeada ou o mapeia para `$merge` do *aggregation pipeline*, e as duas são decisões de escopo próprio. Travado por `TestMerge_MongoDB_DropsMergeSilently_KnownGap`, que afirma tanto o `{}` quanto o parâmetro órfão — fechar a lacuna quebra o teste de forma visível.
 - **O nome da coluna em `MERGE` continua injetável — vale para toda a biblioteca, não só para o `MERGE`.** A correção desta entrega fechou o slot de **valor**; o slot de **identificador** não pode virar parâmetro e os `QuotedName` / `Quote` dos 9 dialetos envolvem o nome no delimitador **sem duplicar o delimitador interno**. Medido em SQL Server 2022: nome de coluna `NOME] = 'x'; DROP TABLE USERS; --` emite `SET [NOME] = 'x'; DROP TABLE USERS; --] = @p1;` e **a tabela foi dropada**. Não é regressão — comportamento idêntico antes e depois. Não corrigido porque o escape de delimitador de identificador toca todos os dialetos e colide com o *passthrough* por `StartsWith`/`Contains` que hoje permite passar nome já qualificado (`[dbo].[T]`); é decisão de arquitetura própria. **Não construa nome de objeto a partir de entrada não confiável.** Detalhes e medição na seção FRONTEIRA de `test.merge.mssql.sql`.
-- **`array of const` em posição de expressão continua interpolando string verbatim.** Vale para `Where`, `Column`, `Having`, `OnCond`, `CaseExpr` e `Merge.On`: escalares numéricos viram `:pN`, strings seguem literais, por serem tratadas como fragmento de SQL (identificador, operador, trecho). `.On(['t.NOME =', 'x''; DROP...'])` emite `ON (t.NOME = x'; DROP...)`. **Isto não mudou nesta entrega e é intencional.** Mudaram apenas os quatro pontos em que o array é comprovadamente uma lista de **valores** e o slot não tem como ser fragmento: `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`.
+- **`array of const` em posição de expressão continua interpolando string verbatim.** Vale para **todo** `array of const` que **não** seja um dos quatro slots de valor — hoje **17 pontos de entrada públicos**, e não os 6 que uma versão anterior desta entrada listava. São eles `Where`, `AndOpe`, `OrOpe`, `Column`, `Having`, `OnCond`, `CaseExpr`, `ForDialectOnly` e `Expression` em `IFluentSQL`; `AndOpe`, `OrOpe`, `Ope` e `Fun` em `IFluentSQLCriteriaExpression`; `When`, `AndOpe` e `OrOpe` em `IFluentSQLCriteriaCase`; e `On` em `IFluentSQLMerge`. A tabela com `arquivo:linha` de cada um está na entrada BREAKING do `MERGE`, em *Changed*.
+
+  Em todos eles escalares numéricos viram `:pN` e strings seguem literais, por serem tratadas como fragmento de SQL (identificador, operador, trecho). `.On(['t.NOME =', 'x''; DROP...'])` emite `ON (t.NOME = x'; DROP...)`, e `.AndOpe(['NOME =', <entrada>])` faz o mesmo depois de um `Where`. **Isto não mudou nesta entrega e é intencional** — é o que permite compor expressão. Mudaram apenas os quatro pontos em que o array é comprovadamente uma lista de **valores** e o slot não tem como ser fragmento: `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`.
+
+  **O critério mecânico, para quem for auditar:** passa por `TUtils.SqlArrayOfConstToParameterizedSql` → literal; passa por `TUtils.SqlArrayOfConstToParameterizedValue` → parâmetro. Não há terceiro caminho. Um caminho seguro para expressão está sob tarefa própria.
 
   **Consequência que vale declarar:** como o `INSERT`/`UPDATE` não exprime expressão em slot de valor por nenhum overload (o tipado `SetValue(String, String)` também parametriza), **não há hoje forma suportada de escrever `SET DATA = CURRENT_TIMESTAMP` pelo construtor de valores**. A distinção entre **valor** e **expressão** que separa os dois casos está sob revisão como tarefa própria, e é ela que decidirá se esse caso ganha caminho próprio.
 - **`FluentSQL.Select.pas` — `TFluentSQLSelect.Serialize` é código morto.** Os 9 drivers sobrescrevem `Serialize` e `FluentSQL.Ast.pas` sempre pega a instância do `Register`; reverter a linha corrigida não derruba teste algum. A forma neutra foi corrigida ali por coerência, não por efeito observável.
