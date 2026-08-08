@@ -140,15 +140,129 @@
   passou a FUNCIONAR, que antes nem isso.
 
   ==============================================================================
+  CARDINALIDADE DO SLOT DE VALOR  -  medicao em SEIS motores
+  ==============================================================================
+
+  Duas formas que o overload emitia CALADO antes da guarda _AssertSingleValue
+  (FluentSQL.Utils.pas:263, chamada em :285). Medidas em execucao real ANTES da forma
+  da correcao, cada recusa acompanhada de um CONTROLE - sem controle, "o motor
+  recusou" nao distingue recusa da FORMA de recusa da INSTRUCAO.
+
+  Containers (todos ja em execucao nesta maquina, docker 29.6.2):
+    docker exec -i t6a4mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ... -C
+    docker exec -i -e PGPASSWORD=pg t6a4pg psql -U postgres
+    docker exec -i t6a4my mysql -uroot -pmy --force -t
+    docker exec -i t6a4fb isql -u sysdba -p fb /var/lib/firebird/data/test.fdb -e
+    docker exec -i t6a4ora sqlplus -S system/ora@localhost/FREEPDB1
+    docker run  --rm -i keinos/sqlite3:latest sqlite3 :memory:
+  Esquema comum:  CREATE TABLE T2 (D varchar(10), E varchar(10));
+
+  --- FORMA A  lista vazia   .SetValue('D', [])
+      emitia    INSERT INTO T2 (D) VALUES ();      e     UPDATE T2 SET D = ;
+
+      MSSQL 2022 16.0.4265.3  Msg 102 Incorrect syntax near ')'
+                              Msg 102 Incorrect syntax near ';'
+      PostgreSQL 16.14        ERROR: syntax error at or near ")"
+                              ERROR: syntax error at or near ";"
+      Oracle Free 23          ORA-00936: missing expression   (as duas formas)
+      Firebird 5.0.4          -104 Token unknown - line 1, column 28  ')'
+                              -104 Unexpected end of command - line 1, column 17
+      MySQL 8.4.11            ERROR 1136 Column count doesn't match value count
+                              ERROR 1064 ... near '' at line 1
+      SQLite 3.53.4           Parse error near ")": syntax error
+                              Parse error near ";": syntax error
+
+      ZERO dos seis aceitam. Nuance registrada: o MySQL recusa por CONTAGEM
+      (1136) e nao por gramatica - "INSERT INTO T2 () VALUES ()" com zero
+      colunas e legal la. A forma que o FluentSQL emitia nomeia a coluna, logo
+      cai no 1136 de qualquer modo.
+
+  --- FORMA C  placeholders JUSTAPOSTOS   .SetValue('D', ['CURRENT','TIMESTAMP'])
+      emitia    INSERT INTO T2 (D,E) VALUES (:p1 :p2)     -- sem virgula
+
+      MSSQL                   Msg 102 Incorrect syntax near '@p2'
+      PostgreSQL 16.14        ERROR: syntax error at or near "$2"
+      Firebird 5.0.4          -104 Token unknown - line 1, column 32  '?'
+      MySQL 8.4.11            ERROR 1064 ... near '?)' at line 1
+      SQLite 3.53.4           Parse error near "?": syntax error
+      Oracle Free 23          ORA-00947: not enough values      <-- LEIA ABAIXO
+
+      CONTROLE (mesma tabela, mesmos binds, so a virgula muda):
+        INSERT INTO T2 (D,E) VALUES (:p1, :p2)   ACEITO nos SEIS.
+      Logo a recusa e da FORMA justaposta, e nao do INSERT.
+
+  --- ORACLE E A EXCECAO, E ELA E PIOR QUE UMA RECUSA
+      O Oracle NAO recusa a justaposicao por gramatica. O ORA-00947 acima diz
+      "not enough values": ele leu ":p1 :p2" como UM valor so. E a sintaxe de
+      VARIAVEL INDICADORA do Oracle (:host:indicator), onde o segundo bind e o
+      indicador de nulidade do primeiro, e nao um segundo valor.
+
+      Consequencia medida: com UMA coluna a mesma forma e ACEITA e grava dado
+      errado, calada.
+
+        SQL> INSERT INTO T2 (D) VALUES (:p1 :p2);     -- :p1='a'  :p2='b'
+        1 row created.
+        SQL> SELECT D, E FROM T2;
+        D          E
+        ---------- ----------
+        a          z
+        a
+
+      Gravou 'a' e DESCARTOU :p2 sem erro nenhum. Ou seja, dos seis motores um
+      aceita a forma - e justamente aceitando-a produz perda silenciosa de
+      valor, que e pior que o erro de sintaxe dos outros cinco. Isso REFORCA a
+      guarda em vez de enfraquece-la: o unico motor que nao protege o usuario
+      pela sintaxe e o que mais precisa da protecao na biblioteca.
+
+      (Nao escreva "zero aceitam" para esta forma. Para a FORMA A, sim.)
+
+  --- MERGE SEM NENHUMA CLAUSULA WHEN   (guarda em FluentSQL.Merge.pas:296)
+      emitia    MERGE INTO T2 t USING T2 s ON (t.D = s.D);
+
+      MSSQL                   Msg 102 Incorrect syntax near ';'
+      PostgreSQL 16.14        ERROR: syntax error at or near ";"
+      Oracle Free 23          ORA-02000: missing WHEN keyword
+      Firebird 5.0.4          -104 Unexpected end of command - line 1, column 41
+      MySQL 8.4.11            ERROR 1064  -  nao tem MERGE
+      SQLite 3.53.4           Parse error near "MERGE"  -  nao tem MERGE
+
+      CONTROLE (mesmo texto + uma clausula):
+        MERGE INTO T2 t USING T2 s ON (t.D = s.D)
+          WHEN MATCHED THEN UPDATE SET t.E = 'z';
+        MSSQL "(0 rows affected)" / PG "MERGE 0" / Oracle "1 row merged." /
+        Firebird sem erro.  ACEITO nos quatro que tem MERGE.
+      Logo a recusa e da forma SEM WHEN, e nao do MERGE.
+
+  ==============================================================================
   ONDE ISTO ESTA TRAVADO NA SUITE
   ==============================================================================
     Test Delphi\Common_tests\test.core.params.pas
       TestSetValueArrayOfConstStringBecomesParam
       TestValuesArrayOfConstStringBecomesParam
       TestSetValueArrayOfConstHostileStringNeverReachesSqlText
+      TestSetValueArrayOfConstNilRaisesInsteadOfWriting00000000
+      TestValuesArrayOfConstNilRaisesInsteadOfWriting00000000
+      TestUpdateSetValueArrayOfConstNilRaises
+      TestSetValueArrayOfConstEmptyRaisesInsteadOfEmittingValuesEmpty
+      TestValuesArrayOfConstEmptyRaises
+      TestUpdateSetValueArrayOfConstEmptyRaisesInsteadOfDanglingSet
+      TestSetValueArrayOfConstTwoElementsRaisesInsteadOfJuxtaposedParams
+      TestSetValueArrayOfConstRejectedCallLeavesNoHalfColumn
 
-  Esses tres rodam nos projetos Firebird e MySQL, que sao os dois que compilam
-  test.core.params.pas.
+    Test Delphi\MSSQL_tests\test.merge.mssql.pas
+      TestMerge_NoWhenClause_RaisesInsteadOfEmittingHeaderOnly
+
+  Os onze primeiros rodam nos projetos Firebird e MySQL, que sao os dois que
+  compilam test.core.params.pas.
+
+  Prova de que nao sao decoracao (mutacao no Source, suite inteira recompilada):
+    vtPointer -> "if False"                 6 vermelhos: os 3 de nil, em CADA um
+                                            dos dois projetos. (Antes desta
+                                            rodada essa mutacao so derrubava os
+                                            2 testes de MERGE, no MSSQL.)
+    _AssertSingleValue comentado           10 vermelhos: os 5 de cardinalidade,
+                                            em CADA um dos dois projetos.
+    "FMatchedClauses.Count = 0" -> False     1 vermelho: o de MERGE sem WHEN.
 
   ==============================================================================
   FRONTEIRA  -  o que esta correcao NAO fecha

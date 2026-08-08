@@ -249,14 +249,23 @@ end;
 ///                        com espaco (correto em posicao de EXPRESSAO, onde os
 ///                        elementos formam um fragmento; sem sentido aqui).
 ///
-///   Medido em execucao real, seis motores, zero aceitam qualquer das duas
-///   formas - com controle acompanhando cada recusa. Saida bruta e docker run
-///   em Test Delphi\Common_tests\test.setvalue.mssql.sql.
+///   Medido em execucao real, seis motores, com controle acompanhando cada
+///   recusa. Saida bruta e docker exec em test.setvalue.mssql.sql.
+///
+///   LISTA VAZIA: zero dos seis aceitam.
+///
+///   DOIS OU MAIS: cinco recusam por sintaxe; o ORACLE NAO. Ele le ":p1 :p2"
+///   como bind + variavel INDICADORA (:host:indicator), ou seja UM valor. Com
+///   duas colunas isso vira ORA-00947; com UMA coluna a forma e ACEITA - o
+///   motor grava :p1, descarta :p2 e nao reclama. Perda silenciosa de valor,
+///   pior que o erro de sintaxe dos outros cinco. Nao escreva "zero aceitam"
+///   para esta forma; e justamente o motor que nao protege pela sintaxe que
+///   torna a guarda necessaria aqui.
 ///
 ///   E a mesma regua ja aplicada ao MERGE em SqlArrayOfConstToNameValuePairs:
-///   entre emitir SQL que nenhum motor executa e recusar a chamada na linha que
-///   a causou, recusa. Nao ha caso legitimo de mais de um elemento: com a
-///   parametrizacao do slot, ate .SetValue('X', ['A','+',1]) sairia como
+///   entre emitir SQL que o motor executa errado (ou nao executa) e recusar a
+///   chamada na linha que a causou, recusa. Nao ha caso legitimo de mais de um
+///   elemento: com a parametrizacao do slot, ate .SetValue('X', ['A','+',1]) sairia como
 ///   ":p1 :p2 :p3" - o INSERT/UPDATE nao exprime expressao em slot de valor,
 ///   por overload nenhum (ver Known issues, valor x expressao).
 /// </summary>
