@@ -390,7 +390,15 @@ end;
 
 function TFluentSQL.SetValue(const AColumnName: String; const AColumnValue: array of const): IFluentSQL;
 begin
-  Result := _InternalSet(AColumnName, TUtils.SqlArrayOfConstToParameterizedSql(AColumnValue, FAST.Params));
+  // AColumnValue e o lado DIREITO de "COLUNA = ...": posicao de VALOR, nunca de
+  // expressao - e o que o proprio _InternalSet afirma com
+  // _AssertSection([secInsert, secUpdate]). Por isso NAO usa
+  // SqlArrayOfConstToParameterizedSql, onde a RN-P3 deixa string literal: ali
+  // .SetValue('NOME', ['x''; DROP TABLE USERS; --']) emitia
+  // "VALUES (x'; DROP TABLE USERS; --)" com ZERO parametros, enquanto
+  // .SetValue('NIVEL', [7]) ja saia como :p1. O numerico parametrizava e a
+  // string nao - assimetria dentro do MESMO slot.
+  Result := _InternalSet(AColumnName, TUtils.SqlArrayOfConstToParameterizedValue(AColumnValue, FAST.Params));
 end;
 
 function TFluentSQL.SetValue(const AColumnName, AColumnValue: String): IFluentSQL;
@@ -1392,7 +1400,8 @@ end;
 
 function TFluentSQL.Values(const AColumnName: String; const AColumnValue: array of const): IFluentSQL;
 begin
-  Result := _InternalSet(AColumnName, TUtils.SqlArrayOfConstToParameterizedSql(AColumnValue, FAST.Params));
+  // Mesmo slot de VALOR de SetValue(array of const) - ver o comentario la.
+  Result := _InternalSet(AColumnName, TUtils.SqlArrayOfConstToParameterizedValue(AColumnValue, FAST.Params));
 end;
 
 function TFluentSQL.Values(const AColumnName, AColumnValue: String): IFluentSQL;

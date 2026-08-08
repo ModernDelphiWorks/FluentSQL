@@ -35,6 +35,8 @@ type
       out APlaceholder: String): Boolean;
     class function _StringVarRecAsParam(const AValue: TVarRec;
       const ASQLParams: IFluentSQLParams): String;
+    class function _ArrayOfConstToSql(const AParams: array of const;
+      const ASQLParams: IFluentSQLParams; const AStringIsValue: Boolean): String;
   public
     class function Concat(const AElements: array of String; const ADelimiter: String = ' '): String;
     class function SqlParamsToStr(const AParams: array of const): String;
@@ -44,6 +46,15 @@ type
     /// String-like VarRec entries remain literal fragments (identifiers, operators, SQL text) per RN-P3.
     /// </summary>
     class function SqlArrayOfConstToParameterizedSql(const AParams: array of const;
+      const ASQLParams: IFluentSQLParams): String;
+    /// <summary>
+    /// Mesmo layout textual de SqlArrayOfConstToParameterizedSql, mas para posicao
+    /// que e comprovadamente VALOR - onde a RN-P3 nao vale, porque ali string nao
+    /// tem como ser fragmento de SQL: TODO elemento vira parametro, inclusive
+    /// string. Usado por SetValue/Values(array of const), cujo array e o lado
+    /// direito de "COLUNA = ..." e nunca uma expressao.
+    /// </summary>
+    class function SqlArrayOfConstToParameterizedValue(const AParams: array of const;
       const ASQLParams: IFluentSQLParams): String;
     class function DateToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDate): String;
     class function DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDateTime): String;
@@ -155,26 +166,55 @@ end;
 class function TUtils._StringVarRecAsParam(const AValue: TVarRec;
   const ASQLParams: IFluentSQLParams): String;
 begin
+  // vtPointer e o que o compilador produz para um `nil` escrito num array of
+  // const. _VarRecToString o mapeia por IntToHex e devolveria a string
+  // '00000000', que iria para o banco como DADO da coluna - corrupcao
+  // silenciosa, e nao o NULL que quem escreveu `nil` obviamente queria.
+  //
+  // O par nome/valor NAO tem forma de exprimir NULL: o slot par e sempre
+  // ligado como parametro, e nao existe hoje marcador de nulidade nesta API.
+  // Entre gravar lixo calado e recusar a chamada, a resposta conservadora e
+  // recusar - mesma classe e mesmo espirito da guarda de contagem impar
+  // abaixo. Dar semantica de NULL ao `nil` e decisao de convencao, nao
+  // conserto de defeito, e por isso nao foi feita aqui.
+  if AValue.VType = vtPointer then
+    raise EArgumentException.Create(
+      'Valor nil em posicao de valor: o par nome/valor nao exprime NULL. ' +
+      'Antes, o nil virava a string ''00000000'' e era gravado como dado. ' +
+      'Se a coluna deve ficar NULL, omita-a da lista de pares.');
+
   if Assigned(ASQLParams) then
     Result := ASQLParams.Add(_VarRecToString(AValue), dftString)
   else
     Result := QuotedStr(_VarRecToString(AValue));
 end;
 
-class function TUtils.SqlArrayOfConstToParameterizedSql(const AParams: array of const;
-  const ASQLParams: IFluentSQLParams): String;
+/// <summary>
+///   Motor unico de SqlArrayOfConstToParameterizedSql e
+///   SqlArrayOfConstToParameterizedValue. A UNICA diferenca entre os dois e o
+///   que fazer com o elemento que nao e escalar reconhecido (tipicamente
+///   string): em posicao de EXPRESSAO ele e fragmento de SQL e segue literal
+///   (RN-P3); em posicao de VALOR ele e dado e vira parametro.
+/// </summary>
+class function TUtils._ArrayOfConstToSql(const AParams: array of const;
+  const ASQLParams: IFluentSQLParams; const AStringIsValue: Boolean): String;
 var
   LFor: Integer;
   LastCh: Char;
   LParam: String;
 begin
-  if not Assigned(ASQLParams) then
+  if (not Assigned(ASQLParams)) and (not AStringIsValue) then
     Exit(SqlParamsToStr(AParams));
   Result := '';
   for LFor := Low(AParams) to High(AParams) do
   begin
     if not _TryVarRecAsParam(AParams[LFor], ASQLParams, LParam) then
-      LParam := _VarRecToString(AParams[LFor]);
+    begin
+      if AStringIsValue then
+        LParam := _StringVarRecAsParam(AParams[LFor], ASQLParams)
+      else
+        LParam := _VarRecToString(AParams[LFor]);
+    end;
     if Result = '' then
       LastCh := ' '
     else
@@ -184,6 +224,18 @@ begin
       Result := Result + ' ';
     Result := Result + LParam;
   end;
+end;
+
+class function TUtils.SqlArrayOfConstToParameterizedSql(const AParams: array of const;
+  const ASQLParams: IFluentSQLParams): String;
+begin
+  Result := _ArrayOfConstToSql(AParams, ASQLParams, False);
+end;
+
+class function TUtils.SqlArrayOfConstToParameterizedValue(const AParams: array of const;
+  const ASQLParams: IFluentSQLParams): String;
+begin
+  Result := _ArrayOfConstToSql(AParams, ASQLParams, True);
 end;
 
 class function TUtils.Concat(const AElements: array of String;
@@ -360,6 +412,21 @@ begin
   //
   // EArgumentException e a mesma classe que FluentSQL.DDL.pas ja usa para
   // chamada malformada (DDL.pas:908 e :915) - nao inventa vocabulario novo.
+  //
+  // LISTA VAZIA cai na MESMA regra, e nao no "caso par que passa limpo" que a
+  // primeira versao desta guarda afirmou. Zero pares serializa como
+  // "UPDATE SET ;" ou "INSERT;", e nenhum dos quatro dialetos que tem MERGE
+  // (MSSQL, Oracle, Firebird, PostgreSQL) aceita qualquer das duas - a lista de
+  // atribuicoes do UPDATE e obrigatoria, e o INSERT do MERGE exige VALUES(...)
+  // ou DEFAULT VALUES. Medido em motor real: ver test.merge.mssql.sql, secao
+  // LISTA VAZIA / FORMA SEM ARGUMENTOS.
+  if Length(AParams) = 0 then
+    raise EArgumentException.Create(
+      'Lista de pares nome/valor vazia. UPDATE sem atribuicao e INSERT sem ' +
+      'colunas nao sao serializaveis: sairia "UPDATE SET ;" ou "INSERT;", ' +
+      'recusado por todos os dialetos com MERGE. Passe ao menos um par ' +
+      '(''COLUNA'', <valor>), ou use .Delete se a intencao era outra acao.');
+
   if Odd(Length(AParams)) then
     raise EArgumentException.CreateFmt(
       'Lista de pares nome/valor malformada: %d elementos. ' +
