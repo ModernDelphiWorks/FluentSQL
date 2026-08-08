@@ -91,9 +91,17 @@ const
   ///   o que prova que este e o teto. Mesmo idioma que o QualifierMySQL usa em
   ///   sentido inverso (LIMIT 2^64-1 para "sem teto").
   ///
-  ///   CUSTA uma varredura completa - 767 leituras logicas em 200 mil linhas,
-  ///   contra zero do TOP 0. O preco fica confinado a este caso: consulta com
-  ///   operacao de conjunto E First(0). Fora dele vale o TOP 0.
+  ///   CUSTA uma varredura completa da tabela, contra I/O zero do TOP 0 - o
+  ///   contraste e a afirmacao; o numero absoluto de leituras varia com a massa.
+  ///   O preco fica confinado a este caso: consulta com operacao de conjunto E
+  ///   First(0). Fora dele vale o TOP 0.
+  ///
+  ///   ATENCAO a quem for mexer aqui: esta e a UNICA cauda do driver que pode
+  ///   sair sem um ORDER BY na frente. Em todos os outros caminhos a clausula e
+  ///   garantida por PaginationOrderBy; aqui ela vem do ORDER BY do usuario, que
+  ///   pode ter sido consumido dentro do primeiro ramo pelo defeito de
+  ///   composicao UNION x OrderBy (Known issues do CHANGELOG). Quando esse
+  ///   defeito for corrigido, este ponto para de ser excecao.
   /// </summary>
   cPULA_TUDO = 'OFFSET 9223372036854775807 ROWS';
 

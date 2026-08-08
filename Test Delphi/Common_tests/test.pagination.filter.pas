@@ -652,8 +652,7 @@ end;
 ///   cauda: o FETCH nao aceita zero (Msg 10744) e o TOP nao coexiste com OFFSET
 ///   (Msg 10741). Descartar o Skip do usuario aqui e correto - pular n linhas de
 ///   um conjunto vazio da o mesmo conjunto vazio - e sai de graca: medido, o
-///   TOP 0 NAO LE a tabela (zero leituras logicas contra 767 da forma com
-///   OFFSET, em 200 mil linhas).
+///   TOP 0 NAO LE a tabela, enquanto a forma com OFFSET a varre inteira.
 ///
 ///   O numero gigante do MongoDB nao e truque: e o maior inteiro que o servidor
 ///   aceita no "skip", usado para exprimir "pule tudo" = "devolva nada". E
@@ -800,9 +799,9 @@ begin
   // da varredura volta para o caso comum - que e o defeito que a terceira via
   // veio consertar.
   Assert.DoesNotContain(_Monta(dbnMSSQL, cbFirstZero), 'OFFSET', False,
-    'Sem operacao de conjunto, First(0) e so "SELECT TOP 0": zero leituras ' +
-    'logicas. A cauda com OFFSET custa varredura completa (767 leituras em ' +
-    '200 mil linhas) e nao pode vazar para o caso comum.');
+    'Sem operacao de conjunto, First(0) e so "SELECT TOP 0", que nao le a ' +
+    'tabela. A cauda com OFFSET custa varredura completa e nao pode vazar ' +
+    'para o caso comum.');
   Assert.DoesNotContain(_Monta(dbnMSSQL, cbFirstZero), 'ORDER BY', False,
     'Sem OFFSET/FETCH nao ha o que hospedar: a clausula ORDER BY de ' +
     'preenchimento tambem desaparece.');

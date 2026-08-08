@@ -77,8 +77,10 @@ end;
 ///   de quebra dispensa a clausula ORDER BY de preenchimento, que so existia para
 ///   hospedar o OFFSET/FETCH.
 ///
-///   Medido em test.pagination.mssql.sql, parte Z: o TOP 0 NAO LE a tabela -
-///   zero leituras logicas, contra 767 da forma com OFFSET, em 200 mil linhas.
+///   Medido em test.pagination.mssql.sql, parte Z: o TOP 0 NAO LE a tabela,
+///   enquanto a forma com OFFSET a varre inteira. O CONTRASTE e a afirmacao - o
+///   numero absoluto de leituras logicas varia com a largura da linha e o
+///   tamanho da massa, entao nao e citado aqui.
 /// </summary>
 function TFluentSQLSelectMSSQL.Serialize: String;
 var

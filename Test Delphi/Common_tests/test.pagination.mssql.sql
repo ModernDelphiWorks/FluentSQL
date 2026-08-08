@@ -400,12 +400,19 @@ GO
     OFFSET 2^63-1 + ORDER BY  -> Table 'Worktable'. Scan count 0, logical reads 0
                                  Table 'BIG'. Scan count 13, logical reads 767
 
-  LEITURA: a diferenca nao e de margem, e de ordem de grandeza - 767 leituras
-  contra ZERO -, e com ORDER BY a forma cara ainda acrescenta 13 scans e uma
-  Worktable, que e ordenacao. Numa tabela de 50 milhoes isso vira incidente:
-  First(pageSize) com pageSize zerado, dentro de um laco, varrendo a tabela
-  inteira para devolver nada. E por isto que o TOP 0 e a via principal e a cauda
-  cara ficou confinada ao unico caso em que ele nao serve (Z5).
+  LEITURA: a diferenca nao e de margem - o TOP 0 NAO LE a tabela, a cauda le
+  tudo -, e com ORDER BY a forma cara ainda acrescenta uma Worktable, que e
+  ordenacao. Numa tabela de 50 milhoes isso vira incidente: First(pageSize) com
+  pageSize zerado, dentro de um laco, varrendo a tabela inteira para devolver
+  nada. E por isto que o TOP 0 e a via principal e a cauda cara ficou confinada
+  ao unico caso em que ele nao serve (Z5).
+
+  O NUMERO 767 E CIRCUNSTANCIAL, e nao deve ser citado como propriedade da
+  forma. Ele e desta massa e desta largura de linha - BIG tem 200 mil linhas de
+  uma coluna INT, criada logo acima. Uma revisao independente mediu 446 na
+  mesma consulta com uma tabela mais estreita, e as duas medicoes concordam no
+  que importa: varredura completa contra I/O zero. O que se afirma aqui e o
+  CONTRASTE; o valor absoluto muda com a tabela.
 */
 
 PRINT '=== Z10: a forma emitida HOJE, em TODAS as combinacoes ===';
