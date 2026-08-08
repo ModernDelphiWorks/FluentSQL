@@ -57,6 +57,33 @@ type
     procedure TestValuesArrayOfConstStringBecomesParam;
     [Test]
     procedure TestSetValueArrayOfConstHostileStringNeverReachesSqlText;
+    /// <summary>
+    ///   O ramo vtPointer de TUtils._StringVarRecAsParam (FluentSQL.Utils.pas)
+    ///   e COMPARTILHADO pelo MERGE e por SetValue/Values. Ate esta celula, os
+    ///   unicos testes que o cobriam eram de MERGE: apagar o ramo deixava a
+    ///   suite verde para INSERT/UPDATE comum, que e o caminho muito mais
+    ///   trafegado dos dois.
+    /// </summary>
+    [Test]
+    procedure TestSetValueArrayOfConstNilRaisesInsteadOfWriting00000000;
+    [Test]
+    procedure TestValuesArrayOfConstNilRaisesInsteadOfWriting00000000;
+    [Test]
+    procedure TestUpdateSetValueArrayOfConstNilRaises;
+    /// <summary>
+    ///   O slot de valor comporta UM valor. Zero e mais de um emitiam SQL que
+    ///   nenhum dos seis motores medidos aceita, e emitiam calados.
+    /// </summary>
+    [Test]
+    procedure TestSetValueArrayOfConstEmptyRaisesInsteadOfEmittingValuesEmpty;
+    [Test]
+    procedure TestValuesArrayOfConstEmptyRaises;
+    [Test]
+    procedure TestUpdateSetValueArrayOfConstEmptyRaisesInsteadOfDanglingSet;
+    [Test]
+    procedure TestSetValueArrayOfConstTwoElementsRaisesInsteadOfJuxtaposedParams;
+    [Test]
+    procedure TestSetValueArrayOfConstRejectedCallLeavesNoHalfColumn;
   end;
 
 implementation
@@ -456,6 +483,186 @@ begin
   Assert.AreEqual(1, LQuery.Params.Count);
   Assert.AreEqual(HOSTILE, String(LQuery.Params[0].Value),
     'o valor tem de chegar INTACTO na lista de parametros');
+end;
+
+{ ---------------------------------------------------------------------------
+  nil EM POSICAO DE VALOR - CAMINHO SetValue / Values
+
+  A guarda esta em TUtils._StringVarRecAsParam, ramo vtPointer
+  (FluentSQL.Utils.pas), e esse ramo e COMPARTILHADO por dois caminhos:
+
+    SqlArrayOfConstToNameValuePairs  -> Merge.Update / Merge.Insert
+    _ArrayOfConstToSql(..., True)    -> SetValue / Values
+
+  Ate estas tres celulas, so o primeiro tinha oraculo. Medido por mutacao:
+  trocar a condicao do ramo por `if False` derrubava 2 testes, ambos de MERGE,
+  e NENHUM de SetValue - ou seja, a guarda do caminho mais trafegado dos dois
+  (INSERT/UPDATE comum) estava sem cobertura nenhuma.
+
+  Antes da guarda, o `nil` chegava como vtPointer, _VarRecToString o mapeava
+  por IntToHex e a coluna recebia a STRING '00000000' - dado corrompido em
+  silencio, sem erro em lugar nenhum.
+
+  Que o nil devesse virar NULL em vez de levantar e decisao de convencao, e
+  NAO foi tomada aqui. Estes testes travam o comportamento atual: LEVANTA.
+  --------------------------------------------------------------------------- }
+
+procedure TTestCoreParams.TestSetValueArrayOfConstNilRaisesInsteadOfWriting00000000;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .SetValue('NOME', [nil]);
+    end,
+    EArgumentException,
+    'nil em slot de valor de SetValue tem de levantar, nao virar ''00000000''');
+end;
+
+procedure TTestCoreParams.TestValuesArrayOfConstNilRaisesInsteadOfWriting00000000;
+begin
+  // Values e o irmao de SetValue no mesmo slot; celula propria para que
+  // redirecionar so um dos dois nao passe despercebido.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .Values('NOME', [nil]);
+    end,
+    EArgumentException,
+    'nil em slot de valor de Values tem de levantar');
+end;
+
+procedure TTestCoreParams.TestUpdateSetValueArrayOfConstNilRaises;
+begin
+  // O mesmo slot no UPDATE: _InternalSet aceita secInsert e secUpdate, e a
+  // guarda tem de valer nos dois.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Update('USUARIOS')
+        .SetValue('NOME', [nil]);
+    end,
+    EArgumentException,
+    'nil em slot de valor de UPDATE tem de levantar');
+end;
+
+{ ---------------------------------------------------------------------------
+  CARDINALIDADE DO SLOT DE VALOR - zero e "dois ou mais"
+
+  O array de SetValue/Values e o lado direito de "COLUNA = ...": UM valor.
+  Fora disso o texto emitido nao e SQL de dialeto nenhum, e saia calado:
+
+    .SetValue('X', [])                        -> INSERT INTO T (X) VALUES ()
+    .Update('T').SetValue('X', [])            -> UPDATE T SET X =
+    .SetValue('D', ['CURRENT','TIMESTAMP'])   -> VALUES (:p1 :p2)
+
+  O terceiro e o mais traicoeiro dos tres: tem parametros de verdade e parece
+  correto, mas os placeholders saem JUSTAPOSTOS, sem virgula - o joiner de
+  _ArrayOfConstToSql separa com espaco, o que e certo em posicao de EXPRESSAO
+  (os elementos formam um fragmento) e sem sentido em posicao de VALOR.
+
+  Medido em execucao real, seis motores, ZERO aceitam qualquer das formas:
+    MSSQL 2022 16.0.4265.3  Msg 102 / Msg 102 near '@p2'
+    PostgreSQL 16.14        syntax error at or near ")" / at or near "$2"
+    Oracle Free 23          ORA-00936 missing expression / ORA-01745
+    Firebird 5.0.4          -104 Token unknown ')' / -104 Token unknown '?'
+    MySQL 8.4.11            ERROR 1136 column count / ERROR 1064
+    SQLite 3.53.4           Parse error near ")" / near "?"
+  Controles: "VALUES (?, ?)" com virgula e aceito nos seis. Saida bruta e
+  docker run em test.setvalue.mssql.sql.
+
+  E a mesma regua ja aplicada ao MERGE: entre emitir SQL que nenhum motor
+  executa e recusar a chamada na linha que a causou, recusa.
+  --------------------------------------------------------------------------- }
+
+procedure TTestCoreParams.TestSetValueArrayOfConstEmptyRaisesInsteadOfEmittingValuesEmpty;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .SetValue('NOME', []);
+    end,
+    EArgumentException,
+    'lista vazia emitia "INSERT INTO USUARIOS (NOME) VALUES ()", calada');
+end;
+
+procedure TTestCoreParams.TestValuesArrayOfConstEmptyRaises;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .Values('NOME', []);
+    end,
+    EArgumentException,
+    'Values e o irmao de SetValue no mesmo slot; a regua tem de ser a mesma');
+end;
+
+procedure TTestCoreParams.TestUpdateSetValueArrayOfConstEmptyRaisesInsteadOfDanglingSet;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Update('USUARIOS')
+        .SetValue('NOME', []);
+    end,
+    EArgumentException,
+    'no UPDATE a lista vazia emitia "UPDATE USUARIOS SET NOME =", calada');
+end;
+
+procedure TTestCoreParams.TestSetValueArrayOfConstTwoElementsRaisesInsteadOfJuxtaposedParams;
+begin
+  // Antes: 'INSERT INTO USUARIOS (DATA) VALUES (:p1 :p2)' com DOIS parametros -
+  // placeholders justapostos, sem virgula. Invalido em todo dialeto, e com
+  // Params.Count = 2 para disfarcar.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .SetValue('DATA', ['CURRENT', 'TIMESTAMP']);
+    end,
+    EArgumentException,
+    'dois elementos num slot de um valor emitiam "VALUES (:p1 :p2)"');
+end;
+
+procedure TTestCoreParams.TestSetValueArrayOfConstRejectedCallLeavesNoHalfColumn;
+var
+  LQuery: IFluentSQL;
+  LSql: string;
+  LRaised: Boolean;
+begin
+  // A guarda esta em TUtils.SqlArrayOfConstToParameterizedValue, ANTES de
+  // _InternalSet - entao a coluna recusada nao chega a entrar na lista. Se a
+  // ordem inverter, quem engolir a excecao passa a ver a coluna orfa no SQL.
+  LQuery := FluentSQL.Query(dbnPostgreSQL).Insert.Into('USUARIOS');
+  LRaised := False;
+  try
+    LQuery.SetValue('DATA', []);
+  except
+    on E: EArgumentException do
+      LRaised := True;
+  end;
+  Assert.IsTrue(LRaised, 'a guarda tinha de ter levantado');
+
+  LQuery.SetValue('NOME', ['ANA']);
+  LSql := LQuery.AsString;
+  Assert.AreEqual('INSERT INTO USUARIOS (NOME) VALUES (:p1)', LSql, False,
+    'a coluna recusada nao pode sobrar no SQL. SQL=' + LSql);
+  Assert.AreEqual(1, LQuery.Params.Count, 'e nao pode sobrar parametro orfao');
 end;
 
 initialization

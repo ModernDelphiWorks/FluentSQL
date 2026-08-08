@@ -37,6 +37,7 @@ type
       const ASQLParams: IFluentSQLParams): String;
     class function _ArrayOfConstToSql(const AParams: array of const;
       const ASQLParams: IFluentSQLParams; const AStringIsValue: Boolean): String;
+    class procedure _AssertSingleValue(const ACount: Integer);
   public
     class function Concat(const AElements: array of String; const ADelimiter: String = ' '): String;
     class function SqlParamsToStr(const AParams: array of const): String;
@@ -53,6 +54,9 @@ type
     /// tem como ser fragmento de SQL: TODO elemento vira parametro, inclusive
     /// string. Usado por SetValue/Values(array of const), cujo array e o lado
     /// direito de "COLUNA = ..." e nunca uma expressao.
+    ///
+    /// Exige EXATAMENTE UM elemento e levanta EArgumentException fora disso -
+    /// ver _AssertSingleValue.
     /// </summary>
     class function SqlArrayOfConstToParameterizedValue(const AParams: array of const;
       const ASQLParams: IFluentSQLParams): String;
@@ -232,9 +236,53 @@ begin
   Result := _ArrayOfConstToSql(AParams, ASQLParams, False);
 end;
 
+/// <summary>
+///   O slot de VALOR de SetValue/Values e o lado direito de "COLUNA = ...":
+///   um valor, exatamente um. Fora disso o texto emitido nao e SQL de dialeto
+///   nenhum, e saia calado:
+///
+///     zero elementos  .SetValue('X', [])
+///                     -> INSERT INTO T (X) VALUES ()   /   UPDATE T SET X =
+///     dois ou mais    .SetValue('D', ['CURRENT','TIMESTAMP'])
+///                     -> VALUES (:p1 :p2)  - placeholders JUSTAPOSTOS, sem
+///                        virgula, porque o joiner de _ArrayOfConstToSql separa
+///                        com espaco (correto em posicao de EXPRESSAO, onde os
+///                        elementos formam um fragmento; sem sentido aqui).
+///
+///   Medido em execucao real, seis motores, zero aceitam qualquer das duas
+///   formas - com controle acompanhando cada recusa. Saida bruta e docker run
+///   em Test Delphi\Common_tests\test.setvalue.mssql.sql.
+///
+///   E a mesma regua ja aplicada ao MERGE em SqlArrayOfConstToNameValuePairs:
+///   entre emitir SQL que nenhum motor executa e recusar a chamada na linha que
+///   a causou, recusa. Nao ha caso legitimo de mais de um elemento: com a
+///   parametrizacao do slot, ate .SetValue('X', ['A','+',1]) sairia como
+///   ":p1 :p2 :p3" - o INSERT/UPDATE nao exprime expressao em slot de valor,
+///   por overload nenhum (ver Known issues, valor x expressao).
+/// </summary>
+class procedure TUtils._AssertSingleValue(const ACount: Integer);
+begin
+  if ACount = 1 then
+    Exit;
+  if ACount = 0 then
+    raise EArgumentException.Create(
+      'SetValue/Values com lista de valores vazia nao e serializavel: sairia ' +
+      '"VALUES ()" no INSERT e "SET COLUNA =" no UPDATE. Nenhum dos dialetos ' +
+      'suportados aceita essa forma. Passe exatamente um valor, ou omita a ' +
+      'coluna.');
+  raise EArgumentException.CreateFmt(
+    'SetValue/Values recebeu %d valores para uma coluna so. O slot e o lado ' +
+    'direito de "COLUNA = ..." e comporta UM valor: com %d os placeholders ' +
+    'saem justapostos ("VALUES (:p1 :p2)"), que nenhum motor aceita. Se o que ' +
+    'voce queria era uma expressao (CURRENT_TIMESTAMP, "A + 1"), o ' +
+    'INSERT/UPDATE nao a exprime em slot de valor - ver Known issues.',
+    [ACount, ACount]);
+end;
+
 class function TUtils.SqlArrayOfConstToParameterizedValue(const AParams: array of const;
   const ASQLParams: IFluentSQLParams): String;
 begin
+  _AssertSingleValue(Length(AParams));
   Result := _ArrayOfConstToSql(AParams, ASQLParams, True);
 end;
 
