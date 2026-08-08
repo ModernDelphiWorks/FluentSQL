@@ -117,10 +117,77 @@
   escapado nem rejeitado - foi tratado como o texto que sempre foi.
 
   ==============================================================================
-  FRONTEIRA
+  ARRAY DE CONTAGEM IMPAR  -  corrigido nesta branch
   ==============================================================================
-  Nao medido em motor real: os outros oito dialetos, porque nenhum deles emite
-  MERGE (cinco levantavam EStackOverflow antes desta branch, dois nao estao
-  compilados no .inc, e o MongoDB descarta a clausula). Nao ha SQL para executar
-  onde nao ha SQL emitido.
+  Um nome sem valor nao tem serializacao possivel. As duas arvores emitiam SQL
+  invalido em silencio; executado no motor:
+
+    .Insert(['ID', 1, 'NOME'])  emitia
+      ... WHEN NOT MATCHED THEN INSERT ([ID], [NOME]) VALUES (@p1, );
+      Msg 102, Level 15, State 1, Line 1
+      Incorrect syntax near ')'.
+
+    .Update(['NOME'])           emitia
+      ... WHEN MATCHED THEN UPDATE SET [NOME] = ;
+      Msg 102, Level 15, State 1, Line 1
+      Incorrect syntax near ';'.
+
+  Agora ambos levantam EArgumentException na chamada, com a contagem na
+  mensagem. Contagem par - inclusive a lista vazia - continua passando.
+
+  ==============================================================================
+  FRONTEIRA  -  o que esta correcao NAO fecha
+  ==============================================================================
+
+  (1) O NOME DA COLUNA (slot impar) CONTINUA INJETAVEL.
+      O valor foi parametrizado; o identificador nao pode ser, e o QuotedName do
+      MSSQL (FluentSQL.SerializeMSSQL.pas:248) envolve em colchetes SEM duplicar
+      o ']' de dentro. Vale IGUAL na base e nesta branch - nao e regressao, e
+      nao foi introduzido aqui.
+
+      Nao basta um ']' solto: com nome "NOME]; DROP TABLE USERS; --" o texto sai
+      "SET [NOME]; DROP TABLE USERS; --] = @p1;" e o motor recusa com Msg 102
+      (near ';'), porque o SET fica sem atribuicao. Mas um payload que FECHA o
+      colchete e COMPLETA a atribuicao passa. Nome de coluna:
+
+        NOME] = 'x'; DROP TABLE USERS; --
+
+      emitido pela biblioteca:
+        MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)
+          WHEN MATCHED THEN UPDATE SET [NOME] = 'x'; DROP TABLE USERS; --] = @p1;
+
+        SELECT COUNT(*) FROM USERS;   -- antes: 2
+        <executa>                     -- (1 rows affected), sem erro
+        SELECT CASE WHEN OBJECT_ID('USERS') IS NULL ...
+          RESULTADO
+          ------------------------------------------------------
+          USERS FOI DROPADA - NOME DE COLUNA E INJETAVEL DE FATO
+
+      Ou seja: num documento chamado "injecao via MERGE", a metade do VALOR
+      fechou e a metade do IDENTIFICADOR nao. Escape de delimitador de
+      identificador e decisao de arquitetura propria - toca todos os QuotedName
+      e Quote dos 9 dialetos, e colide com o passthrough por StartsWith/Contains
+      que hoje permite passar nome ja qualificado. Fica para essa tarefa.
+      Travado por TestMerge_ColumnNamesStayLiteral_OnlyValuesBecomeParams, que
+      afirma que o slot continua literal.
+
+  (2) Merge.On(array of const) CONTINUA INTERPOLANDO VERBATIM.
+      Mesmo builder de MERGE, outro caminho: On([...]) passa por
+      SqlArrayOfConstToParameterizedSql (FluentSQL.Merge.pas:298), onde a RN-P3
+      trata string como FRAGMENTO de SQL e nao como valor - por isso nao foi
+      tocado aqui. Emitido hoje:
+
+        .On(['t.NOME =', 'x''; DROP TABLE USERS; --'])
+          -> ON (t.NOME = x'; DROP TABLE USERS; --)
+
+      O escalar numerico ali VIRA parametro (.On(['ID =', 100]) -> ON (ID = :p1));
+      so a string e que segue literal. A distincao valor x expressao por tras
+      disso e tarefa de arquitetura propria.
+
+  (3) OS OUTROS OITO DIALETOS nao tem oraculo porque nenhum deles emite MERGE:
+      cinco levantavam EStackOverflow antes desta branch e agora levantam
+      EFluentSQLStatementNotSupported, dois nao estao compilados no .inc, e o
+      MongoDB descarta a clausula (e ainda acumula 1 parametro orfao). Onde nao
+      ha SQL emitido, nao ha SQL para executar. A matriz completa esta em
+      test.merge.matrix.pas.
 */

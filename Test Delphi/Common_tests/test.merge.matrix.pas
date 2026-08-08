@@ -187,6 +187,16 @@ begin
   Assert.AreEqual('{}', LSql, False,
     'MongoDB descarta o MERGE em silencio; se isto mudou, a lacuna foi fechada ' +
     'e este teste precisa virar assercao de excecao nomeada.');
+
+  // PARAMETRO ORFAO: a parametrizacao do slot de valor acontece na construcao,
+  // antes da serializacao, entao o valor entra em Params mesmo com a clausula
+  // sendo descartada depois. Na base eram 0 parametros - o valor virava texto, e
+  // o texto era jogado fora junto com a clausula; aqui e 1, referenciado por
+  // nada no MQL emitido. E consequencia direta da lacuna acima e desaparece
+  // junto com ela. Afirmado aqui, e nao escondido.
+  Assert.AreEqual(1, LQuery.Params.Count,
+    'MongoDB acumula 1 parametro que o MQL emitido nao referencia; se virou 0, ' +
+    'o descarte passou a acontecer antes da parametrizacao.');
 end;
 
 initialization
