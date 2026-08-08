@@ -33,6 +33,8 @@ type
     class function _VarRecToString(const AValue: TVarRec): String;
     class function _TryVarRecAsParam(const AValue: TVarRec; const ASQLParams: IFluentSQLParams;
       out APlaceholder: String): Boolean;
+    class function _StringVarRecAsParam(const AValue: TVarRec;
+      const ASQLParams: IFluentSQLParams): String;
   public
     class function Concat(const AElements: array of String; const ADelimiter: String = ' '): String;
     class function SqlParamsToStr(const AParams: array of const): String;
@@ -135,6 +137,28 @@ begin
   else
     Result := False;
   end;
+end;
+
+/// <summary>
+///   Converte um TVarRec que NAO e escalar reconhecido (tipicamente string) em
+///   placeholder de parametro. So deve ser chamado em posicao que e comprovadamente
+///   VALOR - nunca em posicao que possa ser fragmento de SQL.
+///
+///   O ramo sem ASQLParams e defensivo e inalcancavel pela API publica:
+///   TFluentSQLAST cria FParams no construtor (FluentSQL.Ast.pas:133) e nunca o
+///   zera antes do Destroy, entao todo caminho que chega aqui vindo de
+///   TFluentSQL.Query tem lista de parametros. Ainda assim ele NAO devolve o texto
+///   cru: delimita e escapa com QuotedStr (dobra a aspa simples, que e o escape
+///   padrao ISO aceito por todos os dialetos suportados). Devolver cru ali seria
+///   reabrir exatamente o buraco que esta funcao existe para fechar.
+/// </summary>
+class function TUtils._StringVarRecAsParam(const AValue: TVarRec;
+  const ASQLParams: IFluentSQLParams): String;
+begin
+  if Assigned(ASQLParams) then
+    Result := ASQLParams.Add(_VarRecToString(AValue), dftString)
+  else
+    Result := QuotedStr(_VarRecToString(AValue));
 end;
 
 class function TUtils.SqlArrayOfConstToParameterizedSql(const AParams: array of const;
@@ -326,17 +350,32 @@ begin
   I := Low(AParams);
   while I <= High(AParams) do
   begin
+    // Slot IMPAR: nome de coluna. E identificador, nunca parametro - um :pN aqui
+    // produziria SQL sintaticamente invalido. Segue literal, como em SetValue.
     LName := _VarRecToString(AParams[I]);
     Inc(I);
     if I <= High(AParams) then
     begin
+      // Slot PAR: VALOR. Ao contrario de SqlArrayOfConstToParameterizedSql - onde
+      // a RN-P3 trata string como fragmento de SQL (identificador, operador) - aqui
+      // o array e estritamente uma lista de pares nome/valor: o slot par NAO tem
+      // como ser fragmento, so pode ser dado. Portanto TODO valor vira parametro,
+      // inclusive string. Deixar a string cair em _VarRecToString colocava o texto
+      // do usuario cru dentro do SQL (sem aspas, sem escape) - SQL invalido no caso
+      // benigno e injecao no caso hostil.
+      //
+      // Isto alinha o overload array of const com o overload tipado
+      // SetValue(const AColumnName, AColumnValue: String), que ja parametrizava:
+      // nao e convencao nova, e a convencao que ja existia sendo aplicada aqui.
       if not _TryVarRecAsParam(AParams[I], ASQLParams, LValue) then
-        LValue := _VarRecToString(AParams[I]);
+        LValue := _StringVarRecAsParam(AParams[I], ASQLParams);
       Inc(I);
     end
     else
-      LValue := ''; 
-      
+      // Array de tamanho impar: nome sem valor. Preserva o comportamento anterior
+      // (par com valor vazio) em vez de inventar um parametro nulo.
+      LValue := '';
+
     with APairs.Add do
     begin
       Name := LName;
