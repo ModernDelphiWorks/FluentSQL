@@ -48,7 +48,7 @@ end;
 
 ## Comando MERGE (v1.5.0+)
 
-Utilize o builder de **MERGE** para operações de sincronização (UPSERT) de forma fluente:
+Utilize o builder de **MERGE** para operações de sincronização (UPSERT) de forma fluente. O array de `.Update` / `.Insert` alterna **nome da coluna** e **valor** — não existe overload de dois arrays, e todo valor vira parâmetro `:pN`. Detalhes completos: [DML — MERGE](../guides/dml-merge.md).
 
 ```pascal
 uses FluentSQL;
@@ -61,8 +61,10 @@ begin
     .Into('Target', 'T')
     .Using('Source', 'S')
     .On('T.ID = S.ID')
-    .WhenMatched.Update(['T.VALOR = S.VALOR'])
-    .WhenNotMatched.Insert(['ID', 'VALOR'], ['S.ID', 'S.VALOR'])
+    .WhenMatched
+      .Update(['VALOR', 123.45])
+    .WhenNotMatched
+      .Insert(['ID', 7, 'VALOR', 123.45])
     .AsString;
 end;
 ```
