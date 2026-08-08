@@ -31,9 +31,9 @@ type
   TOperators = set of TOperator;
   /// <summary>
   ///   Dialetos suportados. Todo membro DEVE ter uma implementacao real em
-  ///   Source\Drivers e uma entrada em TStrDBEngineName (FluentSQL.Register.pas),
-  ///   que e declarado como array[TFluentSQLDriver] justamente para que qualquer
-  ///   membro novo quebre a compilacao ate ser nomeado la.
+  ///   Source\Drivers e uma entrada em DriverName (abaixo), que e declarado sobre
+  ///   array[TFluentSQLDriver] justamente para que qualquer membro novo quebre a
+  ///   compilacao ate ser nomeado la.
   /// </summary>
   TFluentSQLDriver = (dbnMSSQL, dbnMySQL, dbnFirebird, dbnSQLite, dbnInterbase, dbnDB2,
                    dbnOracle, dbnPostgreSQL, dbnMongoDB);
@@ -62,6 +62,18 @@ type
   EFluentSQLQualifierNotSupported = class(Exception)
   public
     constructor Create(const AQualifier: Integer; const ADialect: String); reintroduce;
+  end;
+
+  /// <summary>
+  ///   O comando existe na API mas o dialeto alvo nao tem serializador para ele.
+  ///   Irmao de EFluentSQLFunctionNotSupported, um nivel acima: la falta uma funcao
+  ///   escalar, aqui falta a instrucao inteira. Caso concreto: MERGE, que so o
+  ///   MSSQL serializa hoje - e palavra-chave em SQL Server, Oracle e
+  ///   PostgreSQL 15+, e nao existe em MySQL nem SQLite.
+  /// </summary>
+  EFluentSQLStatementNotSupported = class(Exception)
+  public
+    constructor Create(const AStatement, ADialect: String); reintroduce;
   end;
 
   /// <summary>ESP-016: one opt-in fragment registered for a specific engine; not portable SQL.</summary>
@@ -1605,7 +1617,32 @@ type
     function Schema(const AName: string): IFluentSQLSchemaBuilder;
   end;
 
+/// <summary>
+///   Nome canonico de cada dialeto. FONTE UNICA: e a chave dos dicionarios de
+///   FluentSQL.Register.pas e o texto que aparece nas mensagens de excecao.
+///   Antes existia so como const privada TStrDBEngineName dentro do Register, o
+///   que impedia qualquer outra unit de nomear um dialeto sem duplicar a tabela.
+/// </summary>
+function DriverName(const ADriver: TFluentSQLDriver): String;
+
 implementation
+
+/// <summary>
+///   O indice e posicional: desalinhar aqui faz o Register devolver o driver
+///   errado, em silencio. Declarado como array[TFluentSQLDriver] (e nao
+///   array[dbnA..dbnZ]) de proposito: assim qualquer membro adicionado ou
+///   removido do enum quebra a compilacao com E2072 ate ser refletido aqui.
+/// </summary>
+const
+  CDriverNames: array[TFluentSQLDriver] of string = (
+    'MSSQL', 'MySQL', 'Firebird', 'SQLite', 'Interbase', 'DB2',
+    'Oracle', 'PostgreSQL', 'MongoDB'
+  );
+
+function DriverName(const ADriver: TFluentSQLDriver): String;
+begin
+  Result := CDriverNames[ADriver];
+end;
 
 { EFluentSQLFunctionNotSupported }
 
@@ -1623,6 +1660,14 @@ begin
   inherited CreateFmt('O qualificador de SELECT de ordinal %d nao tem forma ' +
     'conhecida no dialeto %s. Todo membro novo de TSelectQualifierType precisa ' +
     'ser tratado no serializador de paginacao de cada driver.', [AQualifier, ADialect]);
+end;
+
+{ EFluentSQLStatementNotSupported }
+
+constructor EFluentSQLStatementNotSupported.Create(const AStatement, ADialect: String);
+begin
+  inherited CreateFmt('O comando "%s" nao tem serializador no dialeto %s. ' +
+    'Use uma construcao equivalente suportada por esse motor.', [AStatement, ADialect]);
 end;
 
 end.

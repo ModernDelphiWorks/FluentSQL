@@ -74,18 +74,12 @@ uses
   {$IFDEF MONGODB}FluentSQL.SerializeMongoDB, FluentSQL.SelectMongoDB, FluentSQL.FunctionsMongoDB, FluentSQL.DDL.Serialize.MongoDB,{$ENDIF}
   FluentSQL.Utils;
 
-const
-  /// <summary>
-  ///   Nome de cada dialeto, na MESMA ordem do enum TFluentSQLDriver. O indice e
-  ///   posicional: desalinhar aqui faz o Register devolver o driver errado, em
-  ///   silencio. Declarado como array[TFluentSQLDriver] (e nao array[dbnA..dbnZ])
-  ///   de proposito: assim qualquer membro adicionado ou removido do enum quebra
-  ///   a compilacao com E2072 ate ser refletido nesta lista.
-  /// </summary>
-  TStrDBEngineName: array[TFluentSQLDriver] of string = (
-    'MSSQL', 'MySQL', 'Firebird', 'SQLite', 'Interbase', 'DB2',
-    'Oracle', 'PostgreSQL', 'MongoDB'
-  );
+// O nome de cada dialeto - que e a chave destes dicionarios - mora em
+// DriverName (FluentSQL.Interfaces.pas), junto do proprio enum. Antes havia
+// aqui uma const privada TStrDBEngineName com a mesma tabela; ela virou fonte
+// unica ao ser promovida, porque o serializador base tambem precisa nomear o
+// dialeto para a mensagem de EFluentSQLStatementNotSupported. A protecao E2072
+// contra membro novo do enum foi junto com a tabela.
 
 constructor TFluentSQLRegister.Create;
 begin
@@ -233,39 +227,39 @@ end;
 /// </summary>
 function TFluentSQLRegister.Functions(const ADriverName: TFluentSQLDriver): IFluentSQLFunctions;
 begin
-  if not FCQLFunctions.ContainsKey(TStrDBEngineName[ADriverName]) then
-    raise EFluentSQLDriverNotRegistered.Create('As funcoes do banco ' + TStrDBEngineName[ADriverName] +
+  if not FCQLFunctions.ContainsKey(DriverName(ADriverName)) then
+    raise EFluentSQLDriverNotRegistered.Create('As funcoes do banco ' + DriverName(ADriverName) +
       ' nao estao registradas. Ligue o {$DEFINE} correspondente em FluentSQL.inc e ' +
       'adicione a unit "FluentSQL.Functions???.pas" na clausula USES do seu projeto!');
 
-  Result := FCQLFunctions[TStrDBEngineName[ADriverName]];
+  Result := FCQLFunctions[DriverName(ADriverName)];
 end;
 
 function TFluentSQLRegister.Select(const ADriverName: TFluentSQLDriver): IFluentSQLSelect;
 begin
   Result := nil;
-  if not FCQLSelect.ContainsKey(TStrDBEngineName[ADriverName]) then
-    raise EFluentSQLDriverNotRegistered.Create('O select do banco ' + TStrDBEngineName[ADriverName] + ' n�o est� registrado, adicione a unit "FluentSQL.Select.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
+  if not FCQLSelect.ContainsKey(DriverName(ADriverName)) then
+    raise EFluentSQLDriverNotRegistered.Create('O select do banco ' + DriverName(ADriverName) + ' n�o est� registrado, adicione a unit "FluentSQL.Select.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
 
-  Result := FCQLSelect[TStrDBEngineName[ADriverName]];
+  Result := FCQLSelect[DriverName(ADriverName)];
 end;
 
 procedure TFluentSQLRegister.RegisterFunctions(const ADriverName: TFluentSQLDriver; const ACQLFunctions: IFluentSQLFunctions);
 begin
-  FCQLFunctions.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLFunctions);
+  FCQLFunctions.AddOrSetValue(DriverName(ADriverName), ACQLFunctions);
 end;
 
 procedure TFluentSQLRegister.RegisterSelect(const ADriverName: TFluentSQLDriver; const ACQLSelect: IFluentSQLSelect);
 begin
-  FCQLSelect.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLSelect);
+  FCQLSelect.AddOrSetValue(DriverName(ADriverName), ACQLSelect);
 end;
 
 function TFluentSQLRegister.Serialize(const ADriverName: TFluentSQLDriver): IFluentSQLSerialize;
 begin
-  if not FCQLSerialize.ContainsKey(TStrDBEngineName[ADriverName]) then
-    raise EFluentSQLDriverNotRegistered.Create('O serialize do banco ' + TStrDBEngineName[ADriverName] + ' n�o est� registrado, adicione a unit "FluentSQL.Serialize.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
+  if not FCQLSerialize.ContainsKey(DriverName(ADriverName)) then
+    raise EFluentSQLDriverNotRegistered.Create('O serialize do banco ' + DriverName(ADriverName) + ' n�o est� registrado, adicione a unit "FluentSQL.Serialize.???.pas" onde ??? nome do banco, na cl�usula USES do seu projeto!');
 
-  Result := FCQLSerialize[TStrDBEngineName[ADriverName]];
+  Result := FCQLSerialize[DriverName(ADriverName)];
 end;
 
 /// <summary>
@@ -277,31 +271,31 @@ end;
 function TFluentSQLRegister.Where(const ADriverName: TFluentSQLDriver): IFluentSQLWhere;
 begin
   Result := nil;
-  if FCQLWhere.ContainsKey(TStrDBEngineName[ADriverName]) then
-    Result := FCQLWhere[TStrDBEngineName[ADriverName]];
+  if FCQLWhere.ContainsKey(DriverName(ADriverName)) then
+    Result := FCQLWhere[DriverName(ADriverName)];
 end;
 
 procedure TFluentSQLRegister.RegisterSerialize(const ADriverName: TFluentSQLDriver; const ACQLSelect: IFluentSQLSerialize);
 begin
-  FCQLSerialize.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLSelect);
+  FCQLSerialize.AddOrSetValue(DriverName(ADriverName), ACQLSelect);
 end;
 
 procedure TFluentSQLRegister.RegisterWhere(const ADriverName: TFluentSQLDriver; const ACQLWhere: IFluentSQLWhere);
 begin
-  FCQLWhere.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLWhere);
+  FCQLWhere.AddOrSetValue(DriverName(ADriverName), ACQLWhere);
 end;
 
 function TFluentSQLRegister.DDLSerialize(const ADriverName: TFluentSQLDriver): IFluentDDLSerialize;
 begin
-  if not FCQLDDLSerialize.ContainsKey(TStrDBEngineName[ADriverName]) then
-    raise ENotSupportedException.Create('O DDL serialize do banco ' + TStrDBEngineName[ADriverName] + ' no est registrado!');
+  if not FCQLDDLSerialize.ContainsKey(DriverName(ADriverName)) then
+    raise ENotSupportedException.Create('O DDL serialize do banco ' + DriverName(ADriverName) + ' no est registrado!');
 
-  Result := FCQLDDLSerialize[TStrDBEngineName[ADriverName]];
+  Result := FCQLDDLSerialize[DriverName(ADriverName)];
 end;
 
 procedure TFluentSQLRegister.RegisterDDLSerialize(const ADriverName: TFluentSQLDriver; const ACQLDDLSerialize: IFluentDDLSerialize);
 begin
-  FCQLDDLSerialize.AddOrSetValue(TStrDBEngineName[ADriverName], ACQLDDLSerialize);
+  FCQLDDLSerialize.AddOrSetValue(DriverName(ADriverName), ACQLDDLSerialize);
 end;
 
 end.
