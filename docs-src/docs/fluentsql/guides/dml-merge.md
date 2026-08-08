@@ -50,7 +50,36 @@ end;
 
 ### E se eu quiser copiar coluna a coluna da fonte, como `T.VALOR = S.VALOR`?
 
-Isso é uma **expressão**, não um valor, e o array de `.Update` não a exprime — foi exatamente essa confusão que produziu o exemplo errado acima. Use `.Update` sem argumentos, que emite o `UPDATE` sem lista de atribuições, ou escreva a atribuição onde o dialeto a aceita. Um `Update(['T.VALOR', 'S.VALOR'])` **não** faz isso — emite `SET T.VALOR = :p1`, com o parâmetro carregando a string literal `'S.VALOR'` como dado, e não a coluna `S.VALOR`.
+Isso é uma **expressão**, não um valor, e o array de `.Update` não a exprime — foi exatamente essa confusão que produziu o exemplo errado acima. Um `Update(['T.VALOR', 'S.VALOR'])` **não** faz isso: emite `SET [T.VALOR] = :p1`, com o parâmetro carregando a string literal `'S.VALOR'` como **dado**, e não a coluna `S.VALOR`.
+
+**Hoje o `MERGE` do FluentSQL não exprime atribuição coluna-a-coluna.** Enquanto isso não existir, a saída é não usar `MERGE` para esse caso — escreva o `UPDATE ... FROM` (ou o equivalente do seu dialeto) fora do construtor de `MERGE`.
+
+O que **não** serve como saída é `.Update` sem argumentos: veja o aviso abaixo.
+
+:::danger `.Update` e `.Insert` sem argumentos levantam — e sempre foram inválidos
+
+Até esta revisão esta página recomendava `.Update` sem argumentos como resposta a esta pergunta. **Era conselho para gerar SQL que motor nenhum executa.** As formas sem argumentos — e igualmente a lista vazia, `.Update([])` / `.Insert([])` — emitiam:
+
+```sql
+... WHEN MATCHED THEN UPDATE SET ;
+... WHEN NOT MATCHED THEN INSERT;
+```
+
+Medido em execução real, **nenhum dos seis motores aceita**:
+
+| Motor | Resposta |
+|---|---|
+| SQL Server 2022 (16.0.4265.3) | `Msg 102 — Incorrect syntax near ';'` |
+| PostgreSQL 16.14 | `ERROR: syntax error at or near ";"` |
+| Oracle Free 23.26.2.0.0 | `ORA-00921` / `ORA-00926 Missing VALUES or SET keyword` |
+| Firebird 5.0.4 | `-104 Unexpected end of command` |
+| MySQL 8.4.11 | `ERROR 1064` — `MERGE` não existe na gramática |
+| SQLite 3.53.4 | `Parse error near "MERGE"` — idem |
+
+A lista de atribuições do `UPDATE` é obrigatória, e o `INSERT` do `MERGE` exige `VALUES(...)` ou `DEFAULT VALUES`.
+
+**As quatro chamadas passaram a levantar `EArgumentException` na chamada**, em vez de emitir SQL que só falha no motor do consumidor. **O que fazer:** passe ao menos um par `('COLUNA', valor)`, ou use `.Delete` se a intenção era outra ação. Oráculo com container, versão e saída bruta: `Test Delphi\Common_tests\test.merge.mssql.sql`, seção *LISTA VAZIA / FORMA SEM ARGUMENTOS*.
+:::
 
 A distinção entre **valor** e **expressão** nesta API está sob revisão; até lá, trate o array como dados, nunca como SQL.
 
@@ -72,8 +101,15 @@ Isso vale igualmente para valores hostis: um `'1; DROP TABLE USERS; --'` chega a
 Nomes de coluna são identificadores e não podem ser *bind parameters*; eles são delimitados pelo dialeto, mas o delimitador interno **ainda não é escapado**. Não monte nome de coluna a partir de entrada não confiável.
 :::
 
-:::warning A lista tem de ter contagem par
-Um nome sem valor levanta `EArgumentException` na chamada. Antes, emitia `VALUES (:p1, )` ou `SET [NOME] = `, que o motor recusa com `Msg 102`.
+:::warning A lista tem de ter contagem par e não pode ser vazia
+Um nome sem valor levanta `EArgumentException` na chamada. Antes, emitia `VALUES (:p1, )` ou `SET [NOME] = `, que o motor recusa com `Msg 102`. A lista **vazia** levanta pela mesma razão — ver o aviso sobre as formas sem argumentos.
+:::
+
+:::warning `nil` em posição de valor levanta — o par nome/valor não exprime `NULL`
+
+Um `nil` escrito no array chega como `vtPointer` e era convertido em `IntToHex`. O resultado é que `.Update(['NOME', nil])` gravava na coluna a **string `'00000000'`** — dado corrompido, sem erro em lugar nenhum, porque o SQL gerado era perfeitamente válido.
+
+Passou a levantar `EArgumentException`. **Se a coluna deve ficar `NULL`, omita-a da lista de pares.** Dar semântica de `NULL` ao `nil` é decisão de convenção e não foi tomada aqui.
 :::
 
 ## Seções disponíveis
@@ -85,11 +121,10 @@ Um nome sem valor levanta `EArgumentException` na chamada. Antes, emitia `VALUES
 | **`On(Condition)`** | Define o critério de junção. Aceita `string` ou `array of const`. |
 | **`WhenMatched`** | Bloco executado quando há correspondência (`UPDATE` ou `DELETE`). |
 | **`WhenNotMatched`** | Bloco executado quando **não** há correspondência (`INSERT`). |
-| **`.Update`** | `UPDATE` sem lista de atribuições. |
-| **`.Update([Nome, Valor, ...])`** | `UPDATE SET` a partir de pares nome/valor. Contagem **par**. |
-| **`.Delete`** | `DELETE`, dentro de `WhenMatched`. |
-| **`.Insert`** | `INSERT` sem lista de colunas. |
-| **`.Insert([Nome, Valor, ...])`** | `INSERT (colunas) VALUES (...)` a partir de pares nome/valor. Contagem **par**. |
+| **`.Update([Nome, Valor, ...])`** | `UPDATE SET` a partir de pares nome/valor. Contagem **par** e **não vazia**. |
+| **`.Delete`** | `DELETE`, dentro de `WhenMatched`. É a única ação que dispensa pares. |
+| **`.Insert([Nome, Valor, ...])`** | `INSERT (colunas) VALUES (...)` a partir de pares nome/valor. Contagem **par** e **não vazia**. |
+| **`.Update`**, **`.Insert`** (sem argumentos) | Compilam, mas **levantam `EArgumentException`**. Emitiam `UPDATE SET ;` / `INSERT;`, recusados por todo motor. Ver o aviso acima. |
 
 Não existe overload de dois arrays. Colunas e valores vão no **mesmo** array, alternados.
 
