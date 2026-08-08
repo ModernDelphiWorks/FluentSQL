@@ -262,8 +262,14 @@ begin
       .Update(['NOME', 'TESTE', 'VALOR', 10.5]);
   LSql := LQuery.AsString;
 
-  Assert.IsTrue(Pos('WHEN MATCHED THEN UPDATE SET [NOME] = :p1, [VALOR] = :p2', LSql) > 0,
-    'Should contain UPDATE SET with parameters. SQL=' + LSql);
+  // SQL INTEIRO e case-sensitive, e nao Pos() sobre um trecho: foi asserção por
+  // substring que deixou uma forma quebrada atravessar a suite verde inteira
+  // (ver TestMerge_BasicSyntax_GeneratesMSSQL). Um trecho nao sabe o que sobra
+  // fora dele.
+  Assert.AreEqual(
+    'MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)' +
+    ' WHEN MATCHED THEN UPDATE SET [NOME] = :p1, [VALOR] = :p2;',
+    LSql, False, 'UPDATE SET com parametros, texto exato');
   Assert.AreEqual('TESTE', ParamValue(LQuery, ':p1'), False, 'p1 deve carregar o valor string');
   Assert.AreEqual(2, LQuery.Params.Count, 'string e numero, dois parametros');
 end;
@@ -282,8 +288,12 @@ begin
       .Insert(['ID', 1, 'NOME', 'TESTE']);
   LSql := LQuery.AsString;
 
-  Assert.IsTrue(Pos('WHEN NOT MATCHED THEN INSERT ([ID], [NOME]) VALUES (:p1, :p2)', LSql) > 0,
-    'Should contain INSERT with parameters. SQL=' + LSql);
+  // SQL INTEIRO e case-sensitive - ver o comentario em
+  // TestMerge_UpdateWithValues_GeneratesMSSQL.
+  Assert.AreEqual(
+    'MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)' +
+    ' WHEN NOT MATCHED THEN INSERT ([ID], [NOME]) VALUES (:p1, :p2);',
+    LSql, False, 'INSERT com parametros, texto exato');
   Assert.AreEqual('1', ParamValue(LQuery, ':p1'), False, 'p1 = 1');
   Assert.AreEqual('TESTE', ParamValue(LQuery, ':p2'), False, 'p2 = TESTE');
 end;
