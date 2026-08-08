@@ -133,7 +133,182 @@
       Incorrect syntax near ';'.
 
   Agora ambos levantam EArgumentException na chamada, com a contagem na
-  mensagem. Contagem par - inclusive a lista vazia - continua passando.
+  mensagem. Contagem par e NAO VAZIA continua passando.
+
+  ATENCAO - a primeira versao desta secao terminava com "Contagem par, inclusive
+  a lista vazia, continua passando". Isso era FALSO, e a proxima secao mede por
+  que: zero pares e par, mas serializa como "UPDATE SET ;" / "INSERT;" - o mesmo
+  SQL invalido que esta guarda existe para impedir.
+
+  ==============================================================================
+  LISTA VAZIA / FORMA SEM ARGUMENTOS  -  corrigido nesta branch
+  ==============================================================================
+
+  DUAS chamadas distintas da API produzem o MESMO texto, porque as duas chegam
+  ao serializador com ZERO pares nome/valor:
+
+    .Update([])   e   .Update      -> ... WHEN MATCHED THEN UPDATE SET ;
+    .Insert([])   e   .Insert      -> ... WHEN NOT MATCHED THEN INSERT;
+
+  E o mesmo texto por construcao, nao por coincidencia: em
+  FluentSQL.SerializeMSSQL.pas:211-217 o ramo matUpdate escreve 'UPDATE SET ' e
+  depois percorre a lista de pares - lista vazia, nada escrito -, e em :220-239 o
+  ramo matInsert escreve 'INSERT' e so acrescenta ' (cols) VALUES (vals)' se
+  LPairs.Count > 0. O ';' final vem de :244. Por isso UMA medicao por motor
+  cobre as DUAS chamadas.
+
+  A forma SEM ARGUMENTOS importa em especial porque era a que o guia
+  docs-src/docs/fluentsql/guides/dml-merge.md RECOMENDAVA, como resposta a
+  "quero copiar coluna a coluna da fonte". Era conselho para escrever SQL que
+  nenhum motor executa.
+
+  ------------------------------------------------------------------------------
+  MEDIDO - 6 motores, execucao real, nenhum aceita nenhuma das duas formas
+  ------------------------------------------------------------------------------
+
+  (1) Microsoft SQL Server 2022 (RTM-CU26) (KB5093420) - 16.0.4265.3 (X64)
+      Developer Edition (64-bit) on Linux (Ubuntu 22.04.5 LTS)
+      docker run -d --name t6a-mssql -e "ACCEPT_EULA=Y" \
+        -e "MSSQL_SA_PASSWORD=Fluent#T6a2026" -p 14333:1433 \
+        mcr.microsoft.com/mssql/server:2022-latest
+
+      MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)
+        WHEN MATCHED THEN UPDATE SET ;
+        -> Msg 102, Level 15, State 1, Line 1
+           Incorrect syntax near ';'.
+
+      MERGE INTO [TARGET] AS [t] USING [SOURCE] AS [s] ON (t.ID = s.ID)
+        WHEN NOT MATCHED THEN INSERT;
+        -> Msg 102, Level 15, State 1, Line 1
+           Incorrect syntax near ';'.
+
+  (2) PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu
+      docker run -d --name t6a-pg -e POSTGRES_PASSWORD=fluent -p 54333:5432 \
+        postgres:16
+
+      MERGE INTO target AS t USING source AS s ON (t.id = s.id)
+        WHEN MATCHED THEN UPDATE SET ;
+        -> ERROR:  syntax error at or near ";"
+           LINE 1: ... WHEN MATCHED THEN UPDATE SET ;
+                                                    ^
+
+      MERGE INTO target AS t USING source AS s ON (t.id = s.id)
+        WHEN NOT MATCHED THEN INSERT;
+        -> ERROR:  syntax error at or near ";"
+           LINE 1: ... WHEN NOT MATCHED THEN INSERT;
+                                                   ^
+
+      CONTROLE - a mesma consulta com DEFAULT VALUES atravessa o parser:
+      MERGE INTO target AS t USING source AS s ON (t.id = s.id)
+        WHEN NOT MATCHED THEN INSERT DEFAULT VALUES;
+        -> ERROR:  null value in column "id" of relation "target" violates
+           not-null constraint
+           DETAIL:  Failing row contains (null, null).
+      Isto e erro de RESTRICAO, nao de sintaxe: prova que a recusa acima e
+      especifica da forma NUA, e nao "o PostgreSQL nao gosta desse MERGE".
+      A gramatica exige VALUES(...) ou DEFAULT VALUES; bare INSERT nao e nem um
+      nem outro.
+
+  (3) Oracle AI Database 26ai Free Release 23.26.2.0.0
+      docker run -d --name t6a-ora -e ORACLE_PASSWORD=fluent -p 15210:1521 \
+        gvenzl/oracle-free:23-slim
+
+      MERGE INTO TARGET t USING SOURCE s ON (t.ID = s.ID)
+        WHEN MATCHED THEN UPDATE SET ;
+        -> ORA-00921: unexpected end of SQL command
+
+      MERGE INTO TARGET t USING SOURCE s ON (t.ID = s.ID)
+        WHEN NOT MATCHED THEN INSERT;
+        -> ORA-00926: Missing VALUES or SET keyword
+
+      O ORA-00926 e a confirmacao mais explicita das seis: o motor NOMEIA o que
+      falta.
+
+  (4) Firebird 5.0.4  (RDB$GET_CONTEXT('SYSTEM','ENGINE_VERSION') = 5.0.4)
+      docker run -d --name t6a-fb -e FIREBIRD_ROOT_PASSWORD=fluent \
+        -e FIREBIRD_DATABASE=t6a.fdb -p 30500:3050 firebirdsql/firebird:5.0.4
+
+      MERGE INTO TARGET t USING SOURCE s ON (t.ID = s.ID)
+        WHEN MATCHED THEN UPDATE SET ;
+        -> Statement failed, SQLSTATE = 42000
+           Dynamic SQL Error / -SQL error code = -104
+           -Unexpected end of command - line 1, column 78
+
+      MERGE INTO TARGET t USING SOURCE s ON (t.ID = s.ID)
+        WHEN NOT MATCHED THEN INSERT;
+        -> Statement failed, SQLSTATE = 42000
+           Dynamic SQL Error / -SQL error code = -104
+           -Unexpected end of command - line 1, column 75
+
+  (5) MySQL 8.4.11
+      docker run -d --name t6a-my -e MYSQL_ROOT_PASSWORD=fluent -p 33066:3306 \
+        mysql:8.4
+
+      As duas formas:
+        -> ERROR 1064 (42000): You have an error in your SQL syntax; ... near
+           'MERGE INTO TARGET t USING SOURCE s ON (t.ID = s.ID) WHEN MATCHED
+           THEN UPDATE SET' at line 1
+
+      CONTROLE - um MERGE PERFEITAMENTE VALIDO recebe o MESMO ERROR 1064:
+        MERGE ... WHEN MATCHED THEN UPDATE SET t.NOME = 'x';
+        -> ERROR 1064 (42000): ... near 'MERGE INTO ...' at line 1
+      Ou seja: em MySQL a recusa nao e da forma nua, e da palavra MERGE - ela
+      nao existe na gramatica. Registrado como controle justamente para nao
+      confundir "recusa a forma" com "recusa a instrucao".
+
+  (6) SQLite 3.53.4  (docker run --rm -i keinos/sqlite3:latest sqlite3 :memory:)
+
+      As duas formas:
+        -> Parse error: near "MERGE": syntax error
+      Mesma leitura do MySQL: MERGE nao existe em SQLite.
+
+  ------------------------------------------------------------------------------
+  LEITURA
+  ------------------------------------------------------------------------------
+  Nos QUATRO motores que TEM MERGE (MSSQL, PostgreSQL, Oracle, Firebird) as duas
+  formas sao recusadas por SINTAXE, e o controle do PostgreSQL e o ORA-00926 do
+  Oracle mostram exatamente o porque: a lista de atribuicoes do UPDATE e
+  obrigatoria, e o INSERT do MERGE exige VALUES(...) ou DEFAULT VALUES. Nos
+  outros DOIS (MySQL, SQLite) a instrucao inteira nao existe - a biblioteca ja
+  levanta EFluentSQLStatementNotSupported antes de emitir texto.
+
+  Zero motores aceitam. Nao ha caminho em que essas duas chamadas produzam algo
+  executavel, entao nao existe "limitacao conhecida" a documentar para o
+  consumidor se desviar: e defeito, e as duas passam a levantar
+  EArgumentException na chamada, junto com a guarda de contagem impar.
+
+  Travado por, em Test Delphi\MSSQL_tests\test.merge.mssql.pas:
+    TestMerge_UpdateEmptyArray_RaisesInsteadOfEmittingUpdateSetSemicolon
+    TestMerge_InsertEmptyArray_RaisesInsteadOfEmittingBareInsert
+    TestMerge_UpdateNoArgs_RaisesInsteadOfEmittingUpdateSetSemicolon
+    TestMerge_InsertNoArgs_RaisesInsteadOfEmittingBareInsert
+    TestMerge_RaisedGuard_LeavesNoHalfClauseInSql
+
+  ==============================================================================
+  nil EM POSICAO DE VALOR  -  corrigido nesta branch
+  ==============================================================================
+  Nao ha SQL a medir aqui, porque o defeito nao produzia SQL invalido: produzia
+  SQL VALIDO com o dado ERRADO, o que e pior, porque nenhum motor reclama.
+
+  `nil` escrito num array of const chega como vtPointer, e
+  TUtils._VarRecToString mapeia vtPointer por IntToHex. Em 32 bits o resultado e
+  a string '00000000'. Portanto:
+
+    .Update(['NOME', nil])   ->  SET [NOME] = :p1   com  p1 = '00000000'
+
+  e o SQL Server grava OITO ZEROS na coluna NOME, sem erro, sem aviso. O usuario
+  escreveu nil querendo NULL e recebeu uma string de lixo.
+
+  O par nome/valor NAO tem como exprimir NULL: o slot par e sempre ligado como
+  parametro e nao existe marcador de nulidade nesta API. Entre gravar lixo
+  calado e recusar a chamada, recusa - EArgumentException, mesma classe das
+  outras guardas. Dar semantica de NULL ao nil e decisao de CONVENCAO, nao
+  conserto de defeito, e por isso NAO foi feita aqui: se a coluna deve ficar
+  NULL, omita-a da lista de pares.
+
+  Travado por:
+    TestMerge_UpdateNilValue_RaisesInsteadOfCorruptingDataAsHexString
+    TestMerge_InsertNilValue_RaisesInsteadOfCorruptingDataAsHexString
 
   ==============================================================================
   FRONTEIRA  -  o que esta correcao NAO fecha
