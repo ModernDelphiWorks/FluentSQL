@@ -189,7 +189,7 @@
         IFluentSQLCriteriaCase        When           FluentSQL.Cases.pas:346
                                       AndOpe         FluentSQL.Cases.pas:267
                                       OrOpe          FluentSQL.Cases.pas:317
-        IFluentSQLMerge               On             FluentSQL.Merge.pas:342
+        IFluentSQLMerge               On             FluentSQL.Merge.pas:376
 
       Amostra do emitido, payload  x'; DROP TABLE U; --  :
 
