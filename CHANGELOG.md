@@ -83,7 +83,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   - **Parametrizam string** os **quatro** pontos em que o `array of const` é comprovadamente uma lista de *valores*: `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`. Esses quatro, e só esses, passam por `TUtils.SqlArrayOfConstToParameterizedValue`.
   - **Continuam literais** — string interpolada verbatim no texto do SQL — **todos os demais `array of const`, sem exceção**, porque todos estão em posição de *expressão*, onde a string pode legitimamente ser fragmento de SQL (identificador, operador, trecho). O critério mecânico é: passa por `TUtils.SqlArrayOfConstToParameterizedSql`. **Hoje são 17**, e a versão anterior desta entrada listava só 6 — omitia 11, entre eles `AndOpe`, que é a forma mais comum da API logo depois do `Where`. A lista completa, conferida no código e **executada** uma a uma:
 
-  | # | Ponto de entrada | Declarado em |
+  | # | Ponto de entrada | Implementado em |
   |---|---|---|
   | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1422` |
   | 2 | `IFluentSQL.AndOpe(array)` | `FluentSQL.pas:367` |
@@ -101,7 +101,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:346` |
   | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:267` |
   | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:317` |
-  | 17 | `IFluentSQLMerge.On(array)` | `FluentSQL.Merge.pas:342` |
+  | 17 | `IFluentSQLMerge.On(array)` | `FluentSQL.Merge.pas:376` |
 
   Quatro amostras do que os 11 omitidos emitem de fato, medidas com o payload `x'; DROP TABLE U; --`:
 
@@ -159,7 +159,9 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
 - `EFluentSQLQualifierNotSupported` em `FluentSQL.Interfaces.pas`. Substitui oito cópias de `raise Exception.Create('... Unknown qualifier')` — quatro delas nomeando o driver errado na mensagem.
-- Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4.
+- Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4 (biblioteca embutida no CPython 3.14, módulo `sqlite3`).
+
+  **Duas versões de SQLite aparecem neste CHANGELOG e as duas são medidas, não erro de digitação:** os oráculos de paginação usaram a biblioteca embutida no CPython 3.14 (**3.50.4**); o oráculo de `MERGE` usou a imagem `keinos/sqlite3:latest` (**3.53.4**). Conferido nesta rodada: `docker run --rm -i keinos/sqlite3:latest sqlite3 :memory: "select sqlite_version();"` → `3.53.4`; `python -c "import sqlite3; print(sqlite3.sqlite_version)"` → `3.50.4`. Nenhuma conclusão desta entrega depende da diferença — o SQLite não tem `MERGE` em nenhuma das duas.
 - Matriz de teste `Test Delphi\Common_tests\test.pagination.filter.pas` foi de **15 para 28 testes**, e a contagem merece o detalhe porque `+13` esconde o que aconteceu: **6 removidos, 19 acrescentados**. Os 6 removidos descreviam a janela `ROW_NUMBER()` que deixou de existir, e cada um tem substituto:
 
   | Removido | Substituto |

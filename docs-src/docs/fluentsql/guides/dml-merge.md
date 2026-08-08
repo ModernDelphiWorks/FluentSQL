@@ -50,7 +50,9 @@ end;
 
 ### E se eu quiser copiar coluna a coluna da fonte, como `T.VALOR = S.VALOR`?
 
-Isso é uma **expressão**, não um valor, e o array de `.Update` não a exprime — foi exatamente essa confusão que produziu o exemplo errado acima. Um `Update(['T.VALOR', 'S.VALOR'])` **não** faz isso: emite `SET [T.VALOR] = :p1`, com o parâmetro carregando a string literal `'S.VALOR'` como **dado**, e não a coluna `S.VALOR`.
+Isso é uma **expressão**, não um valor, e o array de `.Update` não a exprime — foi exatamente essa confusão que produziu o exemplo errado acima. Um `Update(['T.VALOR', 'S.VALOR'])` **não** faz isso: emite `SET T.VALOR = :p1`, com o parâmetro carregando a string literal `'S.VALOR'` como **dado**, e não a coluna `S.VALOR`.
+
+O nome sai **sem colchetes** porque `QuotedName` do MSSQL deixa passar verbatim todo nome que já contenha `.` ou `[` (`FluentSQL.SerializeMSSQL.pas:250`) — de modo que `T.VALOR` é entendido como *tabela.coluna*, e não como uma coluna chamada `T.VALOR`. Isso não muda a lição: o lado **direito** continua sendo um parâmetro com o texto `'S.VALOR'` como dado.
 
 **Hoje o `MERGE` do FluentSQL não exprime atribuição coluna-a-coluna.** Enquanto isso não existir, a saída é não usar `MERGE` para esse caso — escreva o `UPDATE ... FROM` (ou o equivalente do seu dialeto) fora do construtor de `MERGE`.
 
