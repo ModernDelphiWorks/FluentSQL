@@ -11,11 +11,41 @@
   TFluentSQLName serve os DOIS papeis. O mesmo objeto e o mesmo Serialize
   atendem:
 
-    * apelido de COLUNA  - montado em TFluentSQL.Column (FluentSQL.pas:608),
-                           vai para FAST.ASTColumns;
-    * apelido de RELACAO - montado em TFluentSQL.From (FluentSQL.pas:898) e em
-                           TFluentSQL._CreateJoin (FluentSQL.pas:700), vai para
-                           FAST.ASTTableNames e para o JoinedTable do join.
+    * apelido de COLUNA  - o no nasce em
+                           TFluentSQL.Column(const AColumnName: String)
+                           (FluentSQL.pas:626; o ASTColumns.Add esta na 630) e
+                           NAO recebe marcacao nenhuma: fica com o valor inicial
+                           cCOLUMN_ALIAS_KEYWORD = 'AS'
+                           (FluentSQL.Name.pas:34, aplicado no construtor em
+                           FluentSQL.Name.pas:97). Vai para FAST.ASTColumns.
+    * apelido de RELACAO - o no nasce em
+                           TFluentSQL.From(const ATableName: String)
+                           (FluentSQL.pas:918; a marcacao AliasKeyword :=
+                           _RelationAliasKeyword esta na 922) e em
+                           TFluentSQL._CreateJoin (FluentSQL.pas:715; marcacao
+                           na 723). Vai para FAST.ASTTableNames e para o
+                           JoinedTable do join.
+
+  CITAR SO O NOME DO METODO NAO IDENTIFICA NADA AQUI: Column tem quatro
+  sobrecargas (FluentSQL.pas:626, 638, 655, 686) e From tem quatro
+  (FluentSQL.pas:908, 913, 918, 1469). Por isso as linhas acima trazem a
+  assinatura, e nao so o nome.
+
+  A sobrecarga que o usuario chama para apelidar tabela e
+  TFluentSQL.From(const ATableName, AAlias: String) (FluentSQL.pas:1469) - e ela
+  NAO marca coisa alguma sozinha. Seu corpo inteiro e
+  "From(ATableName).Alias(AAlias)": delega para a sobrecarga de String
+  (FluentSQL.pas:918), que e onde a marcacao acontece, e so DEPOIS chama
+  TFluentSQL.Alias (FluentSQL.pas:307), que apenas grava o texto do apelido.
+  Mesma coisa para as quatro sobrecargas <Join>(tabela, apelido): delegam a
+  _CreateJoin e depois a Alias.
+
+  Consequencia que o leitor da matriz precisa: como as sobrecargas
+  From(IFluentSQLCriteriaExpression) (FluentSQL.pas:908) e From(IFluentSQL)
+  (FluentSQL.pas:913) tambem desaguam na de 918 - passando a subconsulta como
+  texto entre parenteses -, a regra da relacao vale para elas pelo mesmo
+  caminho, sem codigo proprio. E o que
+  TestApelidoDeSubconsultaSegueARegraDaRelacao afirma.
 
   A Oracle trata os dois de forma OPOSTA: aceita "col AS ap" e RECUSA
   "tabela AS ap". Por isso a correcao nao pode ser "tirar o AS do Serialize" -
@@ -52,6 +82,9 @@ type
     /// <summary>Delete.From(tabela, apelido): mesma regra, mesma recusa na Oracle.</summary>
     [Test]
     procedure TestApelidoDeRelacaoNoDeleteFrom;
+    /// <summary>From(subconsulta) + Alias: a subconsulta e t_alias, nao c_alias.</summary>
+    [Test]
+    procedure TestApelidoDeSubconsultaSegueARegraDaRelacao;
     /// <summary>O contraste: apelido de COLUNA continua com AS em TODO dialeto.</summary>
     [Test]
     procedure TestApelidoDeColunaContinuaComASEmTodoDialeto;
@@ -222,6 +255,41 @@ begin
       ' WHERE (AP.ID = ' + _Bind(LDriver) + ')',
       Query(LDriver).Delete.From('A', 'AP').Where('AP.ID').Equal(1).AsString, False,
       cDIALETO[LDriver] + ': apelido de tabela no DELETE FROM.');
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestAliasMatrix.TestApelidoDeSubconsultaSegueARegraDaRelacao;
+var
+  LDriver: TFluentSQLDriver;
+  LCelulas: Integer;
+begin
+  // A linha da tabela do CHANGELOG que faltava travar. A subconsulta apelidada
+  // e t_alias como qualquer relacao, e nao tem UMA linha de codigo propria: as
+  // tres sobrecargas de From desaguam na de String, que e quem marca o no. Este
+  // teste existe para que a equivalencia nao se perca numa refatoracao que
+  // "otimize" uma das sobrecargas para montar o no por conta propria.
+  // Medido na Oracle: "FROM (SELECT ...) AS S" devolve ORA-03048; sem o AS,
+  // devolve linha (secoes 10 e 11 de test.alias.oracle.sql).
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    Inc(LCelulas);
+
+    // 1) subconsulta passada como texto - a forma que o CHANGELOG lista.
+    Assert.AreEqual('SELECT * FROM ' +
+      _ComApelido(LDriver, '(SELECT ID FROM A)', 'S'),
+      Query(LDriver).Select.All.From('(SELECT ID FROM A)').Alias('S').AsString,
+      False, cDIALETO[LDriver] + ': From(texto de subconsulta) + Alias.');
+
+    // 2) subconsulta passada como IFluentSQL - mesmo destino, outro caminho.
+    Assert.AreEqual('SELECT * FROM ' +
+      _ComApelido(LDriver, '(SELECT ID FROM A)', 'S'),
+      Query(LDriver).Select.All
+        .From(Query(LDriver).Select.Column('ID').From('A')).Alias('S').AsString,
+      False, cDIALETO[LDriver] + ': From(IFluentSQL) + Alias.');
   end;
   Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
 end;
