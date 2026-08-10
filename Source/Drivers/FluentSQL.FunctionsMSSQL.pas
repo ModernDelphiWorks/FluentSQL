@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -43,13 +44,14 @@ type
     function Modulus(const AValue, ADivisor: String): String; override;
     function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsMSSQL }
 
@@ -167,6 +169,51 @@ end;
 function TFluentSQLFunctionsMSSQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEILING(' + AValue + ')';
+end;
+
+// Medido em Microsoft SQL Server 2022 (RTM-CU26) 16.0.4265.3.
+//
+// ESTE E O DIALETO QUE JUSTIFICA A LARGURA EXPLICITA. Um mapeamento ingenuo
+// dftString -> 'NVARCHAR' compila, roda, NAO da erro e CORROMPE:
+//   SELECT LEN(CAST('<40 chars>' AS NVARCHAR)), CAST('<40 chars>' AS NVARCHAR)
+//     len_varchar  len_nvarchar  v
+//     30           30            123456789012345678901234567890
+// 40 caracteres entram, 30 saem, sem erro e sem aviso - o comprimento default de
+// CAST/CONVERT no T-SQL e 30. Trocar a incoerencia de API de hoje por isso seria
+// estritamente pior que nao mexer. Por isso a largura vai SEMPRE explicita.
+//
+// O teto e 4000: CAST('ab' AS NVARCHAR(4001)) da
+//   Msg 131 ... The size (4001) given to the convert specification 'nvarchar'
+//   exceeds the maximum allowed for any data type (4000).
+// Para texto sem teto o alvo e NVARCHAR(MAX), que e o dftText.
+//
+// dftBoolean e BIT (T-SQL nao tem BOOLEAN: "Msg 243 ... Type BOOLEAN is not a
+// defined system type."), e dftArray levanta pela mesma mensagem com ARRAY.
+function TFluentSQLFunctionsMSSQL.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+  LLength: Integer;
+begin
+  LLength := ALength;
+  if LLength <= 0 then
+    LLength := cFluentSQLCastDefaultLength;
+  case ADataType of
+    dftString:   LType := 'NVARCHAR(' + IntToStr(LLength) + ')';
+    dftInteger:  LType := 'INT';
+    dftFloat:    LType := 'FLOAT';
+    dftDate:     LType := 'DATE';
+    dftText:     LType := 'NVARCHAR(MAX)';
+    dftDateTime: LType := 'DATETIME';
+    dftGuid:     LType := 'UNIQUEIDENTIFIER';
+    dftBoolean:  LType := 'BIT';
+    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
+                   'SQL Server (Msg 243: Type ARRAY is not a defined system type)');
+  else
+    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
+      'SQL Server (dftUnknown nao e tipo; nao ha grafia a emitir)');
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

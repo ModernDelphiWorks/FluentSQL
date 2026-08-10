@@ -39,7 +39,9 @@ type
     function Average(const AValue: String): String; virtual;
     function Coalesce(const AValues: array of String): String; virtual;
     function SubString(const AVAlue: String; const AStart, ALength: Integer): String; virtual;
-    function Cast(const AExpression: String; const ADataType: String): String; virtual;
+    function Cast(const AExpression: String; const ADataType: String): String; overload; virtual;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; virtual;
     function Convert(const ADataType: String; const AExpression: String;
       const AStyle: String): String; virtual;
     function Year(const AValue: String): String; virtual;
@@ -81,6 +83,13 @@ end;
 function TFluentSQLFunctionAbstract.Cast(const AExpression, ADataType: String): String;
 begin
   raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['Cast', Self.ClassName]);
+end;
+
+function TFluentSQLFunctionAbstract.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+begin
+  raise EAbstractError.CreateFmt(ABSTRACT_METHOD_ERROR, ['Cast(TFluentSQLDataFieldType)',
+    Self.ClassName]);
 end;
 
 function TFluentSQLFunctionAbstract.Ceil(const AValue: String): String;

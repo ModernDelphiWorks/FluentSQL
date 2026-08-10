@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -36,13 +37,14 @@ type
     function Concat(const AValue: array of String): String; override;
     function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsInterbase }
 
@@ -125,6 +127,30 @@ function TFluentSQLFunctionsInterbase.Ceil(const AValue: String): String;
 begin
   raise EFluentSQLFunctionNotSupported.Create('Ceil',
     'InterBase (forma correta nao verificada; Firebird usa CEIL desde a 2.1)');
+end;
+
+// NAO MEDIDO, e por isso levanta em TODAS as dez celulas do enum.
+//
+// A T17 mediu a matriz CAST contra motor real nos outros sete dialetos. O
+// InterBase nao tem imagem de container publica (produto pago da Embarcadero) e
+// nao ha instancia neste ambiente, entao NENHUMA celula dele foi verificada.
+//
+// A tentacao obvia e copiar o Firebird - mesma origem, ate a IB 6. Nao se faz isso
+// aqui, pela mesma razao que ja esta escrita em Length e Ceil logo acima: os dois
+// motores JA divergem, e a divergencia so aparece depois de medir. A T17 mediu
+// justamente quanto uma matriz de CAST diverge entre motores parecidos - a Oracle
+// recusa CLOB que o DB2 aceita, o SQL Server trunca em 30 onde o PostgreSQL nao
+// trunca. Supor semelhanca aqui seria repetir o defeito que esta tarefa matou.
+//
+// Levantar erro nomeado nao custa nada a quem nao usa InterBase (driver DESLIGADO
+// em FluentSQL.inc) e custa uma linha por celula a quem for medi-lo um dia.
+function TFluentSQLFunctionsInterbase.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+begin
+  raise EFluentSQLFunctionNotSupported.Create('Cast(TFluentSQLDataFieldType)',
+    'InterBase (matriz de CAST nao medida: nao ha imagem publica do motor. ' +
+    'A grafia NAO foi inferida do Firebird de proposito - ver comentario no driver. ' +
+    'Use a sobrecarga Cast(String, String) informando a grafia do tipo)');
 end;
 
 end.

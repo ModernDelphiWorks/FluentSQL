@@ -53,7 +53,9 @@ type
     // Null handling
     function Coalesce(const AValues: array of String): String; override;
     // Type conversion
-    function Cast(const AExpression: String; const ADataType: String): String; override;
+    function Cast(const AExpression: String; const ADataType: String): String; overload; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
     // Date functions
     function Date(const AValue: String; const AFormat: String): String; overload; override;
     function Date(const AValue: String): String; overload; override;
@@ -86,8 +88,9 @@ uses FluentSQL;
     Ex.: Result := 'COUNT(' + AValue + ')';
     Use APENAS quando a forma ANSI for comprovadamente valida nos 7 dialetos
     ativos (Firebird, MSSQL, MySQL, SQLite, Oracle, PostgreSQL, MongoDB).
-    Hoje em A: Count, Sum, Min, Max, Average, Abs, Upper, Lower, Cast, Round,
-               Floor.
+    Hoje em A: Count, Sum, Min, Max, Average, Abs, Upper, Lower, Round, Floor,
+               e a sobrecarga Cast(String, String) - esta ultima por decisao, nao
+               por omissao: ver o comentario dela na implementacao.
     Custo de manutencao: zero. Risco: se um dialeto divergir, o core emite SQL
     invalido EM SILENCIO - foi exatamente o que aconteceu com CEIL no MSSQL.
 
@@ -95,7 +98,8 @@ uses FluentSQL;
     Ex.: Result := FRegister.Functions(FDatabase).Trim(AValue);
     Obrigatorio sempre que UM dialeto que seja divirja da forma ANSI.
     Hoje em B: Length, Ceil, Trim, LTrim, RTrim, SubString, Concat, Coalesce,
-               Date, Day, Month, Year, CurrentDate, CurrentTimestamp, Modulus.
+               Date, Day, Month, Year, CurrentDate, CurrentTimestamp, Modulus,
+               e a sobrecarga Cast(String, TFluentSQLDataFieldType, Integer).
 
   ADICIONAR UMA FUNCAO NO PADRAO B custa 6 pontos de toque, TODOS obrigatorios:
     1. FluentSQL.Interfaces.pas ......... assinatura em IFluentSQLFunctions
@@ -208,9 +212,30 @@ begin
   Result := FRegister.Functions(FDatabase).Coalesce(AValues);
 end;
 
+// PADRAO A DE PROPOSITO, e a UNICA sobrecarga que continua nele. O chamador
+// escreveu a grafia do tipo; ele assumiu a responsabilidade pelo dialeto e o
+// core so envelopa. Nao ha o que despachar: nao existe traducao de 'DECIMAL(10,2)'
+// que o driver pudesse fazer melhor que quem escreveu.
+//
+// Fique claro que isto NAO e portavel: Cast('C', 'INTEGER') e erro de sintaxe no
+// MySQL 8.4 (ERROR 1064, o CAST do MySQL so aceita SIGNED). Quem quer portabilidade
+// usa a sobrecarga de TFluentSQLDataFieldType logo abaixo.
 function TFluentSQLFunctions.Cast(const AExpression: String; const ADataType: String): String;
 begin
   Result := 'CAST(' + AExpression + ' AS ' + ADataType + ')';
+end;
+
+// PADRAO B: nao ha grafia ANSI unica que sirva aos sete. Medido contra motor real
+// (Test Delphi\Common_tests\test.cast.matrix.sql), a mesma celula diverge em
+// SINTAXE, em LARGURA OBRIGATORIA e em SEMANTICA:
+//   dftInteger -> 'INTEGER' vale em 5, mas o MySQL exige SIGNED (ERROR 1064);
+//   dftString  -> 'VARCHAR' sem largura e erro no Firebird (-104) e na Oracle
+//                 (ORA-00906), e no SQL Server TRUNCA EM SILENCIO em 30;
+//   dftDate    -> no SQLite, CAST('2026-08-10' AS DATE) devolve 2026.
+function TFluentSQLFunctions.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+begin
+  Result := FRegister.Functions(FDatabase).Cast(AExpression, ADataType, ALength);
 end;
 
 function TFluentSQLFunctions.Date(const AValue: String): String;

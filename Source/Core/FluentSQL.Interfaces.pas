@@ -85,6 +85,27 @@ type
   TFluentSQLDataFieldType = (dftUnknown, dftString, dftInteger, dftFloat, dftDate,
     dftArray, dftText, dftDateTime, dftGuid, dftBoolean);
 
+const
+  /// <summary>
+  ///   Largura default do alvo de CAST para tipo de texto, usada pelos dialetos
+  ///   que EXIGEM largura (Firebird, Oracle) ou que corrompem sem ela (SQL
+  ///   Server). Nao e numero redondo escolhido a esmo: 4000 e o MAIOR valor
+  ///   simultaneamente legal nos dois motores mais restritivos, medido contra
+  ///   motor real (ver Test Delphi\Common_tests\test.cast.matrix.sql):
+  ///
+  ///     Oracle AI 26ai .. CAST('ab' AS VARCHAR2(4001))
+  ///                       ORA-00910: specified length too long for its datatype
+  ///     SQL Server 2022 . CAST('ab' AS NVARCHAR(4001))
+  ///                       Msg 131 ... exceeds the maximum allowed for any data
+  ///                       type (4000)
+  ///
+  ///   Subir daqui quebra Oracle e SQL Server; descer daqui trunca texto que
+  ///   hoje passa. Quem precisar de outra largura passa ALength explicito em
+  ///   IFluentSQLFunctions.Cast.
+  /// </summary>
+  cFluentSQLCastDefaultLength = 4000;
+
+type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
@@ -875,7 +896,24 @@ type
     // Null handling
     function Coalesce(const AValues: array of String): String;
     // Type conversion
-    function Cast(const AExpression: String; const ADataType: String): String;
+    /// <summary>
+    ///   ESCAPE HATCH - PADRAO A. O chamador escreve a grafia do tipo e assume a
+    ///   responsabilidade por ela; o core so envelopa em CAST(... AS ...). Existe
+    ///   para o que o enum nao exprime, tipicamente largura/precisao explicita
+    ///   ('DECIMAL(10,2)'). NAO e portavel por construcao: 'INTEGER' aqui e erro
+    ///   de sintaxe no MySQL, que so aceita SIGNED.
+    /// </summary>
+    function Cast(const AExpression: String; const ADataType: String): String; overload;
+    /// <summary>
+    ///   PADRAO B - cada dialeto devolve a propria grafia. ALength = 0 pede a
+    ///   largura default do dialeto (ver cFluentSQLCastDefaultLength); os
+    ///   dialetos em que largura nao faz sentido a ignoram. Celula que o dialeto
+    ///   nao tem levanta EFluentSQLFunctionNotSupported - erro nomeado e melhor
+    ///   que SQL que o motor recusa, e MUITO melhor que SQL que o motor aceita
+    ///   com semantica errada.
+    /// </summary>
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload;
     // Date functions
     function Date(const AValue: String; const AFormat: String): String; overload;
     function Date(const AValue: String): String; overload;

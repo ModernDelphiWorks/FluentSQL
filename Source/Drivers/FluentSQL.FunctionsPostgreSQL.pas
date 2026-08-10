@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -43,13 +44,14 @@ type
     function Modulus(const AValue, ADivisor: String): String; override;
     function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsPostgreSQL }
 
@@ -161,6 +163,49 @@ end;
 function TFluentSQLFunctionsPostgreSQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEIL(' + AValue + ')';
+end;
+
+// Medido em PostgreSQL 16.14. E o dialeto mais completo da matriz: das dez celulas
+// do enum so dftArray e dftUnknown nao tem alvo.
+//
+// dftString emite VARCHAR SEM largura DE PROPOSITO, e isto e o INVERSO da regra do
+// SQL Server. Medido:
+//   CAST('<40 chars>'  AS VARCHAR)    -> 40 caracteres, nada truncado
+//   CAST('abcdefghij'  AS VARCHAR(4)) -> 'abcd', truncado EM SILENCIO
+// Ou seja, aqui a largura e que INTRODUZ corrupcao. Emitir VARCHAR(4000) "por
+// consistencia" com Firebird/Oracle colocaria um teto de 4000 onde hoje nao ha teto
+// nenhum. Largura so vai se o chamador pedir explicitamente.
+//
+// dftArray levanta porque nao existe alvo generico: 'ARRAY' sozinho e erro de
+// sintaxe (ERROR: syntax error at or near "ARRAY"); o PostgreSQL exige o tipo do
+// ELEMENTO - INTEGER[], TEXT[] - e o enum nao carrega essa informacao. Quem precisa
+// disso usa a sobrecarga Cast(String, String), que e o escape hatch.
+function TFluentSQLFunctionsPostgreSQL.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+begin
+  case ADataType of
+    dftString:
+      if ALength > 0 then
+        LType := 'VARCHAR(' + IntToStr(ALength) + ')'
+      else
+        LType := 'VARCHAR';
+    dftInteger:  LType := 'INTEGER';
+    dftFloat:    LType := 'DOUBLE PRECISION';
+    dftDate:     LType := 'DATE';
+    dftText:     LType := 'TEXT';
+    dftDateTime: LType := 'TIMESTAMP';
+    dftGuid:     LType := 'UUID';
+    dftBoolean:  LType := 'BOOLEAN';
+    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
+                   'PostgreSQL (ARRAY sozinho e erro de sintaxe; o motor exige o ' +
+                   'tipo do elemento, como INTEGER[], que o enum nao carrega)');
+  else
+    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
+      'PostgreSQL (dftUnknown nao e tipo; nao ha grafia a emitir)');
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

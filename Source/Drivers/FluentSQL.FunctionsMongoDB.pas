@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -73,12 +74,13 @@ type
     // Numeric
     function Ceil(const AValue: String): String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
+    // Type conversion
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
-uses
-  FluentSQL.Interfaces;
 
 const
   cDIALECT = 'MongoDB';
@@ -167,6 +169,22 @@ end;
 function TFluentSQLFunctionsMongoDB.Modulus(const AValue, ADivisor: String): String;
 begin
   raise EFluentSQLFunctionNotSupported.Create('Modulus', cDIALECT);
+end;
+
+// A sobrecarga de enum entra na regra geral desta classe: escalar levanta erro
+// nomeado. Isto FECHA UMA das seis celulas de MQL invalido em silencio que a T3
+// deixou registradas como divida - a de Cast. Antes, Cast estava no padrao A, o
+// core respondia 'CAST(x AS INTEGER)' sem consultar este driver, o
+// SerializeMongoDB nao reconhecia o prefixo 'CAST(' e a coluna caia em
+// NormalizeFieldName e era DESCARTADA sem aviso.
+//
+// Continuam em silencio, porque continuam no padrao A: Abs, Upper, Lower, Round,
+// Floor - e a sobrecarga Cast(String, String), que por decisao permanece no padrao
+// A. Ver a nota MONGODB em Source\Core\FluentSQL.Functions.pas.
+function TFluentSQLFunctionsMongoDB.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+begin
+  raise EFluentSQLFunctionNotSupported.Create('Cast(TFluentSQLDataFieldType)', cDIALECT);
 end;
 
 end.
