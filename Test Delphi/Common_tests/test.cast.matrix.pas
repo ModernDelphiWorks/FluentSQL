@@ -370,16 +370,37 @@ end;
 ///   em MongoDB e InterBase, que recusam TUDO com mensagem propria de dialeto. Se
 ///   a guarda viesse depois do raise proprio deles, Cast('C', dftGuid) devolveria
 ///   a mensagem do MongoDB no MongoDB e a mensagem de politica no PostgreSQL -
-///   duas respostas para a mesma pergunta. Trocar a ordem daquelas duas linhas em
-///   qualquer um dos dois fica VERMELHO aqui.
+///   duas respostas para a mesma pergunta.
+///
+///   AS DUAS PORTAS, e por que o teste tem de bater nas duas. Ha DOIS objetos que
+///   implementam IFluentSQLFunctions e os dois sao alcancaveis:
+///
+///     porta do core ... TFluentSQLFunctions, o que TFluentSQL usa. Guarda em
+///                       Source\Core\FluentSQL.Functions.pas, ANTES do despacho.
+///     porta do driver . TFluentSQLRegister.Functions(D), o objeto do dialeto.
+///                       Guarda na primeira linha do Cast de cada driver.
+///
+///   A guarda do core faz CURTO-CIRCUITO: por ela, o Cast do driver nunca chega a
+///   rodar para tipo fora da intersecao. Se este teste so batesse na porta do
+///   core, TODAS as dez guardas de driver seriam decoracao nao observavel -
+///   medido: com o teste so no core, inverter a ordem no MongoDB e ate fazer o
+///   PostgreSQL responder 'UUID' passavam VERDES. Por isso o laco varre as duas
+///   portas e exige a MESMA mensagem em todas: e o que torna a ordem das linhas
+///   dentro de cada driver uma afirmacao testada, e nao um comentario.
 /// </summary>
 procedure TTestCastMatrix.TestRecusaDeTipoForaDaIntersecaoEUniforme;
+const
+  cPORTA: array[Boolean] of String = (
+    'porta do core (TFluentSQLFunctions)',
+    'porta do driver (TFluentSQLRegister.Functions)');
 var
   LRegister: TFluentSQLRegister;
   LDriver: TFluentSQLDriver;
   LType: TFluentSQLDataFieldType;
+  LPortaDriver: Boolean;
   LMensagemReferencia: String;
-  LDriverReferencia: String;
+  LOrigemReferencia: String;
+  LOrigem: String;
   LMensagem: String;
   LLevantou: Boolean;
   LObtido: String;
@@ -393,52 +414,59 @@ begin
       if LType in cFluentSQLCastPortableTypes then
         Continue;
       LMensagemReferencia := '';
-      LDriverReferencia := '';
+      LOrigemReferencia := '';
       for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
       begin
         if not _EstaRegistrado(LRegister, LDriver) then
           Continue;
-        LLevantou := False;
-        LMensagem := '';
-        LObtido := '';
-        try
-          LObtido := _Funcoes(LRegister, LDriver).Cast('C', LType);
-        except
-          on E: EFluentSQLFunctionNotSupported do
-          begin
-            LLevantou := True;
-            LMensagem := E.Message;
-          end;
-        end;
-        Inc(LConferidas);
-
-        Assert.IsTrue(LLevantou,
-          'Celula ' + _Celula(LDriver, LType) + ' respondeu "' + LObtido +
-          '" em vez de levantar. ' + _NomeTipo(LType) + ' nao esta em ' +
-          'cFluentSQLCastPortableTypes, logo a sobrecarga de enum tem de recusar ' +
-          'AQUI TAMBEM - inclusive se a celula existir neste motor. Oferece-la so ' +
-          'onde ela existe e devolver a UNIAO dos dialetos por uma porta que se ' +
-          'apresenta como portavel.');
-
-        if LDriverReferencia = '' then
+        for LPortaDriver := False to True do
         begin
-          LMensagemReferencia := LMensagem;
-          LDriverReferencia := DriverName(LDriver);
-        end
-        else
-          // ignoreCase = False: a mensagem e o contrato visivel da politica.
-          Assert.AreEqual(LMensagemReferencia, LMensagem, False,
-            'A recusa de ' + _NomeTipo(LType) + ' em ' + DriverName(LDriver) +
-            ' tem texto diferente da recusa em ' + LDriverReferencia + '. A ' +
-            'recusa e de POLITICA, nao de dialeto, e por isso e a MESMA nos ' +
-            'nove drivers. Mensagem por dialeto aqui significa que a guarda ' +
-            '_AssertCastTypeIsPortable deixou de ser a primeira linha do Cast ' +
-            'deste driver, ou que alguem a duplicou com texto proprio.');
+          LOrigem := _Celula(LDriver, LType) + ' pela ' + cPORTA[LPortaDriver];
+          LLevantou := False;
+          LMensagem := '';
+          LObtido := '';
+          try
+            if LPortaDriver then
+              LObtido := LRegister.Functions(LDriver).Cast('C', LType)
+            else
+              LObtido := _Funcoes(LRegister, LDriver).Cast('C', LType);
+          except
+            on E: EFluentSQLFunctionNotSupported do
+            begin
+              LLevantou := True;
+              LMensagem := E.Message;
+            end;
+          end;
+          Inc(LConferidas);
+
+          Assert.IsTrue(LLevantou,
+            LOrigem + ' respondeu "' + LObtido + '" em vez de levantar. ' +
+            _NomeTipo(LType) + ' nao esta em cFluentSQLCastPortableTypes, logo a ' +
+            'sobrecarga de enum tem de recusar AQUI TAMBEM - inclusive se a celula ' +
+            'existir neste motor. Oferece-la so onde ela existe e devolver a UNIAO ' +
+            'dos dialetos por uma porta que se apresenta como portavel.');
+
+          if LOrigemReferencia = '' then
+          begin
+            LMensagemReferencia := LMensagem;
+            LOrigemReferencia := LOrigem;
+          end
+          else
+            // ignoreCase = False: a mensagem e o contrato visivel da politica.
+            Assert.AreEqual(LMensagemReferencia, LMensagem, False,
+              'A recusa de ' + _NomeTipo(LType) + ' tem texto diferente em ' +
+              LOrigem + ' e em ' + LOrigemReferencia + '. A recusa e de POLITICA, ' +
+              'nao de dialeto: e a MESMA nos nove drivers e nas duas portas. Texto ' +
+              'proprio aqui significa que _AssertCastTypeIsPortable deixou de ser a ' +
+              'PRIMEIRA linha do Cast neste ponto, ou que alguem a duplicou com ' +
+              'mensagem propria.');
+        end;
       end;
     end;
-    Assert.IsTrue(LConferidas >= 49,
-      'Esperado ao menos 49 recusas conferidas (7 tipos fora da intersecao x 7 ' +
-      'dialetos ligados por default); conferidas ' + IntToStr(LConferidas) + '.');
+    Assert.IsTrue(LConferidas >= 98,
+      'Esperado ao menos 98 recusas conferidas (7 tipos fora da intersecao x 7 ' +
+      'dialetos ligados por default x 2 portas); conferidas ' +
+      IntToStr(LConferidas) + '.');
   finally
     LRegister.Free;
   end;
