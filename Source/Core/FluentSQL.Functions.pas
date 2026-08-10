@@ -242,13 +242,28 @@ end;
 // A MESMA guarda e a primeira linha dos nove Cast de driver, e ali ela e
 // REDUNDANTE PARA O CAMINHO FLUENTE. A redundancia e DELIBERADA, porque as duas
 // camadas fecham portas diferentes:
+//
 //   * tirar esta, do core, faria a garantia depender de todo driver futuro lembrar
 //     de chamar a guarda; quem esquecesse reintroduziria a uniao EM SILENCIO, que e
-//     o modo de falha que esta politica existe para matar;
+//     o modo de falha que esta politica existe para matar. E e SO ESTA camada que
+//     defende o cenario do IFluentSQLFunctions de TERCEIRO: RegisterFunctions faz
+//     AddOrSetValue (FluentSQL.Register.pas:249), ou seja SUBSTITUI o nosso objeto,
+//     e com ele vai embora a guarda do nosso driver. Medido: com um terceiro
+//     registrado em dbnPostgreSQL, a chamada pela porta do core e barrada AQUI, e
+//     a chamada pela porta do driver CHEGA ao terceiro. Some-se que um terceiro
+//     registrado nem sequer e alcancavel pela API fluente - Func e Query constroem
+//     CADA UM o seu proprio TFluentSQLRegister (FluentSQL.pas:267 e :694) e nao ha
+//     construtor nem propriedade para injetar um de fora;
+//
 //   * tirar as dos drivers faria a garantia depender de o consumidor entrar pela
-//     porta do core - e a porta do driver e PUBLICA: TFluentSQLRegister.Functions(D)
-//     devolve o IFluentSQLFunctions do dialeto, a propria biblioteca a usa, e um
-//     IFluentSQLFunctions de terceiro pode ser injetado por RegisterFunctions.
+//     porta do core, e a porta do driver e PUBLICA:
+//     TFluentSQLRegister.Functions(D).Cast(x, dftGuid) sobre os NOSSOS drivers e
+//     caminho real e alcancavel, e e a guarda do driver que o barra - medido. Essa
+//     razao basta sozinha. O que NAO se deve escrever aqui e que a biblioteca use
+//     essa porta como entrada independente: as unicas chamadas a
+//     TFluentSQLRegister.Functions(D) no Source/ estao no despacho deste proprio
+//     arquivo, sempre DEPOIS da guarda do core.
+//
 // Custo de manter as duas: uma linha por driver. A mensagem tem fonte unica em
 // TFluentSQLFunctionAbstract._AssertCastTypeIsPortable, entao nao deriva.
 //
