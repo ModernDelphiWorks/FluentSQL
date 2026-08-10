@@ -1803,8 +1803,8 @@ constructor EFluentSQLFunctionNotSupported.CreateCastNotPortable(
 begin
   inherited CreateFmt(
     'Cast(%s) foi recusado. A sobrecarga de TFluentSQLDataFieldType e a PORTAVEL: ' +
-    'ela so aceita os tipos que existem nos sete dialetos relacionais (Firebird, ' +
-    'SQL Server, MySQL, SQLite, Oracle, PostgreSQL, DB2), que sao dftString, ' +
+    'ela so aceita os tipos que existem em TODOS os dialetos relacionais que o ' +
+    'FluentSQL atende, medidos um a um contra motor real - e sao dftString, ' +
     'dftInteger e dftFloat. %s nao esta nessa intersecao e por isso e recusado ' +
     'em TODOS os dialetos, inclusive naqueles onde a celula existiria - a API do ' +
     'FluentSQL e a intersecao, nao a uniao, e celula que so funciona em alguns ' +

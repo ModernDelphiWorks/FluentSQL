@@ -84,8 +84,13 @@
 
   NAO MEDIDO: InterBase - nao ha imagem de container publica. Todas as celulas
   dele levantam, e isso e deliberado: a grafia NAO foi inferida do Firebird. Ver
-  FluentSQL.FunctionsInterbase.pas. MongoDB tambem levanta em todas, pela doutrina
-  ja escrita em FluentSQL.FunctionsMongoDB.pas (a intersecao e relacional).
+  FluentSQL.FunctionsInterbase.pas.
+
+  MONGODB: levanta em todas, pela regra geral daquele driver (escalar levanta erro
+  nomeado). Ele esta FORA da promessa de intersecao, que e RELACIONAL, por decisao
+  do autor: aqui ele e varrido como EXTRA, com a mesma exigencia celula a celula,
+  mas NENHUM piso desta unidade se apoia nele. Os pisos contam so os relacionais -
+  ver _ERelacional.
   ------------------------------------------------------------------------------
 }
 
@@ -116,7 +121,11 @@ type
     /// <summary>A mensagem de recusa nomeia o tipo e entrega as duas saidas.</summary>
     [Test]
     procedure TestMensagemDeRecusaEnsinaASaida;
-    /// <summary>Dialeto registrado nunca cai no corpo abstrato (EAbstractError).</summary>
+    /// <summary>
+    ///   Na PORTA DO CORE, dialeto registrado nunca cai no corpo abstrato
+    ///   (EAbstractError). O escopo e esse e nao mais - ver o comentario da
+    ///   implementacao, que declara o que este teste NAO cobre.
+    /// </summary>
     [Test]
     procedure TestNenhumaCelulaLevantaEAbstractError;
     /// <summary>A sobrecarga String continua verbatim - escape hatch preservado.</summary>
@@ -264,6 +273,19 @@ begin
   end;
 end;
 
+/// <summary>
+///   A promessa de intersecao do FluentSQL e RELACIONAL, e por decisao do autor
+///   (2026-08-08) o MongoDB esta FORA dela, em regime congelado: o driver
+///   continua compilando e continua sendo varrido por estas matrizes, mas nao
+///   vota em regra de feature e NAO PODE SUSTENTAR NUMERO DE PISO. Se um piso
+///   dependesse dele, desligar um dialeto congelado derrubaria um teste que
+///   afirma coisa sobre os dialetos vivos.
+/// </summary>
+function _ERelacional(const ADriver: TFluentSQLDriver): Boolean;
+begin
+  Result := ADriver <> dbnMongoDB;
+end;
+
 function _NomeTipo(const AType: TFluentSQLDataFieldType): String;
 begin
   case AType of
@@ -309,8 +331,10 @@ var
   LObtido: String;
   LLevantou: Boolean;
   LConferidas: Integer;
+  LConferidasRelacionais: Integer;
 begin
   LConferidas := 0;
+  LConferidasRelacionais := 0;
   LRegister := TFluentSQLRegister.Create;
   try
     for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
@@ -330,6 +354,8 @@ begin
             LLevantou := True;
         end;
         Inc(LConferidas);
+        if _ERelacional(LDriver) then
+          Inc(LConferidasRelacionais);
 
         if LEsperado = cLEVANTA then
           Assert.IsTrue(LLevantou,
@@ -349,10 +375,16 @@ begin
         end;
       end;
     end;
-    Assert.IsTrue(LConferidas >= 70,
-      'Esperado ao menos 70 celulas conferidas (7 dialetos x 10 tipos); ' +
-      'conferidas ' + IntToStr(LConferidas) + '. Driver desligado no .inc ' +
-      'reduz a cobertura desta matriz.');
+    // O piso conta SO os RELACIONAIS: 6 ligados por default (Firebird, MSSQL,
+    // MySQL, SQLite, Oracle, PostgreSQL) x 10 tipos. O MongoDB continua sendo
+    // varrido acima - celula a celula, com a mesma exigencia - mas entra como
+    // EXTRA e nao sustenta este numero, porque e dialeto congelado e fora da
+    // promessa de intersecao.
+    Assert.IsTrue(LConferidasRelacionais >= 60,
+      'Esperado ao menos 60 celulas relacionais conferidas (6 dialetos ' +
+      'relacionais ligados por default x 10 tipos); conferidas ' +
+      IntToStr(LConferidasRelacionais) + ' de ' + IntToStr(LConferidas) +
+      ' no total. Driver desligado no .inc reduz a cobertura desta matriz.');
   finally
     LRegister.Free;
   end;
@@ -367,10 +399,10 @@ end;
 ///   nao suporta" e concluiria, errado, que trocar de banco resolve.
 ///
 ///   E daqui que vem a exigencia de a guarda ser a PRIMEIRA linha de Cast tambem
-///   em MongoDB e InterBase, que recusam TUDO com mensagem propria de dialeto. Se
-///   a guarda viesse depois do raise proprio deles, Cast('C', dftGuid) devolveria
-///   a mensagem do MongoDB no MongoDB e a mensagem de politica no PostgreSQL -
-///   duas respostas para a mesma pergunta.
+///   no InterBase, que recusa TUDO com mensagem propria de dialeto. Se a guarda
+///   viesse depois do raise proprio dele, Cast('C', dftGuid) devolveria a mensagem
+///   do InterBase ali e a mensagem de politica no PostgreSQL - duas respostas para
+///   a mesma pergunta.
 ///
 ///   AS DUAS PORTAS, e por que o teste tem de bater nas duas. Ha DOIS objetos que
 ///   implementam IFluentSQLFunctions e os dois sao alcancaveis:
@@ -382,11 +414,16 @@ end;
 ///
 ///   A guarda do core faz CURTO-CIRCUITO: por ela, o Cast do driver nunca chega a
 ///   rodar para tipo fora da intersecao. Se este teste so batesse na porta do
-///   core, TODAS as dez guardas de driver seriam decoracao nao observavel -
-///   medido: com o teste so no core, inverter a ordem no MongoDB e ate fazer o
-///   PostgreSQL responder 'UUID' passavam VERDES. Por isso o laco varre as duas
-///   portas e exige a MESMA mensagem em todas: e o que torna a ordem das linhas
-///   dentro de cada driver uma afirmacao testada, e nao um comentario.
+///   core, as NOVE guardas de driver seriam decoracao nao observavel - medido: com
+///   o teste so no core, fazer o PostgreSQL responder 'UUID' para dftGuid passava
+///   VERDE. Por isso o laco varre as duas portas e exige a MESMA mensagem em
+///   todas: e o que torna a ordem das linhas dentro de cada driver uma afirmacao
+///   testada, e nao um comentario.
+///
+///   O QUE ESTE TESTE NAO PEGA, declarado: a guarda do CORE. Como o driver logo
+///   abaixo recusa com a MESMA mensagem, apagar a linha do core deixa este teste -
+///   e a suite inteira - VERDE. A camada do core existe para o driver futuro que
+///   esquecer a guarda, e essa redundancia e deliberada e NAO coberta por teste.
 /// </summary>
 procedure TTestCastMatrix.TestRecusaDeTipoForaDaIntersecaoEUniforme;
 const
@@ -405,8 +442,10 @@ var
   LLevantou: Boolean;
   LObtido: String;
   LConferidas: Integer;
+  LConferidasRelacionais: Integer;
 begin
   LConferidas := 0;
+  LConferidasRelacionais := 0;
   LRegister := TFluentSQLRegister.Create;
   try
     for LType := Low(TFluentSQLDataFieldType) to High(TFluentSQLDataFieldType) do
@@ -438,6 +477,8 @@ begin
             end;
           end;
           Inc(LConferidas);
+          if _ERelacional(LDriver) then
+            Inc(LConferidasRelacionais);
 
           Assert.IsTrue(LLevantou,
             LOrigem + ' respondeu "' + LObtido + '" em vez de levantar. ' +
@@ -463,10 +504,16 @@ begin
         end;
       end;
     end;
-    Assert.IsTrue(LConferidas >= 98,
-      'Esperado ao menos 98 recusas conferidas (7 tipos fora da intersecao x 7 ' +
-      'dialetos ligados por default x 2 portas); conferidas ' +
-      IntToStr(LConferidas) + '.');
+    // Piso SO sobre os relacionais: 7 tipos fora da intersecao x 6 dialetos
+    // relacionais ligados por default x 2 portas. O MongoDB e varrido junto e a
+    // exigencia de mensagem identica vale para ele tambem, mas ele NAO sustenta
+    // este numero: e dialeto congelado, fora da promessa de intersecao, e um piso
+    // que dependesse dele afirmaria sobre os vivos contando com um morto.
+    Assert.IsTrue(LConferidasRelacionais >= 84,
+      'Esperado ao menos 84 recusas relacionais conferidas (7 tipos fora da ' +
+      'intersecao x 6 dialetos relacionais ligados por default x 2 portas); ' +
+      'conferidas ' + IntToStr(LConferidasRelacionais) + ' de ' +
+      IntToStr(LConferidas) + ' no total.');
   finally
     LRegister.Free;
   end;
@@ -579,6 +626,23 @@ begin
   end;
 end;
 
+/// <summary>
+///   ESCOPO DECLARADO: este teste varre UMA porta - a do CORE (TFluentSQLFunctions,
+///   o objeto que TFluentSQL usa) - e UMA sobrecarga - a de TFluentSQLDataFieldType.
+///   Dentro disso a afirmacao e forte: nenhum dos dez tipos, em nenhum dialeto
+///   registrado, cai no corpo abstrato.
+///
+///   O QUE ELE NAO COBRE, dito aqui porque teste nao pode afirmar cobertura que
+///   nao tem: pela PORTA DO DRIVER, a sobrecarga de String tem EAbstractError
+///   CONHECIDO - LRegister.Functions(dbnMSSQL).Cast('C', 'INTEGER') levanta
+///   EAbstractError, e o mesmo vale nos nove drivers, porque nenhum deles
+///   sobrescreve Cast(String, String) e o corpo herdado de
+///   TFluentSQLFunctionAbstract levanta. Isso e PRE-EXISTENTE a T17 (antes dela
+///   nenhum driver sobrescrevia sobrecarga alguma de Cast) e continua aberto de
+///   proposito: nao e escopo desta entrega. Pela porta do CORE a mesma chamada
+///   responde 'CAST(C AS INTEGER)', porque ali a sobrecarga de String e padrao A e
+///   nao despacha - e e por isso que o buraco nao aparece aqui.
+/// </summary>
 procedure TTestCastMatrix.TestNenhumaCelulaLevantaEAbstractError;
 var
   LRegister: TFluentSQLRegister;
