@@ -67,13 +67,138 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   O método responde "o usuário pediu `First(0)`?". É pergunta sobre a coleção de qualificadores, não sobre dialeto: a **forma** de exprimir zero linhas varia (`TOP 0`, `LIMIT 0`, `FIRST 0`, pular tudo), o **pedido** é o mesmo nos sete. E não é `First = 0`, é `HasFirst and (First = 0)` — "não pediu `First`" e "pediu `First(0)`" são coisas diferentes, e só a primeira devolve o conjunto todo.
 
+- **BREAKING CHANGE (SQL emitido) — `IFluentSQLMerge.Update`/`.Insert` passaram a parametrizar valores string.** Valores numéricos já viravam `:pN`; **strings iam verbatim para o texto do SQL**, sem aspas e sem escape. Quem compara o SQL gerado com string fixa **precisa atualizar as expectativas**:
+
+  | Chamada | Antes | Depois |
+  |---|---|---|
+  | `.Update(['NOME', 'TESTE', 'VALOR', 10.5])` | `SET [NOME] = TESTE, [VALOR] = :p1` | `SET [NOME] = :p1, [VALOR] = :p2` |
+  | `.Insert(['ID', 1, 'NOME', 'TESTE'])` | `VALUES (:p1, TESTE)` | `VALUES (:p1, :p2)` |
+
+  **Isto não era só um buraco de segurança latente — era funcionalidade quebrada.** O caso benigno já não funcionava em motor nenhum: `SET [NOME] = TESTE` é `Msg 207, Invalid column name 'TESTE'` no SQL Server, e `O'Brien` dava `Msg 105, Unclosed quotation mark`. Com valor hostil, era injeção executável: medido em SQL Server 2022, `.Update(['NOME', '1; DROP TABLE USERS; --'])` **derrubou a tabela**. Depois da correção o mesmo payload chega ao banco como dado da coluna. Oráculo completo, com `docker run`, versão do motor e saída bruta antes e depois: `Test Delphi\Common_tests\test.merge.mssql.sql`.
+
+  A regra é a que o overload tipado `SetValue(const AColumnName, AColumnValue: String)` já seguia: no array de `.Update`/`.Insert` os slots ímpares são **nomes de coluna** (identificadores, seguem literais) e os pares são **valores** (sempre `:pN`).
+
+  A fronteira, agora que o overload `array of const` de `SetValue`/`Values` também mudou (entrada abaixo), é uma **regra**, não uma lista curta:
+
+  - **Parametrizam string** os **quatro** pontos em que o `array of const` é comprovadamente uma lista de *valores*: `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`. Esses quatro, e só esses, passam por `TUtils.SqlArrayOfConstToParameterizedValue`.
+  - **Continuam literais** — string interpolada verbatim no texto do SQL — **todos os demais `array of const`, sem exceção**, porque todos estão em posição de *expressão*, onde a string pode legitimamente ser fragmento de SQL (identificador, operador, trecho). O critério mecânico é: passa por `TUtils.SqlArrayOfConstToParameterizedSql`. **Hoje são 17**, e a versão anterior desta entrada listava só 6 — omitia 11, entre eles `AndOpe`, que é a forma mais comum da API logo depois do `Where`. A lista completa, conferida no código e **executada** uma a uma:
+
+  | # | Ponto de entrada | Implementado em |
+  |---|---|---|
+  | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1422` |
+  | 2 | `IFluentSQL.AndOpe(array)` | `FluentSQL.pas:367` |
+  | 3 | `IFluentSQL.OrOpe(array)` | `FluentSQL.pas:372` |
+  | 4 | `IFluentSQL.Column(array)` | `FluentSQL.pas:664` |
+  | 5 | `IFluentSQL.Having(array)` | `FluentSQL.pas:968` |
+  | 6 | `IFluentSQL.OnCond(array)` | `FluentSQL.pas:420` |
+  | 7 | `IFluentSQL.CaseExpr(array)` | `FluentSQL.pas:342` |
+  | 8 | `IFluentSQL.ForDialectOnly(dialeto, array)` | `FluentSQL.pas:325` |
+  | 9 | `IFluentSQL.Expression(array)` | `FluentSQL.pas:873` |
+  | 10 | `IFluentSQLCriteriaExpression.AndOpe(array)` | `FluentSQL.Expression.pas:261` |
+  | 11 | `IFluentSQLCriteriaExpression.OrOpe(array)` | `FluentSQL.Expression.pas:344` |
+  | 12 | `IFluentSQLCriteriaExpression.Ope(array)` | `FluentSQL.Expression.pas:358` |
+  | 13 | `IFluentSQLCriteriaExpression.Fun(array)` | `FluentSQL.Expression.pas:318` |
+  | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:346` |
+  | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:267` |
+  | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:317` |
+  | 17 | `IFluentSQLMerge.On(array)` | `FluentSQL.Merge.pas:376` |
+
+  Quatro amostras do que os 11 omitidos emitem de fato, medidas com o payload `x'; DROP TABLE U; --`:
+
+  ```
+  AndOpe(array)         => SELECT * FROM T WHERE (A = :p1) AND (NOME = x'; DROP TABLE U; --)   params=1
+  OrOpe(array)          => SELECT * FROM T WHERE ((A = :p1) OR (NOME = x'; DROP TABLE U; --))  params=1
+  Expression(array)     => SELECT * FROM T WHERE NOME = x'; DROP TABLE U; --                   params=0
+  ForDialectOnly(array) => SELECT * FROM TOPTION(x'; DROP TABLE U; --)                         params=0
+  ```
+
+  **Se você audita a fronteira, audite a regra, não a lista:** qualquer `array of const` que não seja um dos quatro slots de valor acima interpola string verbatim. **Não passe entrada não confiável por nenhum deles.** O caminho seguro para expressão está sob tarefa própria.
+
+- **BREAKING CHANGE (SQL emitido) — `SetValue(nome, array of const)` e `Values(nome, array of const)` passaram a parametrizar valores string.** É o mesmo defeito da entrada acima, no `INSERT`/`UPDATE` comum em vez do `MERGE`, e a régua é a mesma: string deixou de ir verbatim e passou a `:pN`. Quem compara o SQL gerado com string fixa **precisa atualizar as expectativas**:
+
+  | Chamada | Antes | Depois |
+  |---|---|---|
+  | `.SetValue('NOME', ['TESTE']).SetValue('NIVEL', [7])` | `VALUES (TESTE, :p1)` — 1 parâmetro | `VALUES (:p1, :p2)` — 2 parâmetros |
+  | `.Values('NOME', ['ANA'])` | `VALUES (ANA)` — 0 parâmetros | `VALUES (:p1)` — 1 parâmetro |
+
+  **A assimetria era dentro do mesmo slot:** `.Values('NIVEL', [7])` já saía como `:p1`, enquanto `.SetValue('NOME', ['TESTE'])` saía como o texto `TESTE` cru. O numérico parametrizava, a string não. E é posição de valor por construção — o próprio `_InternalSet` a afirma com `_AssertSection([secInsert, secUpdate])`, ou seja, o array é o lado direito de `COLUNA = ...` e não tem como ser fragmento de SQL.
+
+  **Também aqui era funcionalidade quebrada, e não só risco latente.** Medido em SQL Server 2022: o caso benigno `.SetValue('NOME', ['TESTE'])` emitia `INSERT INTO USERS (NOME) VALUES (TESTE)` → `Msg 207, Invalid column name 'TESTE'`; e `O'Brien` dava `Msg 105, Unclosed quotation mark`. Com valor hostil era injeção executável — mas **o payload que funciona aqui não é o mesmo do `MERGE`**: numa lista `VALUES (...)` a aspa simples abre um literal que engole o resto do batch, então `x'; DROP TABLE USERS; --` apenas quebra o comando. O payload que executa fecha o parêntese: `.SetValue('NOME', ['1); DROP TABLE USERS; --'])` emitia `INSERT INTO USERS (NOME) VALUES (1); DROP TABLE USERS; --)`, `(1 rows affected)` sem erro, e **a tabela foi dropada**. Depois da correção o mesmo payload chega ao banco como dado da coluna. Oráculo com `docker run`, versão do motor e saída bruta antes e depois: `Test Delphi\Common_tests\test.setvalue.mssql.sql`.
+
+  **`SetValue`/`Values` também passaram a levantar `EArgumentException` em formas que antes saíam caladas** — é a entrada irmã da do `MERGE`, logo abaixo, e vale para o `INSERT`/`UPDATE` comum, que é o caminho **mais** trafegado dos dois:
+
+  | Chamada | Antes (emitido) | Depois |
+  |---|---|---|
+  | `.SetValue('NOME', [nil])` / `.Values('NOME', [nil])` — `nil` em posição de valor | `VALUES (:p1)`, com `p1 = '00000000'` | `EArgumentException` |
+  | `.SetValue('X', [umObjeto])` — instância em posição de valor | `VALUES (:p1)`, com `p1` = o **`ClassName`** | `EArgumentException` |
+  | `.SetValue('X', [TMinhaClasse])` — referência de classe | `VALUES (:p1)`, com `p1` = o **`ClassName`** | `EArgumentException` |
+  | `.SetValue('X', [Unassigned])` — variante vazia | `VALUES (:p1)`, com `p1 = ''` (string **vazia**, não `NULL`) | `EArgumentException` |
+  | `.SetValue('X', [Null])` — variante `Null` | `EVariantTypeCastError` **da RTL** | `EArgumentException` |
+  | `.SetValue('X', [])` — lista vazia | `INSERT INTO T (X) VALUES ()` / `UPDATE T SET X =` | `EArgumentException` |
+  | `.SetValue('D', ['CURRENT','TIMESTAMP'])` — mais de um valor | `VALUES (:p1 :p2)` — placeholders **justapostos**, sem vírgula | `EArgumentException` |
+
+  **O `nil` não é novidade desta rodada, mas nunca tinha sido declarado nem testado neste caminho.** O ramo `vtPointer` de `TUtils._StringVarRecAsParam` é **compartilhado** pelo `MERGE` e por `SetValue`/`Values`, então a guarda introduzida para o `MERGE` já valia aqui desde então — mas a entrada do CHANGELOG falava só em "chamadas de `MERGE`", e a mutação daquele ramo só derrubava testes de `MERGE`: a guarda do caminho mais usado estava **sem oráculo nenhum**. Agora tem, em `Test Delphi\Common_tests\test.core.params.pas`.
+
+  **As quatro linhas do meio são a mesma corrupção do `nil`, por outras portas — e essas portas estavam abertas.** Objeto, referência de classe e `Unassigned` **não levantavam nada**: `TUtils._VarRecToString` converte os três em texto plausível (`ClassName`, `ClassName`, string vazia) e o valor ia para a coluna como dado, com o SQL bem-formado e nenhum motor reclamando. O `Null` variante já falhava, mas com `EVariantTypeCastError` **da RTL**, cuja mensagem não nomeia a chamada que a causou — quem captura `EArgumentException` das demais guardas não o pegava. Os cinco passaram a levantar no mesmo lugar, `TUtils._AssertValueSlotCarriesData` (`FluentSQL.Utils.pas:192-224`). Que `nil`/`Null`/`Unassigned` devessem virar `NULL` em vez de levantar continua sendo **decisão de convenção não tomada** — os testes travam o comportamento atual, não o abençoam. **`vtInterface` ficou de fora de propósito:** já levanta hoje, em `_VarRecToString`, então não há corrupção silenciosa a fechar — só a classe e a mensagem são pobres.
+
+  **As duas últimas são guardas de cardinalidade**, e existem porque o `CHANGELOG` afirmava que "a régua é a mesma" do `MERGE` enquanto o irmão seguia emitindo SQL inválido em silêncio. Medido em execução real, seis motores, antes de decidir a forma:
+
+  - **Lista vazia — zero dos seis aceitam.** MSSQL 2022 `Msg 102 near ')'` / `near ';'`; PostgreSQL 16.14 `syntax error at or near ")"` / `near ";"`; Oracle Free 23 `ORA-00936: missing expression` (as duas); Firebird 5.0.4 `-104 Token unknown ')'` / `-104 Unexpected end of command`; MySQL 8.4.11 `ERROR 1136` / `ERROR 1064`; SQLite 3.53.4 `Parse error near ")"` / `near ";"`.
+  - **Mais de um valor — cinco dos seis recusam, e o sexto é o motivo mais forte para a guarda.** MSSQL `Msg 102 near '@p2'`; PostgreSQL `syntax error at or near "$2"`; Firebird `-104 Token unknown '?'`; MySQL `ERROR 1064 near '?)'`; SQLite `Parse error near "?"`. **O Oracle não recusa por gramática:** ele lê `:p1 :p2` como *bind + variável indicadora* (`:host:indicator`), ou seja, **um** valor. Com duas colunas isso vira `ORA-00947: not enough values`; **com uma coluna a forma é aceita** — medido, `INSERT INTO T2 (D) VALUES (:p1 :p2)` responde `1 row created`, grava o valor de `:p1` e **descarta `:p2` sem erro nenhum**. Perda silenciosa de valor, que é pior que o erro de sintaxe dos outros cinco.
+
+  Controle acompanhando as duas: `VALUES (:p1, :p2)` **com** vírgula executa em MSSQL, PostgreSQL, MySQL, SQLite e Oracle. **No Firebird, dito com precisão, não chega a executar:** pelo `isql` o comando atravessa a gramática e para na *ligação* dos binds — `SQLSTATE 07002`, `No SQLDA for input values provided` —, porque o `isql` não liga parâmetro. É fase diferente do `-104 Token unknown` que a forma justaposta recebe no mesmo cliente, e é justamente esse contraste que sustenta a leitura: **a recusa é da forma justaposta, e não do `INSERT`**. Saída bruta e os `docker exec` exatos em `Test Delphi\Common_tests\test.setvalue.mssql.sql`.
+
+  **Que um motor aceite não enfraquece a guarda, é o que a justifica:** o único dialeto que não protege o consumidor pela sintaxe é justamente o que precisa da proteção na biblioteca. E a chamada que produzia isso — `.SetValue('D', ['CURRENT','TIMESTAMP'])` — **parece** correta a quem a escreve: tem parâmetros de verdade e `Params.Count = 2`.
+
+  **O que fazer:** passe **exatamente um** valor por coluna; **omita a coluna** se ela deve ficar `NULL`; e, se o que você queria era uma expressão (`CURRENT_TIMESTAMP`, `A + 1`), veja o parágrafo seguinte — não há forma de exprimi-la em slot de valor.
+
+  **O que fazer (parametrização):** se você dependia de passar fragmento de SQL por esse array — por exemplo `.SetValue('DATA', ['CURRENT_TIMESTAMP'])` — ele agora vira **dado**, e a coluna recebe a string `CURRENT_TIMESTAMP`. **Não há substituto hoje:** o overload tipado `SetValue(const AColumnName, AColumnValue: String)` também parametriza (`FluentSQL.pas:404-411`), e sempre parametrizou. Ou seja, o `INSERT`/`UPDATE` do FluentSQL **não exprime expressão em slot de valor** — nem antes nem depois; o que existia era um caminho que funcionava *por acidente*, e apenas quando o texto passado calhava de ser SQL válido no dialeto alvo. Isso está registrado em *Known issues* como a distinção **valor × expressão**, que é tarefa de arquitetura própria.
+
+- **BREAKING CHANGE (comportamento) — nove formas de `MERGE` que não levantavam nada passaram a levantar `EArgumentException`.** Quase todas emitiam SQL que **nenhum motor executa**, e o faziam em silêncio: o erro só aparecia no banco do consumidor, longe da linha que o causou. *(A tabela abaixo é a lista completa; uma versão anterior desta entrada dizia "quatro" e listava cinco linhas, e a seguinte dizia "seis" antes de os irmãos do `nil` serem medidos.)*
+
+  | Chamada | Antes (emitido) | Depois |
+  |---|---|---|
+  | `.Update(['NOME'])` — contagem ímpar | `SET [NOME] = ` | `EArgumentException` |
+  | `.Insert(['ID', 1, 'NOME'])` — contagem ímpar | `VALUES (:p1, )` | `EArgumentException` |
+  | `.Update([])` / `.Update` — lista vazia ou sem argumentos | `UPDATE SET ;` | `EArgumentException` |
+  | `.Insert([])` / `.Insert` — lista vazia ou sem argumentos | `INSERT;` | `EArgumentException` |
+  | `.Update(['NOME', nil])` — `nil` em posição de valor | `SET [NOME] = :p1`, com `p1 = '00000000'` | `EArgumentException` |
+  | `.Update(['NOME', umObjeto])` — instância em posição de valor | `SET [NOME] = :p1`, com `p1` = o **`ClassName`** | `EArgumentException` |
+  | `.Update(['NOME', TMinhaClasse])` — referência de classe | `SET [NOME] = :p1`, com `p1` = o **`ClassName`** | `EArgumentException` |
+  | `.Update(['NOME', Unassigned])` / `.Update(['NOME', Null])` — variante sem dado | `:p1 = ''` no primeiro caso; `EVariantTypeCastError` **da RTL** no segundo | `EArgumentException` |
+  | `.Into(…).Using(…).On(…)` **sem nenhum `WhenMatched`/`WhenNotMatched`** | `MERGE INTO [T] AS [t] USING [S] AS [s] ON (…);` — só o cabeçalho | `EArgumentException` |
+
+  **Está aqui, e não em *Fixed*, porque é a régua que esta própria entrega estabelece:** se ela rotula como BREAKING até a troca de *classe* de exceção que pede revisão de `try..except` (`EFluentSQLDriverNotRegistered`, `EFluentSQLStatementNotSupported`), então sair de **nenhuma exceção** para **exceção lançada na chamada** — que derruba código que hoje atravessa esse caminho sem `try` nenhum — não pode ser rodapé de *Fixed*.
+
+  **`.Update([])` e `.Update` produzem o mesmo texto** — as duas chegam ao serializador com zero pares — e por isso caem na mesma regra. **A afirmação anterior de que "contagem par, inclusive a lista vazia, continua passando" era falsa:** zero é par, mas serializa como `UPDATE SET ;`, exatamente o SQL inválido que a guarda existe para impedir. Contagem par **e não vazia** é que continua passando.
+
+  Medido em execução real, as duas formas nuas, seis motores, **zero aceitam**: SQL Server 2022 `Msg 102`; PostgreSQL 16.14 `syntax error at or near ";"`; Oracle Free 23.26 `ORA-00921` e `ORA-00926 Missing VALUES or SET keyword`; Firebird 5.0.4 `-104 Unexpected end of command`; MySQL 8.4.11 e SQLite 3.53.4 recusam a palavra `MERGE` inteira, que não existe nesses dois. Dois controles acompanham a medição para que a leitura não ultrapasse o medido: no PostgreSQL, `INSERT DEFAULT VALUES` atravessa o parser e só falha em restrição `NOT NULL` — logo a recusa é da forma nua, não do `MERGE`; no MySQL, um `MERGE` perfeitamente válido recebe o mesmo `ERROR 1064` — logo ali a recusa é da instrução, não da forma. Saída bruta e `docker run` em `Test Delphi\Common_tests\test.merge.mssql.sql`.
+
+  O **`MERGE` sem nenhuma cláusula `WHEN`** é a instrução pela metade: o cabeçalho sozinho não é `MERGE` em motor nenhum. Medido antes de decidir a forma, e nenhum dos que têm `MERGE` aceita: SQL Server 2022 `Msg 102, Incorrect syntax near ';'`; Oracle Free 23 `ORA-02000: missing WHEN keyword`; PostgreSQL 16.14 `syntax error at or near ";"`; Firebird 5.0.4 `-104 Unexpected end of command`. Controle acompanhando: o **mesmo** texto com `WHEN MATCHED THEN UPDATE SET D = 'z'` é aceito pelos quatro — logo a recusa é da forma sem `WHEN`, e não do `MERGE`. A guarda ficou no **núcleo** (`TFluentSQLMerge.Serialize`, `FluentSQL.Merge.pas:296`) e não no serializador do MSSQL, porque a regra é da instrução e não do dialeto.
+
+  **Consequência de ordem, declarada de propósito:** como essa guarda roda **antes** do despacho por dialeto, um `MERGE` sem `WHEN` montado sobre um dialeto **relacional** sem serializador recebe `EArgumentException` e **não** `EFluentSQLStatementNotSupported`. As duas seriam verdadeiras; a escolhida é a que aponta a linha que o consumidor escreveu.
+
+  Medido, dialeto por dialeto, sem `defines` extras: **Firebird, MSSQL, MySQL, SQLite, Oracle e PostgreSQL** → `EArgumentException`; **InterBase e DB2** (desligados no `.inc`) → `EFluentSQLDriverNotRegistered`, porque morrem antes, ainda em `Query()`; **MongoDB → não levanta nada**, e devolve `{}`. A enumeração fecha aqui de propósito, sem reticências: o MongoDB é contraexemplo, não caso omisso. `TFluentSQLSerializeMongoDB` sobrescreve `AsString` inteiro, então `TFluentSQLMerge.Serialize` — onde a guarda mora — nunca chega a rodar. Isso está registrado em *Known issues* como o `MERGE` que o MongoDB descarta em silêncio, e travado por `TestMerge_MongoDB_DropsMergeSilently_KnownGap`.
+
+  O caso do **`nil` — e o dos quatro irmãos dele — é de natureza diferente e pior**: não emitia SQL inválido, emitia SQL **válido com o dado errado**. `nil` num `array of const` chega como `vtPointer` e era convertido por `IntToHex`, então a coluna recebia a string `'00000000'`. Pela **mesma** porta passavam instância (`vtObject`), referência de classe (`vtClass`) e `Unassigned`, convertidos em `ClassName`, `ClassName` e string vazia — corrupção silenciosa, sem erro em lugar nenhum, nos quatro. `Null` variante já levantava, mas `EVariantTypeCastError` da RTL. O par nome/valor não tem como exprimir `NULL`, e dar essa semântica a `nil`/`Null`/`Unassigned` é decisão de convenção que **não** foi tomada aqui.
+
+  **O que fazer:** passe ao menos um par `('COLUNA', valor)`; use `.Delete` se a ação pretendida era outra; e **omita a coluna da lista** se ela deve ficar `NULL`. Se o seu código chamava `.Update`/`.Insert` sem argumentos, ele estava gerando SQL que o motor rejeitava — a exceção agora aponta a linha.
+
+- **BREAKING CHANGE (comportamento) — `MERGE` em dialeto sem serializador passou de `EStackOverflow` para `EFluentSQLStatementNotSupported`.** Afeta **Firebird, MySQL, SQLite, Oracle e PostgreSQL**. `TFluentSQLSerialize.Merge` estava escrito como despachante e redelegava ao próprio dialeto, reentrando em si mesmo indefinidamente — não era erro tratável, era estouro de pilha que **matava o processo**. Só o MSSQL sobrescreve `Merge`.
+
+  **Quem captura `EStackOverflow` para tratar isso deve trocar por `EFluentSQLStatementNotSupported`.** É a mesma régua aplicada ao `EFluentSQLDriverNotRegistered` acima: troca de classe de exceção que pede revisão de `try..except` é BREAKING.
+
+  **`dbnMongoDB` não mudou e continua sendo lacuna conhecida** — ver *Known issues*.
+
 - **InterBase (`dbnInterbase`, desligado por omissão) — `Length` e `Ceil` passaram a levantar `EFluentSQLFunctionNotSupported`** em vez de emitir `LENGTH(...)` / `CEIL(...)`. O InterBase divergiu do tronco comum antes de o Firebird 2.1 introduzir `CHAR_LENGTH` e `CEIL`/`CEILING`, e a forma correta para esse dialeto não foi verificada — emitir a forma do Firebird seria repetir o defeito do `CEIL` no MSSQL. Se você liga `{$DEFINE INTERBASE}` e precisa dessas duas funções, implemente-as em `FluentSQL.FunctionsInterbase.pas` e remova-as da tabela de suporte em `Test Delphi\Common_tests\test.driver.functions.matrix.pas`.
 
 ### Added
 
 - `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
 - `EFluentSQLQualifierNotSupported` em `FluentSQL.Interfaces.pas`. Substitui oito cópias de `raise Exception.Create('... Unknown qualifier')` — quatro delas nomeando o driver errado na mensagem.
-- Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4.
+- Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4 (biblioteca embutida no CPython 3.14, módulo `sqlite3`).
+
+  **Duas versões de SQLite aparecem neste CHANGELOG e as duas são medidas, não erro de digitação:** os oráculos de paginação usaram a biblioteca embutida no CPython 3.14 (**3.50.4**); o oráculo de `MERGE` usou a imagem `keinos/sqlite3:latest` (**3.53.4**). Conferido nesta rodada: `docker run --rm -i keinos/sqlite3:latest sqlite3 :memory: "select sqlite_version();"` → `3.53.4`; `python -c "import sqlite3; print(sqlite3.sqlite_version)"` → `3.50.4`. Nenhuma conclusão desta entrega depende da diferença — o SQLite não tem `MERGE` em nenhuma das duas.
 - Matriz de teste `Test Delphi\Common_tests\test.pagination.filter.pas` foi de **15 para 28 testes**, e a contagem merece o detalhe porque `+13` esconde o que aconteceu: **6 removidos, 19 acrescentados**. Os 6 removidos descreviam a janela `ROW_NUMBER()` que deixou de existir, e cada um tem substituto:
 
   | Removido | Substituto |
@@ -88,6 +213,16 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   Nenhuma regra deixou de ser verificada; três delas passaram de 1 para 7 dialetos.
 - Implementações em falta de `Trim`, `LTrim`, `RTrim`, `Coalesce`, `Modulus`, `CurrentDate` e `CurrentTimestamp` nos drivers **Firebird**, **SQLite** e **Oracle**.
 - Funções escalares do **MongoDB** passam a levantar `EFluentSQLFunctionNotSupported` em vez de `EAbstractError`. As agregações (`Count`, `Sum`, `Min`, `Max`, `Average`) não mudaram.
+- **`EFluentSQLStatementNotSupported` em `FluentSQL.Interfaces.pas`.** Irmão de `EFluentSQLFunctionNotSupported` um nível acima: lá falta uma função escalar, aqui falta a **instrução inteira** no dialeto. Primeiro uso: `MERGE`, que só o MSSQL serializa.
+- **`DriverName(ADriver: TFluentSQLDriver): String` em `FluentSQL.Interfaces.pas`.** Nome canônico do dialeto, agora **fonte única**: é a chave dos dicionários do `FluentSQL.Register.pas` e o texto das mensagens de exceção. Antes existia apenas como `const` privada `TStrDBEngineName` dentro do `Register`, o que impedia qualquer outra unit de nomear um dialeto sem duplicar a tabela. O `Register` passou a chamá-la nos 19 pontos onde indexava a `const`; as chaves dos dicionários são as mesmas strings, sem mudança de comportamento. A proteção `E2072` contra membro novo do enum foi junto com a tabela.
+- Oráculo de motor real `Test Delphi\Common_tests\test.merge.mssql.sql`, medindo a injeção via `MERGE` antes e depois, em SQL Server 2022 (RTM-CU26) 16.0.4265.3. Traz o `docker run` exato, o SQL emitido pela própria biblioteca nas duas árvores, a saída bruta do motor e a seção **FRONTEIRA**, com o que a correção **não** fecha.
+- Matriz `Test Delphi\Common_tests\test.merge.matrix.pas` (9 testes): uma célula por dialeto, afirmando parametrização onde há serializador e **exceção nomeada** onde não há. `Test Delphi\MSSQL_tests\test.merge.mssql.pas` foi de 5 para **34** testes — inclui 16 casos de payload hostil (aspa simples, aspa dupla, `;`, `--`, `/* */`, aspa dobrada, `UNION`), o `O'Brien` que **tem** de funcionar, as guardas de lista malformada / vazia / sem argumentos, o `nil` que não pode virar `'00000000'`, e a asserção de que a cláusula recusada **não** sobra pela metade no SQL.
+
+  Três dos cinco testes originais desse arquivo **passavam sobre SQL inválido**: usavam `.Update`/`.Insert` sem argumentos e asseveravam com `Pos()` sobre *prefixos* — `'WHEN MATCHED THEN UPDATE'` casa em `UPDATE SET ;` tão bem quanto em `UPDATE SET [X] = :p1`. Foi essa fragilidade que deixou uma forma quebrada atravessar a suíte verde inteira e chegar ao guia como recomendação. Os três passaram a usar a forma válida e a asseverar o **SQL inteiro**, com `Assert.AreEqual` *case-sensitive* — o padrão do DUnitX é *case-insensitive*, o que numa biblioteca cujo produto é texto SQL deixa passar regressão de caixa.
+- Oráculo de motor real `Test Delphi\Common_tests\test.setvalue.mssql.sql`, para o caminho de `SetValue`/`Values` (`INSERT`/`UPDATE` comum, sem `MERGE`), medido em SQL Server 2022 (RTM-CU26) 16.0.4265.3. Registra os quatro casos antes/depois — **inclusive um resultado que corrige uma suposição**: o payload com aspa não derruba a tabela nessa gramática, porque a aspa abre um literal que engole o resto do batch; o que executa é o que fecha o parêntese (`1); DROP TABLE USERS; --`).
+- **Onze testes em `Test Delphi\Common_tests\test.core.params.pas`** para o slot de valor de `SetValue`/`Values(array of const)` — que até então **não tinha teste nenhum**. Rodam nos projetos **Firebird** e **MySQL**, os dois que compilam esse arquivo. São 3 de parametrização (a string vira `:pN`, inclusive o payload hostil), 3 do `nil` que levanta, e 5 de cardinalidade (lista vazia em `INSERT`, em `Values` e em `UPDATE`; mais de um valor; e a coluna recusada não sobrar pela metade no SQL).
+
+  Os 3 do `nil` merecem nota porque **o comportamento já existia e mesmo assim não estava coberto**: a guarda é o ramo `vtPointer` compartilhado com o `MERGE`, e medindo por mutação (`vtPointer` → `if False`) o vermelho aparecia **só** em testes de `MERGE`. O caminho mais trafegado dos dois estava apoiado num oráculo que não o observava.
 
 ### Fixed
 
@@ -96,6 +231,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - **`Select.Distinct` levantava `Exception` crua em MSSQL, MySQL, PostgreSQL e Oracle, mesmo SEM paginação.** Os quatro tratavam `sqDistinct` como qualificador desconhecido dentro do laço de paginação, que os serializadores chamam incondicionalmente. O laço, que estava duplicado nos nove drivers, virou `TFluentSQLSelectQualifiers._Pagination`.
 - **`Skip(n)` sem `First(m)` emitia SQL inválido em MSSQL, Oracle, MySQL e SQLite.** Ver a tabela em *Changed*.
 - **Oracle — o embrulho `SELECT * FROM (SELECT T.*, ROWNUM AS ROWINI ...)` acrescentava a coluna `ROWINI` ao resultado.** Uma consulta `Select.All.From('T').First(n)` devolvia uma coluna que o usuário nunca pediu. Medido: cinco valores por linha numa tabela de quatro colunas. Sem embrulho, some.
+- **`MERGE` com lista de pares de contagem ímpar emitia SQL inválido em silêncio.** Ver a entrada BREAKING em *Changed* — a correção troca "não levantava nada" por "levanta `EArgumentException`", e por isso não cabe aqui.
+- **Documentação — o guia `dml-merge.md` ensinava duas formas que nunca funcionaram.** O exemplo principal usava `.Update(['T.VALOR = S.VALOR', 'T.DATA = S.DATA'])`, tratando o array como lista de **fragmentos de SQL**; o array sempre foi lido como pares nome/valor, e essa chamada emite `UPDATE SET T.VALOR = S.VALOR = ...`, que o SQL Server recusa com `Msg 102, Incorrect syntax near '='`. A mesma página anunciava um overload `.Insert(['ID','VALOR'], ['S.ID','S.VALOR'])` de **dois arrays que não existe** em `IFluentSQLMergeWhenNotMatched` — copiar aquela linha dá `E2034 Too many actual parameters`. A página foi reescrita com a forma correta, com aviso explícito de que a anterior era inválida, e com a tabela de suporte por dialeto refletindo o que cada um faz hoje. O overload de dois arrays **não** foi criado: colunas e valores vão no mesmo array, alternados.
 
 ### Known issues
 
@@ -106,6 +243,15 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **Fora de escopo, confirmado pré-existente:** `First(0)` com `From(<subconsulta>)` sai como `Msg 102` (*derived table* sem alias). Independe de `First(0)` e já ocorria antes desta entrega.
 - **MongoDB — `Union` levanta `EIntfCastError`,** com ou sem paginação. Não é defeito de paginação; o MongoDB não tem `UNION` e deveria recusar com exceção nomeada, como já faz para CTE (`EFluentSQLMongoDBSerialize`).
+- **MongoDB — `MERGE` é descartado em silêncio.** `FluentSQL.SerializeMongoDB.pas` sobrescreve `AsString` por inteiro e nunca chega à seção de `MERGE`, então a cláusula some e a saída é `{}`. **Não vaza valor do usuário**, mas também não avisa — é o único dos nove que não levanta nem emite. Como a parametrização acontece na construção, antes da serialização, o valor ainda entra em `Params`: `Params.Count = 1` referenciado por nada no MQL. Não corrigido nesta entrega: exige decidir se o MongoDB recusa `MERGE` com exceção nomeada ou o mapeia para `$merge` do *aggregation pipeline*, e as duas são decisões de escopo próprio. Travado por `TestMerge_MongoDB_DropsMergeSilently_KnownGap`, que afirma tanto o `{}` quanto o parâmetro órfão — fechar a lacuna quebra o teste de forma visível.
+- **O nome da coluna em `MERGE` continua injetável — vale para toda a biblioteca, não só para o `MERGE`.** A correção desta entrega fechou o slot de **valor**; o slot de **identificador** não pode virar parâmetro e os `QuotedName` / `Quote` dos 9 dialetos envolvem o nome no delimitador **sem duplicar o delimitador interno**. Medido em SQL Server 2022: nome de coluna `NOME] = 'x'; DROP TABLE USERS; --` emite `SET [NOME] = 'x'; DROP TABLE USERS; --] = @p1;` e **a tabela foi dropada**. Não é regressão — comportamento idêntico antes e depois. Não corrigido porque o escape de delimitador de identificador toca todos os dialetos e colide com o *passthrough* por `StartsWith`/`Contains` que hoje permite passar nome já qualificado (`[dbo].[T]`); é decisão de arquitetura própria. **Não construa nome de objeto a partir de entrada não confiável.** Detalhes e medição na seção FRONTEIRA de `test.merge.mssql.sql`.
+- **`array of const` em posição de expressão continua interpolando string verbatim.** Vale para **todo** `array of const` que **não** seja um dos quatro slots de valor — hoje **17 pontos de entrada públicos**, e não os 6 que uma versão anterior desta entrada listava. São eles `Where`, `AndOpe`, `OrOpe`, `Column`, `Having`, `OnCond`, `CaseExpr`, `ForDialectOnly` e `Expression` em `IFluentSQL`; `AndOpe`, `OrOpe`, `Ope` e `Fun` em `IFluentSQLCriteriaExpression`; `When`, `AndOpe` e `OrOpe` em `IFluentSQLCriteriaCase`; e `On` em `IFluentSQLMerge`. A tabela com `arquivo:linha` de cada um está na entrada BREAKING do `MERGE`, em *Changed*.
+
+  Em todos eles escalares numéricos viram `:pN` e strings seguem literais, por serem tratadas como fragmento de SQL (identificador, operador, trecho). `.On(['t.NOME =', 'x''; DROP...'])` emite `ON (t.NOME = x'; DROP...)`, e `.AndOpe(['NOME =', <entrada>])` faz o mesmo depois de um `Where`. **Isto não mudou nesta entrega e é intencional** — é o que permite compor expressão. Mudaram apenas os quatro pontos em que o array é comprovadamente uma lista de **valores** e o slot não tem como ser fragmento: `Merge.Update`, `Merge.Insert`, `SetValue(nome, [...])` e `Values(nome, [...])`.
+
+  **O critério mecânico, para quem for auditar:** passa por `TUtils.SqlArrayOfConstToParameterizedSql` → literal; passa por `TUtils.SqlArrayOfConstToParameterizedValue` → parâmetro. Não há terceiro caminho. Um caminho seguro para expressão está sob tarefa própria.
+
+  **Consequência que vale declarar:** como o `INSERT`/`UPDATE` não exprime expressão em slot de valor por nenhum overload (o tipado `SetValue(String, String)` também parametriza), **não há hoje forma suportada de escrever `SET DATA = CURRENT_TIMESTAMP` pelo construtor de valores**. A distinção entre **valor** e **expressão** que separa os dois casos está sob revisão como tarefa própria, e é ela que decidirá se esse caso ganha caminho próprio.
 - **`FluentSQL.Select.pas` — `TFluentSQLSelect.Serialize` é código morto.** Os 9 drivers sobrescrevem `Serialize` e `FluentSQL.Ast.pas` sempre pega a instância do `Register`; reverter a linha corrigida não derruba teste algum. A forma neutra foi corrigida ali por coerência, não por efeito observável.
 - **A matriz de paginação vive apenas no projeto Firebird.** `PTestFluentSQLFirebird.dpr` é o único que compila `test.pagination.filter.pas`. Consequência medida: reverter a cauda `LIMIT/OFFSET` do SQLite derruba 4 testes, **todos ali** — `SQLite_tests` não tem teste de paginação nenhum. A cobertura existe, mas mora longe do driver que protege.
 - **MongoDB — `Abs`, `Cast`, `Upper`, `Lower`, `Round` e `Floor` geram MQL inválido em silêncio.** Essas seis são do "padrão A" (o núcleo emite SQL ANSI sem consultar o driver), e `FluentSQL.SerializeMongoDB.pas` só reconhece nome de campo e os prefixos de agregação (`AGG:`, `SUM(`, `COUNT(`, `MIN(`, `MAX(`, `AVG(`, `AVERAGE(`). O resultado é que a coluna é **descartada sem exceção**: `.Column(Fun.Round('v',2))` produz `{"find":"t","filter":{},"projection":{}}` — a projeção sai vazia — enquanto `.Column(Fun.Sum('v'))` produz corretamente `{"aggregate":"t","pipeline":[{"$project":{"x":1,"_id":0}}],...}`. É o mesmo modo de falha que foi corrigido para `Ceil` e `Length`, e sobrevive nestas seis. **Não corrigido nesta entrega** — o conserto exige mover as seis para o "padrão B" (implementação por driver nos 9 dialetos) ou ensinar o serializador MongoDB a montar `$project` com expressão, e nenhum dos dois cabia no escopo. Registrado como dívida; até lá, não use funções escalares na projeção com `dbnMongoDB`.

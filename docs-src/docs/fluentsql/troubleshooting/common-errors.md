@@ -27,11 +27,16 @@ title: Erros comuns
 - **Provável causa:** **`AddRow`** chamado sem **`SetValue`** (ou equivalente) na linha corrente; linhas com **número ou nomes de colunas** diferentes; valor em falta para uma coluna esperada na linha.
 - **Ação:** preencha cada linha com o mesmo conjunto de colunas antes de **`AddRow`**; não chame **`AddRow`** com **`Values`** vazio. A **última** linha pode ser fechada só com **`AsString`** (*flush* implícito). Use **`Clear`** na secção Insert para recomeçar todas as linhas. Referência: **`FluentSQL.Insert.pas`**, guia [INSERT, UPDATE e DELETE](../guides/dml-insert-update-delete.md); rastreio **ESP-015** / **[1.0.9]**: issue [#24](https://github.com/ModernDelphiWorks/FluentSQL/issues/24).
 
-## `ENotSupportedException` ao usar Schemas ou MERGE
+## `ENotSupportedException` ao usar Schemas ou `EFluentSQLStatementNotSupported` / `EFluentSQLDriverNotRegistered` ao usar MERGE
 
-- **Sintoma:** erro em tempo de execução ao chamar `.AsString` em operações de Schema ou Merge.
-- **Provável causa:** o dialeto selecionado (ex: SQLite, Firebird) não possui suporte implementado para a operação solicitada (Schemas ou MERGE skeleton).
-- **Ação:** verifique a [Matriz de Suporte](../architecture/overview.md#matriz-de-dialetos). No caso de Schemas, utilize dialetos como PostgreSQL ou MSSQL. Operações de Schema no MySQL são mapeadas para Database.
+- **Sintoma (Schemas):** erro em tempo de execução ao chamar `.AsString` em operações de Schema.
+- **Sintoma (MERGE):** erro em tempo de execução ao chamar `.AsString` em `Query(...).Merge`.
+- **Provável causa:** o dialeto selecionado não possui suporte implementado para a operação solicitada.
+- **Ação (Schemas):** verifique a [Matriz de Suporte](../architecture/overview.md#matriz-de-dialetos). Utilize dialetos como PostgreSQL ou MSSQL. Operações de Schema no MySQL são mapeadas para Database.
+- **Ação (MERGE):** `ENotSupportedException` **não** é levantada neste cenário. São duas classes distintas, conforme o motivo:
+  - Dialeto **ligado** mas sem serializador de `MERGE` (PostgreSQL, Oracle, MySQL, SQLite, Firebird) → `EFluentSQLStatementNotSupported`. Até a v1.5.1 esse caso entrava em recursão infinita e terminava em `EStackOverflow`; se a sua camada captura `EStackOverflow` para tratar isso, troque pela classe nomeada.
+  - Dialeto **não compilado** nesta build (Interbase e DB2, desligados por omissão) → `EFluentSQLDriverNotRegistered`, porque a chamada morre antes de chegar ao `MERGE`. **Se você os ligar** — pelo `.inc` **ou** por `-DINTERBASE` / `-DDB2` no compilador, as duas formas suportadas —, a resposta passa a ser `EFluentSQLStatementNotSupported`, igual à dos dialetos ligados sem serializador.
+  - Apenas o **MSSQL** possui serializador de `MERGE` hoje. Detalhes e matriz completa: [DML — MERGE](../guides/dml-merge.md#suporte-por-dialeto).
 
 ## `EFluentSQLDriverNotRegistered` — «… do banco … não está registrado» em runtime (testes ou app)
 

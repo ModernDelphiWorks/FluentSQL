@@ -25,6 +25,7 @@ uses
   test.ddl.procedures in 'test.ddl.procedures.pas',
   test.ddl.schemas in 'test.ddl.schemas.pas',
   test.ddl.sequences in 'test.ddl.sequences.pas',
+  test.merge.matrix in 'test.merge.matrix.pas',
   test_esp074_unit in 'test_esp074_unit.pas',
   FluentSQL.Ast in '..\..\Source\Core\FluentSQL.Ast.pas',
   FluentSQL.Cache.Interfaces in '..\..\Source\Core\FluentSQL.Cache.Interfaces.pas',

@@ -33,6 +33,12 @@ type
     class function _VarRecToString(const AValue: TVarRec): String;
     class function _TryVarRecAsParam(const AValue: TVarRec; const ASQLParams: IFluentSQLParams;
       out APlaceholder: String): Boolean;
+    class procedure _AssertValueSlotCarriesData(const AValue: TVarRec);
+    class function _StringVarRecAsParam(const AValue: TVarRec;
+      const ASQLParams: IFluentSQLParams): String;
+    class function _ArrayOfConstToSql(const AParams: array of const;
+      const ASQLParams: IFluentSQLParams; const AStringIsValue: Boolean): String;
+    class procedure _AssertSingleValue(const ACount: Integer);
   public
     class function Concat(const AElements: array of String; const ADelimiter: String = ' '): String;
     class function SqlParamsToStr(const AParams: array of const): String;
@@ -42,6 +48,18 @@ type
     /// String-like VarRec entries remain literal fragments (identifiers, operators, SQL text) per RN-P3.
     /// </summary>
     class function SqlArrayOfConstToParameterizedSql(const AParams: array of const;
+      const ASQLParams: IFluentSQLParams): String;
+    /// <summary>
+    /// Mesmo layout textual de SqlArrayOfConstToParameterizedSql, mas para posicao
+    /// que e comprovadamente VALOR - onde a RN-P3 nao vale, porque ali string nao
+    /// tem como ser fragmento de SQL: TODO elemento vira parametro, inclusive
+    /// string. Usado por SetValue/Values(array of const), cujo array e o lado
+    /// direito de "COLUNA = ..." e nunca uma expressao.
+    ///
+    /// Exige EXATAMENTE UM elemento e levanta EArgumentException fora disso -
+    /// ver _AssertSingleValue.
+    /// </summary>
+    class function SqlArrayOfConstToParameterizedValue(const AParams: array of const;
       const ASQLParams: IFluentSQLParams): String;
     class function DateToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDate): String;
     class function DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver; const AValue: TDateTime): String;
@@ -137,20 +155,124 @@ begin
   end;
 end;
 
-class function TUtils.SqlArrayOfConstToParameterizedSql(const AParams: array of const;
+/// <summary>
+///   Recusa, em posicao de VALOR, os TVarRec que nao carregam dado nenhum e que
+///   _VarRecToString mesmo assim converteria em texto plausivel. E o pior
+///   desfecho possivel: o SQL sai bem-formado, o motor nao reclama, e a coluna
+///   recebe algo que o chamador nunca escreveu.
+///
+///   Medido nesta arvore ANTES desta guarda (dbnPostgreSQL,
+///   .SetValue('X', [...]), lendo AsString e Params):
+///
+///     [nil]                -> VALUES (:p1)  p1 = '00000000'   (IntToHex do ponteiro)
+///     [TDescarte.Create]   -> VALUES (:p1)  p1 = 'TDescarte'  (ClassName da instancia)
+///     [TDescarte]          -> VALUES (:p1)  p1 = 'TDescarte'  (ClassName da classe)
+///     [Unassigned]         -> VALUES (:p1)  p1 = ''           (string vazia, nao NULL)
+///     [Null]               -> EVariantTypeCastError, "Could not convert variant
+///                             of type (Null) into type (OleStr)"
+///
+///   Os QUATRO primeiros sao a mesma corrupcao silenciosa, por quatro portas do
+///   mesmo corredor - so a primeira estava fechada. O quinto ja falhava, mas com
+///   classe crua da RTL, cuja mensagem nao nomeia a chamada que a causou.
+///
+///   O par nome/valor NAO tem forma de exprimir NULL: o slot de valor e sempre
+///   ligado como parametro, e nao existe hoje marcador de nulidade nesta API.
+///   Entre gravar lixo calado e recusar a chamada, a resposta conservadora e
+///   recusar - mesma classe (EArgumentException) e mesmo espirito da guarda de
+///   contagem impar de SqlArrayOfConstToNameValuePairs e da de cardinalidade de
+///   _AssertSingleValue. Dar semantica de NULL a nil/Null/Unassigned e decisao
+///   de CONVENCAO, nao conserto de defeito, e por isso NAO foi tomada aqui.
+///
+///   FICA DE FORA, de proposito: vtInterface. Ele ja levanta hoje, em
+///   _VarRecToString ('VarRecToString: Unsupported parameter type'), entao nao
+///   ha corrupcao silenciosa a fechar - so a classe e a mensagem sao pobres.
+///   Trocar a classe de excecao de um caminho que ja falha e mudanca de
+///   contrato sem defeito por tras, e nao entra aqui.
+/// </summary>
+class procedure TUtils._AssertValueSlotCarriesData(const AValue: TVarRec);
+const
+  cOMITA = ' Se a coluna deve ficar NULL, omita-a da chamada.';
+begin
+  case AValue.VType of
+    vtPointer:
+      raise EArgumentException.Create(
+        'Valor nil em posicao de valor: o par nome/valor nao exprime NULL. ' +
+        'Antes, o nil virava a string ''00000000'' e era gravado como dado.' + cOMITA);
+    vtObject:
+      raise EArgumentException.Create(
+        'Objeto em posicao de valor: o slot comporta um DADO escalar, nao uma ' +
+        'instancia. Antes, o objeto virava a string do seu ClassName e ela era ' +
+        'gravada na coluna, sem erro nenhum. Passe a propriedade que voce ' +
+        'queria gravar.');
+    vtClass:
+      raise EArgumentException.Create(
+        'Referencia de classe em posicao de valor: o slot comporta um DADO ' +
+        'escalar. Antes, a classe virava a string do seu ClassName e ela era ' +
+        'gravada na coluna, sem erro nenhum.');
+    vtVariant:
+      if VarIsNull(AValue.VVariant^) then
+        raise EArgumentException.Create(
+          'Variant Null em posicao de valor: o par nome/valor nao exprime ' +
+          'NULL. Antes, esta chamada levantava EVariantTypeCastError da RTL, ' +
+          'que nao nomeia a chamada que a causou.' + cOMITA)
+      else if VarIsEmpty(AValue.VVariant^) then
+        raise EArgumentException.Create(
+          'Variant Unassigned em posicao de valor: nao ha dado a gravar. ' +
+          'Antes, virava a string VAZIA e a coluna recebia '''' em vez de ' +
+          'ficar intacta.' + cOMITA);
+  end;
+end;
+
+/// <summary>
+///   Converte um TVarRec que NAO e escalar reconhecido (tipicamente string) em
+///   placeholder de parametro. So deve ser chamado em posicao que e comprovadamente
+///   VALOR - nunca em posicao que possa ser fragmento de SQL.
+///
+///   O ramo sem ASQLParams e defensivo e inalcancavel pela API publica:
+///   TFluentSQLAST cria FParams no construtor (FluentSQL.Ast.pas:133) e nunca o
+///   zera antes do Destroy, entao todo caminho que chega aqui vindo de
+///   TFluentSQL.Query tem lista de parametros. Ainda assim ele NAO devolve o texto
+///   cru: delimita e escapa com QuotedStr (dobra a aspa simples, que e o escape
+///   padrao ISO aceito por todos os dialetos suportados). Devolver cru ali seria
+///   reabrir exatamente o buraco que esta funcao existe para fechar.
+/// </summary>
+class function TUtils._StringVarRecAsParam(const AValue: TVarRec;
   const ASQLParams: IFluentSQLParams): String;
+begin
+  _AssertValueSlotCarriesData(AValue);
+
+  if Assigned(ASQLParams) then
+    Result := ASQLParams.Add(_VarRecToString(AValue), dftString)
+  else
+    Result := QuotedStr(_VarRecToString(AValue));
+end;
+
+/// <summary>
+///   Motor unico de SqlArrayOfConstToParameterizedSql e
+///   SqlArrayOfConstToParameterizedValue. A UNICA diferenca entre os dois e o
+///   que fazer com o elemento que nao e escalar reconhecido (tipicamente
+///   string): em posicao de EXPRESSAO ele e fragmento de SQL e segue literal
+///   (RN-P3); em posicao de VALOR ele e dado e vira parametro.
+/// </summary>
+class function TUtils._ArrayOfConstToSql(const AParams: array of const;
+  const ASQLParams: IFluentSQLParams; const AStringIsValue: Boolean): String;
 var
   LFor: Integer;
   LastCh: Char;
   LParam: String;
 begin
-  if not Assigned(ASQLParams) then
+  if (not Assigned(ASQLParams)) and (not AStringIsValue) then
     Exit(SqlParamsToStr(AParams));
   Result := '';
   for LFor := Low(AParams) to High(AParams) do
   begin
     if not _TryVarRecAsParam(AParams[LFor], ASQLParams, LParam) then
-      LParam := _VarRecToString(AParams[LFor]);
+    begin
+      if AStringIsValue then
+        LParam := _StringVarRecAsParam(AParams[LFor], ASQLParams)
+      else
+        LParam := _VarRecToString(AParams[LFor]);
+    end;
     if Result = '' then
       LastCh := ' '
     else
@@ -160,6 +282,71 @@ begin
       Result := Result + ' ';
     Result := Result + LParam;
   end;
+end;
+
+class function TUtils.SqlArrayOfConstToParameterizedSql(const AParams: array of const;
+  const ASQLParams: IFluentSQLParams): String;
+begin
+  Result := _ArrayOfConstToSql(AParams, ASQLParams, False);
+end;
+
+/// <summary>
+///   O slot de VALOR de SetValue/Values e o lado direito de "COLUNA = ...":
+///   um valor, exatamente um. Fora disso o texto emitido nao e SQL de dialeto
+///   nenhum, e saia calado:
+///
+///     zero elementos  .SetValue('X', [])
+///                     -> INSERT INTO T (X) VALUES ()   /   UPDATE T SET X =
+///     dois ou mais    .SetValue('D', ['CURRENT','TIMESTAMP'])
+///                     -> VALUES (:p1 :p2)  - placeholders JUSTAPOSTOS, sem
+///                        virgula, porque o joiner de _ArrayOfConstToSql separa
+///                        com espaco (correto em posicao de EXPRESSAO, onde os
+///                        elementos formam um fragmento; sem sentido aqui).
+///
+///   Medido em execucao real, seis motores, com controle acompanhando cada
+///   recusa. Saida bruta e docker exec em test.setvalue.mssql.sql.
+///
+///   LISTA VAZIA: zero dos seis aceitam.
+///
+///   DOIS OU MAIS: cinco recusam por sintaxe; o ORACLE NAO. Ele le ":p1 :p2"
+///   como bind + variavel INDICADORA (:host:indicator), ou seja UM valor. Com
+///   duas colunas isso vira ORA-00947; com UMA coluna a forma e ACEITA - o
+///   motor grava :p1, descarta :p2 e nao reclama. Perda silenciosa de valor,
+///   pior que o erro de sintaxe dos outros cinco. Nao escreva "zero aceitam"
+///   para esta forma; e justamente o motor que nao protege pela sintaxe que
+///   torna a guarda necessaria aqui.
+///
+///   E a mesma regua ja aplicada ao MERGE em SqlArrayOfConstToNameValuePairs:
+///   entre emitir SQL que o motor executa errado (ou nao executa) e recusar a
+///   chamada na linha que a causou, recusa. Nao ha caso legitimo de mais de um
+///   elemento: com a parametrizacao do slot, ate .SetValue('X', ['A','+',1]) sairia como
+///   ":p1 :p2 :p3" - o INSERT/UPDATE nao exprime expressao em slot de valor,
+///   por overload nenhum (ver Known issues, valor x expressao).
+/// </summary>
+class procedure TUtils._AssertSingleValue(const ACount: Integer);
+begin
+  if ACount = 1 then
+    Exit;
+  if ACount = 0 then
+    raise EArgumentException.Create(
+      'SetValue/Values com lista de valores vazia nao e serializavel: sairia ' +
+      '"VALUES ()" no INSERT e "SET COLUNA =" no UPDATE. Nenhum dos dialetos ' +
+      'suportados aceita essa forma. Passe exatamente um valor, ou omita a ' +
+      'coluna.');
+  raise EArgumentException.CreateFmt(
+    'SetValue/Values recebeu %d valores para uma coluna so. O slot e o lado ' +
+    'direito de "COLUNA = ..." e comporta UM valor: com %d os placeholders ' +
+    'saem justapostos ("VALUES (:p1 :p2)"), que nenhum motor aceita. Se o que ' +
+    'voce queria era uma expressao (CURRENT_TIMESTAMP, "A + 1"), o ' +
+    'INSERT/UPDATE nao a exprime em slot de valor - ver Known issues.',
+    [ACount, ACount]);
+end;
+
+class function TUtils.SqlArrayOfConstToParameterizedValue(const AParams: array of const;
+  const ASQLParams: IFluentSQLParams): String;
+begin
+  _AssertSingleValue(Length(AParams));
+  Result := _ArrayOfConstToSql(AParams, ASQLParams, True);
 end;
 
 class function TUtils.Concat(const AElements: array of String;
@@ -323,20 +510,78 @@ var
   LValue: string;
 begin
   if not Assigned(APairs) then exit;
+
+  // O array e uma lista de PARES: nome, valor, nome, valor... Contagem impar
+  // significa um nome sem valor, e isso nao tem serializacao possivel - saia
+  // "VALUES (:p1, )" ou "SET [NOME] = ", ambos recusados pelo motor
+  // (SQL Server 2022: Msg 102, Incorrect syntax near ')' e near ';').
+  //
+  // E erro de programacao do chamador, nao dado do usuario, entao a resposta
+  // certa e falhar alto e cedo. Emitir SQL quebrado em silencio nao sobrevive
+  // ao padrao desta biblioteca: ela gera 100% texto, e texto invalido so
+  // aparece no motor do consumidor, longe da linha que o causou.
+  //
+  // EArgumentException e a mesma classe que FluentSQL.DDL.pas ja usa para
+  // chamada malformada (DDL.pas:908 e :915) - nao inventa vocabulario novo.
+  //
+  // LISTA VAZIA cai na MESMA regra, e nao no "caso par que passa limpo" que a
+  // primeira versao desta guarda afirmou. Zero pares serializa como
+  // "UPDATE SET ;" ou "INSERT;", e nenhum dos quatro dialetos que tem MERGE
+  // (MSSQL, Oracle, Firebird, PostgreSQL) aceita qualquer das duas - a lista de
+  // atribuicoes do UPDATE e obrigatoria, e o INSERT do MERGE exige VALUES(...)
+  // ou DEFAULT VALUES. Medido em motor real: ver test.merge.mssql.sql, secao
+  // LISTA VAZIA / FORMA SEM ARGUMENTOS.
+  if Length(AParams) = 0 then
+    raise EArgumentException.Create(
+      'Lista de pares nome/valor vazia. UPDATE sem atribuicao e INSERT sem ' +
+      'colunas nao sao serializaveis: sairia "UPDATE SET ;" ou "INSERT;", ' +
+      'recusado por todos os dialetos com MERGE. Passe ao menos um par ' +
+      '(''COLUNA'', <valor>), ou use .Delete se a intencao era outra acao.');
+
+  if Odd(Length(AParams)) then
+    raise EArgumentException.CreateFmt(
+      'Lista de pares nome/valor malformada: %d elementos. ' +
+      'A lista tem de alternar nome e valor (''COLUNA'', <valor>, ...), ' +
+      'portanto a contagem tem de ser par. O ultimo nome ficou sem valor.',
+      [Length(AParams)]);
+
   I := Low(AParams);
   while I <= High(AParams) do
   begin
+    // Slot IMPAR: nome de coluna. E identificador, nunca parametro - um :pN aqui
+    // produziria SQL sintaticamente invalido. Segue literal, como em SetValue.
+    //
+    // FRONTEIRA CONHECIDA: por ser identificador, este slot NAO passa por
+    // parametro, e o delimitador do dialeto nao e escapado pelos QuotedName /
+    // Quote atuais. Medido em SQL Server 2022 com nome de coluna
+    // "NOME] = 'x'; DROP TABLE USERS; --": a tabela foi dropada. Vale igual na
+    // base e nesta branch - nao e regressao. Escape de identificador e decisao
+    // de arquitetura propria e esta fora do escopo aqui.
     LName := _VarRecToString(AParams[I]);
     Inc(I);
     if I <= High(AParams) then
     begin
+      // Slot PAR: VALOR. Ao contrario de SqlArrayOfConstToParameterizedSql - onde
+      // a RN-P3 trata string como fragmento de SQL (identificador, operador) - aqui
+      // o array e estritamente uma lista de pares nome/valor: o slot par NAO tem
+      // como ser fragmento, so pode ser dado. Portanto TODO valor vira parametro,
+      // inclusive string. Deixar a string cair em _VarRecToString colocava o texto
+      // do usuario cru dentro do SQL (sem aspas, sem escape) - SQL invalido no caso
+      // benigno e injecao no caso hostil.
+      //
+      // Isto alinha o overload array of const com o overload tipado
+      // SetValue(const AColumnName, AColumnValue: String), que ja parametrizava:
+      // nao e convencao nova, e a convencao que ja existia sendo aplicada aqui.
       if not _TryVarRecAsParam(AParams[I], ASQLParams, LValue) then
-        LValue := _VarRecToString(AParams[I]);
+        LValue := _StringVarRecAsParam(AParams[I], ASQLParams);
       Inc(I);
     end
     else
-      LValue := ''; 
-      
+      // Inalcancavel: a guarda de contagem impar no topo ja saiu com excecao.
+      // Fica como rede, e nao como comportamento - se algum dia esta linha
+      // executar, e porque a guarda foi removida por engano.
+      LValue := '';
+
     with APairs.Add do
     begin
       Name := LName;
