@@ -172,20 +172,11 @@ begin
 end;
 
 // A sobrecarga de enum entra na regra geral desta classe: escalar levanta erro
-// nomeado. Isto FECHA UMA das seis celulas de MQL invalido em silencio que a T3
-// deixou registradas como divida - a de Cast. Antes, Cast estava no padrao A, o
-// core respondia 'CAST(x AS INTEGER)' sem consultar este driver, o
-// SerializeMongoDB nao reconhecia o prefixo 'CAST(' e a coluna caia em
-// NormalizeFieldName e era DESCARTADA sem aviso.
+// nomeado. Ver a nota MONGODB em Source\Core\FluentSQL.Functions.pas.
 //
-// Continuam em silencio, porque continuam no padrao A: Abs, Upper, Lower, Round,
-// Floor - e a sobrecarga Cast(String, String), que por decisao permanece no padrao
-// A. Ver a nota MONGODB em Source\Core\FluentSQL.Functions.pas.
-//
-// A guarda de portabilidade vem ANTES do raise proprio de proposito: para um tipo
-// fora da intersecao, quem pediu dftGuid aqui recebe a MESMA mensagem que receberia
-// no PostgreSQL. Recusa uniforme so e uniforme se valer tambem nos drivers que
-// recusam tudo - senao a mensagem viraria pista de qual driver esta ligado.
+// A chamada a _AssertCastTypeIsPortable e aplicacao mecanica da mesma linha que os
+// outros oito drivers tem, e nao um argumento de politica erguido a partir deste
+// dialeto: a politica de intersecao e RELACIONAL e se decide nos seis relacionais.
 function TFluentSQLFunctionsMongoDB.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 begin

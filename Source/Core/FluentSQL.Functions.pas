@@ -233,12 +233,30 @@ end;
 //                 (ORA-00906), e no SQL Server TRUNCA EM SILENCIO em 30;
 //   dftDate    -> no SQLite, CAST('2026-08-10' AS DATE) devolve 2026.
 //
-// A GUARDA VEM ANTES DO DESPACHO, e essa ordem e a politica inteira. Se o tipo
-// fosse ao driver primeiro, a resposta dependeria do dialeto - dftGuid passaria no
-// PostgreSQL e levantaria na Oracle - e a sobrecarga que se apresenta como PORTAVEL
-// estaria devolvendo a uniao dos sete em vez da intersecao. Recusando aqui, no
-// core, a resposta e a mesma nos nove drivers e o programador descobre o problema
-// na primeira execucao, nao na primeira troca de banco.
+// A GUARDA VEM ANTES DO DESPACHO, e ESTA e a guarda que o caminho vivo atravessa.
+// A API fluente so expoe o objeto do CORE - Func (FluentSQL.pas:278) e
+// TFluentSQL.AsFun (FluentSQL.pas:315) devolvem TFluentSQLFunctions -, entao todo
+// Cast escrito pelo consumidor entra por aqui e faz CURTO-CIRCUITO: para tipo fora
+// da intersecao, o Cast do driver nem chega a rodar.
+//
+// A MESMA guarda e a primeira linha dos nove Cast de driver, e ali ela e
+// REDUNDANTE PARA O CAMINHO FLUENTE. A redundancia e DELIBERADA, porque as duas
+// camadas fecham portas diferentes:
+//   * tirar esta, do core, faria a garantia depender de todo driver futuro lembrar
+//     de chamar a guarda; quem esquecesse reintroduziria a uniao EM SILENCIO, que e
+//     o modo de falha que esta politica existe para matar;
+//   * tirar as dos drivers faria a garantia depender de o consumidor entrar pela
+//     porta do core - e a porta do driver e PUBLICA: TFluentSQLRegister.Functions(D)
+//     devolve o IFluentSQLFunctions do dialeto, a propria biblioteca a usa, e um
+//     IFluentSQLFunctions de terceiro pode ser injetado por RegisterFunctions.
+// Custo de manter as duas: uma linha por driver. A mensagem tem fonte unica em
+// TFluentSQLFunctionAbstract._AssertCastTypeIsPortable, entao nao deriva.
+//
+// LACUNA DECLARADA, e ela e desta linha: NENHUM teste da suite observa esta guarda.
+// Apagar esta linha nao deixa um unico teste vermelho, porque o driver logo abaixo
+// recusa com a MESMA mensagem. Apagar as guardas dos drivers, essas sim, ficam
+// vermelhas (TestRecusaDeTipoForaDaIntersecaoEUniforme varre a porta do driver).
+// A camada de baixo e observavel; esta aqui nao e, e fica mesmo assim.
 function TFluentSQLFunctions.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 begin
