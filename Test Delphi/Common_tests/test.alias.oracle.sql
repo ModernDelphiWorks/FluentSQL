@@ -258,7 +258,7 @@ WITH CTE AS (SELECT ID FROM A) SELECT * FROM CTE;
     1 row selected.
 
   LEITURA: o AS do WITH e outra gramatica (query_name), e continua obrigatorio.
-  FluentSQL.Serialize.pas:103 monta 'WITH <alias> AS (' e esta CERTO - a T12 nao
+  FluentSQL.Serialize.pas:104 monta 'WITH <alias> AS (' e esta CERTO - a T12 nao
   encostou nele. Registrado aqui para que ninguem "padronize" os dois.
 */
 
@@ -296,6 +296,56 @@ SELECT COUNT(*) FROM D1 WHERE DT = '2026-08-10';
   DD-MON-RR, entao esse literal NAO casa com coluna DATE. Isto NAO e a T12 e
   NAO foi consertado aqui - esta transcrito porque foi medido nesta sessao e
   seria desonesto omitir. Registrar como divida.
+*/
+
+PROMPT
+PROMPT === 17 ACHADO FORA DO ESCOPO DA T12: aspa embutida no apelido ===
+SELECT * FROM A A'B;
+SELECT * FROM A LEFT JOIN B X'Y ON 1=1;
+SELECT NOME AS N'M FROM A;
+SELECT NOME AS "N'M" FROM A;
+/*
+  SAIDA BRUTA (as tres primeiras):
+    ERROR:
+    ORA-01756: quoted string not properly terminated
+
+  SAIDA BRUTA (a quarta, com aspas duplas):
+    N'M
+    ------------------------------
+    um
+
+    1 row selected.
+
+  LEITURA: o FluentSQL entrega o texto do apelido CRU, sem nenhum tratamento de
+  identificador, em TODOS os dialetos. Medido no proprio framework:
+
+    dbnMSSQL/MySQL/Firebird/SQLite/PostgreSQL  ->  FROM CLIENTES AS A'B
+    dbnOracle                                  ->  FROM CLIENTES A'B
+    todos                                      ->  SELECT NOME AS N'M FROM A
+
+  ISTO NAO E DEFEITO DA T12 E NAO FOI CONSERTADO AQUI. Tres razoes para nao
+  encostar:
+
+  1. E PRE-EXISTENTE E INALTERADO. O apelido sempre foi concatenado cru em
+     TFluentSQLName.Serialize; a T12 trocou a PALAVRA que o antecede, nao o
+     tratamento do texto. Na base (eb48337) o texto emitido para apelido com
+     aspa e byte-identico ao de agora em seis dos sete dialetos, e no setimo
+     (Oracle) a unica diferenca e o "AS" que sumiu - a aspa continua crua nos
+     dois lados.
+
+  2. NAO E ESPECIFICO DE RELACAO. A quarta consulta acima mostra o apelido de
+     COLUNA caindo no MESMO ORA-01756, e o apelido de coluna e justamente o lado
+     que a T12 provou nao ter tocado. Consertar so o lado da relacao deixaria o
+     defeito de pe pela outra metade.
+
+  3. EXIGE DECISAO DE CONVENCAO QUE NAO E DO IMPLEMENTADOR. Citar identificador
+     e por dialeto (aspas duplas na Oracle, PostgreSQL, Firebird e SQLite;
+     colchetes no MSSQL; crase no MySQL) e mexe com QuotedName, que ja existe em
+     IFluentSQLSerialize e hoje NAO e chamado no caminho do apelido. Decidir se
+     o framework passa a citar sempre, a citar sob demanda ou a recusar
+     identificador invalido e escolha do dono, nao conserto silencioso.
+
+  Registrado como divida, junto com a da secao 16.
 */
 
 ROLLBACK;
