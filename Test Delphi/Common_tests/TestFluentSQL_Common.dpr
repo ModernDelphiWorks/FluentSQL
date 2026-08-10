@@ -19,6 +19,7 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   {$ENDIF }
   DUnitX.TestFramework,
+  test.alias.matrix in 'test.alias.matrix.pas',
   test.cache in 'test.cache.pas',
   test.ddl.identity in 'test.ddl.identity.pas',
   test.ddl.numeric in 'test.ddl.numeric.pas',

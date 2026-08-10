@@ -52,12 +52,22 @@ procedure TTestFluentSQLSelectOracle.TestSelectAll;
 var
   LAsString: String;
 begin
-  LAsString := 'SELECT * FROM CLIENTES AS CLI';
+  // T12 - BREAKING. Ate eb48337 este teste afirmava
+  // 'SELECT * FROM CLIENTES AS CLI', e passava. O SQL que ele afirmava nao roda
+  // na Oracle: medido em Oracle Free 23.9, "SELECT * FROM A AS AP" devolve
+  // ORA-03048 ("SQL reserved word 'AS' is not syntactically valid following
+  // 'SELECT * FROM A '"). Ver Test Delphi\Common_tests\test.alias.oracle.sql.
+  //
+  // O apelido de COLUNA nao mudou e continua com AS - ver TestSelectColumnsCase
+  // logo abaixo, que segue afirmando ') AS TIPO_PESSOA'.
+  //
+  // O False fecha a comparacao para caixa: sem ele o DUnitX aceitaria 'as cli'.
+  LAsString := 'SELECT * FROM CLIENTES CLI';
   Assert.AreEqual(LAsString, FluentSQL.Query(dbnOracle)
                                       .Select
                                       .All
                                       .From('CLIENTES').Alias('CLI')
-                                      .AsString);
+                                      .AsString, False);
 end;
 
 procedure TTestFluentSQLSelectOracle.TestSelectAllOrderBy;
