@@ -33,6 +33,7 @@ type
     class function _VarRecToString(const AValue: TVarRec): String;
     class function _TryVarRecAsParam(const AValue: TVarRec; const ASQLParams: IFluentSQLParams;
       out APlaceholder: String): Boolean;
+    class procedure _AssertValueSlotCarriesData(const AValue: TVarRec);
     class function _StringVarRecAsParam(const AValue: TVarRec;
       const ASQLParams: IFluentSQLParams): String;
     class function _ArrayOfConstToSql(const AParams: array of const;
@@ -155,6 +156,74 @@ begin
 end;
 
 /// <summary>
+///   Recusa, em posicao de VALOR, os TVarRec que nao carregam dado nenhum e que
+///   _VarRecToString mesmo assim converteria em texto plausivel. E o pior
+///   desfecho possivel: o SQL sai bem-formado, o motor nao reclama, e a coluna
+///   recebe algo que o chamador nunca escreveu.
+///
+///   Medido nesta arvore ANTES desta guarda (dbnPostgreSQL,
+///   .SetValue('X', [...]), lendo AsString e Params):
+///
+///     [nil]                -> VALUES (:p1)  p1 = '00000000'   (IntToHex do ponteiro)
+///     [TDescarte.Create]   -> VALUES (:p1)  p1 = 'TDescarte'  (ClassName da instancia)
+///     [TDescarte]          -> VALUES (:p1)  p1 = 'TDescarte'  (ClassName da classe)
+///     [Unassigned]         -> VALUES (:p1)  p1 = ''           (string vazia, nao NULL)
+///     [Null]               -> EVariantTypeCastError, "Could not convert variant
+///                             of type (Null) into type (OleStr)"
+///
+///   Os QUATRO primeiros sao a mesma corrupcao silenciosa, por quatro portas do
+///   mesmo corredor - so a primeira estava fechada. O quinto ja falhava, mas com
+///   classe crua da RTL, cuja mensagem nao nomeia a chamada que a causou.
+///
+///   O par nome/valor NAO tem forma de exprimir NULL: o slot de valor e sempre
+///   ligado como parametro, e nao existe hoje marcador de nulidade nesta API.
+///   Entre gravar lixo calado e recusar a chamada, a resposta conservadora e
+///   recusar - mesma classe (EArgumentException) e mesmo espirito da guarda de
+///   contagem impar de SqlArrayOfConstToNameValuePairs e da de cardinalidade de
+///   _AssertSingleValue. Dar semantica de NULL a nil/Null/Unassigned e decisao
+///   de CONVENCAO, nao conserto de defeito, e por isso NAO foi tomada aqui.
+///
+///   FICA DE FORA, de proposito: vtInterface. Ele ja levanta hoje, em
+///   _VarRecToString ('VarRecToString: Unsupported parameter type'), entao nao
+///   ha corrupcao silenciosa a fechar - so a classe e a mensagem sao pobres.
+///   Trocar a classe de excecao de um caminho que ja falha e mudanca de
+///   contrato sem defeito por tras, e nao entra aqui.
+/// </summary>
+class procedure TUtils._AssertValueSlotCarriesData(const AValue: TVarRec);
+const
+  cOMITA = ' Se a coluna deve ficar NULL, omita-a da chamada.';
+begin
+  case AValue.VType of
+    vtPointer:
+      raise EArgumentException.Create(
+        'Valor nil em posicao de valor: o par nome/valor nao exprime NULL. ' +
+        'Antes, o nil virava a string ''00000000'' e era gravado como dado.' + cOMITA);
+    vtObject:
+      raise EArgumentException.Create(
+        'Objeto em posicao de valor: o slot comporta um DADO escalar, nao uma ' +
+        'instancia. Antes, o objeto virava a string do seu ClassName e ela era ' +
+        'gravada na coluna, sem erro nenhum. Passe a propriedade que voce ' +
+        'queria gravar.');
+    vtClass:
+      raise EArgumentException.Create(
+        'Referencia de classe em posicao de valor: o slot comporta um DADO ' +
+        'escalar. Antes, a classe virava a string do seu ClassName e ela era ' +
+        'gravada na coluna, sem erro nenhum.');
+    vtVariant:
+      if VarIsNull(AValue.VVariant^) then
+        raise EArgumentException.Create(
+          'Variant Null em posicao de valor: o par nome/valor nao exprime ' +
+          'NULL. Antes, esta chamada levantava EVariantTypeCastError da RTL, ' +
+          'que nao nomeia a chamada que a causou.' + cOMITA)
+      else if VarIsEmpty(AValue.VVariant^) then
+        raise EArgumentException.Create(
+          'Variant Unassigned em posicao de valor: nao ha dado a gravar. ' +
+          'Antes, virava a string VAZIA e a coluna recebia '''' em vez de ' +
+          'ficar intacta.' + cOMITA);
+  end;
+end;
+
+/// <summary>
 ///   Converte um TVarRec que NAO e escalar reconhecido (tipicamente string) em
 ///   placeholder de parametro. So deve ser chamado em posicao que e comprovadamente
 ///   VALOR - nunca em posicao que possa ser fragmento de SQL.
@@ -170,22 +239,7 @@ end;
 class function TUtils._StringVarRecAsParam(const AValue: TVarRec;
   const ASQLParams: IFluentSQLParams): String;
 begin
-  // vtPointer e o que o compilador produz para um `nil` escrito num array of
-  // const. _VarRecToString o mapeia por IntToHex e devolveria a string
-  // '00000000', que iria para o banco como DADO da coluna - corrupcao
-  // silenciosa, e nao o NULL que quem escreveu `nil` obviamente queria.
-  //
-  // O par nome/valor NAO tem forma de exprimir NULL: o slot par e sempre
-  // ligado como parametro, e nao existe hoje marcador de nulidade nesta API.
-  // Entre gravar lixo calado e recusar a chamada, a resposta conservadora e
-  // recusar - mesma classe e mesmo espirito da guarda de contagem impar
-  // abaixo. Dar semantica de NULL ao `nil` e decisao de convencao, nao
-  // conserto de defeito, e por isso nao foi feita aqui.
-  if AValue.VType = vtPointer then
-    raise EArgumentException.Create(
-      'Valor nil em posicao de valor: o par nome/valor nao exprime NULL. ' +
-      'Antes, o nil virava a string ''00000000'' e era gravado como dado. ' +
-      'Se a coluna deve ficar NULL, omita-a da lista de pares.');
+  _AssertValueSlotCarriesData(AValue);
 
   if Assigned(ASQLParams) then
     Result := ASQLParams.Add(_VarRecToString(AValue), dftString)

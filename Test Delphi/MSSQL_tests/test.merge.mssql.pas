@@ -112,6 +112,24 @@ type
     procedure TestMerge_UpdateNilValue_RaisesInsteadOfCorruptingDataAsHexString;
     [Test]
     procedure TestMerge_InsertNilValue_RaisesInsteadOfCorruptingDataAsHexString;
+
+    { ---- os irmaos do nil: objeto e Null variante, mesma porta ---- }
+
+    /// <summary>
+    ///   O ramo que recusa o nil e o MESMO por onde passavam objeto,
+    ///   referencia de classe, Null e Unassigned - e nenhum deles era pego.
+    ///   Medido nesta branch, antes da guarda:
+    ///     .Update(['NOME', obj])  -> SET [NOME] = :p1  com p1 = 'TDescarte'
+    ///     .Update(['NOME', Null]) -> EVariantTypeCastError da RTL
+    ///   As celulas de SetValue estao em test.core.params.pas; estas duas
+    ///   existem para que a guarda continue coberta PELO caminho do MERGE - foi
+    ///   exatamente a assimetria inversa (so o MERGE coberto) que motivou as
+    ///   celulas de nil em test.core.params.
+    /// </summary>
+    [Test]
+    procedure TestMerge_UpdateObjectValue_RaisesInsteadOfWritingClassName;
+    [Test]
+    procedure TestMerge_UpdateVariantNullValue_RaisesNamedInsteadOfRtlCastError;
   end;
 
 implementation
@@ -119,6 +137,14 @@ implementation
 uses
   System.SysUtils,
   System.Variants;
+
+type
+  /// <summary>
+  ///   Classe de descarte, so para dar um ClassName reconhecivel ao TVarRec de
+  ///   tipo vtObject na celula de corrupcao silenciosa.
+  /// </summary>
+  TDescarte = class(TObject)
+  end;
 
 { TTestMergeMSSQL }
 
@@ -677,6 +703,47 @@ begin
     end,
     EArgumentException,
     'nil em posicao de valor tem de levantar, nao gravar a string ''00000000''');
+end;
+
+procedure TTestMergeMSSQL.TestMerge_UpdateObjectValue_RaisesInsteadOfWritingClassName;
+var
+  LObj: TObject;
+begin
+  LObj := TDescarte.Create;
+  try
+    Assert.WillRaise(
+      procedure
+      begin
+        FluentSQL.Query(dbnMSSQL)
+          .Merge
+            .Into('TARGET', 't')
+            .Using('SOURCE', 's')
+            .On('t.ID = s.ID')
+            .WhenMatched
+              .Update(['NOME', LObj]);
+      end,
+      EArgumentException,
+      'objeto em posicao de valor emitia SET [NOME] = :p1 com p1 = ''TDescarte''');
+  finally
+    LObj.Free;
+  end;
+end;
+
+procedure TTestMergeMSSQL.TestMerge_UpdateVariantNullValue_RaisesNamedInsteadOfRtlCastError;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnMSSQL)
+        .Merge
+          .Into('TARGET', 't')
+          .Using('SOURCE', 's')
+          .On('t.ID = s.ID')
+          .WhenMatched
+            .Update(['NOME', Null]);
+    end,
+    EArgumentException,
+    'Null variante levantava EVariantTypeCastError da RTL, nao a guarda da casa');
 end;
 
 initialization

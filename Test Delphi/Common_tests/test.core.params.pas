@@ -71,6 +71,32 @@ type
     [Test]
     procedure TestUpdateSetValueArrayOfConstNilRaises;
     /// <summary>
+    ///   OS IRMAOS DO nil. A guarda de vtPointer existia para impedir que um
+    ///   "sem valor" virasse texto plausivel e fosse gravado como dado. Os
+    ///   quatro abaixo sao a MESMA corrupcao pelo mesmo caminho, e nenhum era
+    ///   pego. Medido nesta branch ANTES da guarda (dbnPostgreSQL,
+    ///   .SetValue('X', [...]), saida do proprio AsString/Params):
+    ///
+    ///     [TObject.Create] -> VALUES (:p1)  p1 = 'TDummy'  (ClassName)
+    ///     [TDummy]         -> VALUES (:p1)  p1 = 'TDummy'  (ClassName da classe)
+    ///     [Unassigned]     -> VALUES (:p1)  p1 = ''        (string vazia)
+    ///     [Null]           -> EVariantTypeCastError da RTL, "Could not convert
+    ///                         variant of type (Null) into type (OleStr)"
+    ///
+    ///   Os tres primeiros nao levantavam nada: SQL bem-formado, dado errado,
+    ///   nenhum motor reclama - exatamente o desfecho que a guarda de nil
+    ///   fecha. O quarto ja falhava, mas com classe crua de RTL cuja mensagem
+    ///   nao nomeia a chamada que a causou.
+    /// </summary>
+    [Test]
+    procedure TestSetValueArrayOfConstObjectRaisesInsteadOfWritingClassName;
+    [Test]
+    procedure TestSetValueArrayOfConstClassRefRaisesInsteadOfWritingClassName;
+    [Test]
+    procedure TestSetValueArrayOfConstVariantNullRaisesNamedInsteadOfRtlCastError;
+    [Test]
+    procedure TestSetValueArrayOfConstVariantUnassignedRaisesInsteadOfWritingEmptyString;
+    /// <summary>
     ///   O slot de valor comporta UM valor. Zero e mais de um emitiam SQL que
     ///   nenhum dos seis motores medidos aceita, e emitiam calados.
     /// </summary>
@@ -90,8 +116,17 @@ implementation
 
 uses
   SysUtils,
+  Variants,
   FluentSQL.Interfaces,
   FluentSQL;
+
+type
+  /// <summary>
+  ///   Classe de descarte, so para dar um ClassName reconhecivel ao TVarRec de
+  ///   tipo vtObject / vtClass nas celulas de corrupcao silenciosa.
+  /// </summary>
+  TDescarte = class(TObject)
+  end;
 
 procedure TTestCoreParams.TestParamExtraction;
 var
@@ -553,6 +588,103 @@ begin
 end;
 
 { ---------------------------------------------------------------------------
+  OS IRMAOS DO nil NO MESMO SLOT - objeto, referencia de classe, Null, Unassigned
+
+  A guarda de vtPointer fechava UM dos cinco TVarRec que nao carregam dado
+  algum e que _VarRecToString converte em texto plausivel. Os outros quatro
+  seguiam passando, pelo MESMO _StringVarRecAsParam e portanto pelos MESMOS
+  dois caminhos (SetValue/Values e Merge.Update/Insert).
+
+  Medido nesta branch antes da guarda - nao e suposicao:
+
+    .SetValue('X', [TDescarte.Create]) -> INSERT ... VALUES (:p1)  p1='TDescarte'
+    .SetValue('X', [TDescarte])        -> INSERT ... VALUES (:p1)  p1='TDescarte'
+    .SetValue('X', [Unassigned])       -> INSERT ... VALUES (:p1)  p1=''
+    .SetValue('X', [Null])             -> EVariantTypeCastError (RTL)
+    .Merge...Update(['NOME', obj])     -> SET [NOME] = :p1         p1='TDescarte'
+
+  Os tres primeiros sao a corrupcao silenciosa que a guarda de nil existe para
+  impedir, so que por outra porta: o SQL sai bem-formado e a coluna recebe
+  texto que o chamador nunca escreveu. O quarto ja levantava, mas com classe da
+  RTL, cuja mensagem nao diz qual chamada a causou.
+
+  Como no nil, NAO se deu semantica de NULL a nenhum deles: isso e decisao de
+  convencao e continua pendente. Estes testes travam o comportamento novo -
+  LEVANTA EArgumentException, na linha que o consumidor escreveu.
+  --------------------------------------------------------------------------- }
+
+procedure TTestCoreParams.TestSetValueArrayOfConstObjectRaisesInsteadOfWritingClassName;
+var
+  LObj: TObject;
+begin
+  LObj := TDescarte.Create;
+  try
+    Assert.WillRaise(
+      procedure
+      begin
+        FluentSQL.Query(dbnPostgreSQL)
+          .Insert
+          .Into('USUARIOS')
+          .SetValue('NOME', [LObj]);
+      end,
+      EArgumentException,
+      'objeto em slot de valor virava a string ''TDescarte'' e ia gravado como dado');
+  finally
+    LObj.Free;
+  end;
+end;
+
+procedure TTestCoreParams.TestSetValueArrayOfConstClassRefRaisesInsteadOfWritingClassName;
+begin
+  // vtClass e o irmao de vtObject em _VarRecToString: os dois saem por
+  // ClassName. Celula propria para que fechar so um dos dois nao passe.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .SetValue('NOME', [TDescarte]);
+    end,
+    EArgumentException,
+    'referencia de classe em slot de valor virava a string ''TDescarte''');
+end;
+
+procedure TTestCoreParams.TestSetValueArrayOfConstVariantNullRaisesNamedInsteadOfRtlCastError;
+begin
+  // Antes: EVariantTypeCastError "Could not convert variant of type (Null)
+  // into type (OleStr)" - levantava, mas com classe da RTL. O consumidor que
+  // captura EArgumentException das outras guardas nao pegava esta.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .SetValue('NOME', [Null]);
+    end,
+    EArgumentException,
+    'Null em slot de valor tem de levantar a MESMA classe das outras guardas');
+end;
+
+procedure TTestCoreParams.TestSetValueArrayOfConstVariantUnassignedRaisesInsteadOfWritingEmptyString;
+begin
+  // Antes: VALUES (:p1) com p1 = '' - a coluna recebia string VAZIA em vez de
+  // ficar intacta. E o caso mais silencioso dos cinco: nem excecao, nem lixo
+  // visivel no dado.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL)
+        .Insert
+        .Into('USUARIOS')
+        .SetValue('NOME', [Unassigned]);
+    end,
+    EArgumentException,
+    'Unassigned em slot de valor virava string vazia, calado');
+end;
+
+{ ---------------------------------------------------------------------------
   CARDINALIDADE DO SLOT DE VALOR - zero e "dois ou mais"
 
   O array de SetValue/Values e o lado direito de "COLUNA = ...": UM valor.
@@ -567,15 +699,31 @@ end;
   _ArrayOfConstToSql separa com espaco, o que e certo em posicao de EXPRESSAO
   (os elementos formam um fragmento) e sem sentido em posicao de VALOR.
 
-  Medido em execucao real, seis motores, ZERO aceitam qualquer das formas:
-    MSSQL 2022 16.0.4265.3  Msg 102 / Msg 102 near '@p2'
-    PostgreSQL 16.14        syntax error at or near ")" / at or near "$2"
-    Oracle Free 23          ORA-00936 missing expression / ORA-01745
-    Firebird 5.0.4          -104 Token unknown ')' / -104 Token unknown '?'
-    MySQL 8.4.11            ERROR 1136 column count / ERROR 1064
-    SQLite 3.53.4           Parse error near ")" / near "?"
-  Controles: "VALUES (?, ?)" com virgula e aceito nos seis. Saida bruta e
-  docker run em test.setvalue.mssql.sql.
+  Medido em execucao real, seis motores. Leia as duas formas separadamente,
+  porque elas NAO tem o mesmo placar:
+
+    LISTA VAZIA - zero dos seis aceitam:
+      MSSQL 2022 16.0.4265.3  Msg 102 near ')' / near ';'
+      PostgreSQL 16.14        syntax error at or near ")" / near ";"
+      Oracle Free 23          ORA-00936 missing expression (as duas)
+      Firebird 5.0.4          -104 Token unknown ')' / -104 Unexpected end
+      MySQL 8.4.11            ERROR 1136 column count / ERROR 1064
+      SQLite 3.53.4           Parse error near ")" / near ";"
+
+    DOIS OU MAIS - cinco recusam por sintaxe, e o ORACLE NAO:
+      MSSQL Msg 102 near '@p2'; PostgreSQL near "$2"; Firebird -104 Token
+      unknown '?'; MySQL ERROR 1064 near '?)'; SQLite Parse error near "?".
+      O Oracle le ":p1 :p2" como bind + variavel INDICADORA (:host:indicator),
+      ou seja UM valor: com duas colunas da ORA-00947 (nao ORA-01745), e com
+      UMA coluna a forma e ACEITA - "1 row created", grava :p1 e descarta :p2
+      calado. Perda silenciosa de valor, pior que o erro de sintaxe dos outros.
+      Nao escreva "zero aceitam" para esta forma.
+
+  Controle: "VALUES (:p1, :p2)" com virgula executa em MSSQL, PostgreSQL,
+  MySQL, SQLite e Oracle; no Firebird via isql ele passa a GRAMATICA e para no
+  bind (SQLSTATE 07002, "No SQLDA for input values provided"), porque o isql
+  nao liga parametro - fase diferente do -104 que a forma justaposta recebe.
+  Saida bruta, versoes e docker exec em test.setvalue.mssql.sql.
 
   E a mesma regua ja aplicada ao MERGE: entre emitir SQL que nenhum motor
   executa e recusar a chamada na linha que a causou, recusa.
