@@ -35,7 +35,7 @@ title: Erros comuns
 - **Ação (Schemas):** verifique a [Matriz de Suporte](../architecture/overview.md#matriz-de-dialetos). Utilize dialetos como PostgreSQL ou MSSQL. Operações de Schema no MySQL são mapeadas para Database.
 - **Ação (MERGE):** `ENotSupportedException` **não** é levantada neste cenário. São duas classes distintas, conforme o motivo:
   - Dialeto **ligado** mas sem serializador de `MERGE` (PostgreSQL, Oracle, MySQL, SQLite, Firebird) → `EFluentSQLStatementNotSupported`. Até a v1.5.1 esse caso entrava em recursão infinita e terminava em `EStackOverflow`; se a sua camada captura `EStackOverflow` para tratar isso, troque pela classe nomeada.
-  - Dialeto **desligado** no `Source\FluentSQL.inc` (Interbase, DB2) → `EFluentSQLDriverNotRegistered`.
+  - Dialeto **não compilado** nesta build (Interbase e DB2, desligados por omissão) → `EFluentSQLDriverNotRegistered`, porque a chamada morre antes de chegar ao `MERGE`. **Se você os ligar** — pelo `.inc` **ou** por `-DINTERBASE` / `-DDB2` no compilador, as duas formas suportadas —, a resposta passa a ser `EFluentSQLStatementNotSupported`, igual à dos dialetos ligados sem serializador.
   - Apenas o **MSSQL** possui serializador de `MERGE` hoje. Detalhes e matriz completa: [DML — MERGE](../guides/dml-merge.md#suporte-por-dialeto).
 
 ## `EFluentSQLDriverNotRegistered` — «… do banco … não está registrado» em runtime (testes ou app)

@@ -8,11 +8,30 @@
   celula por celula, o que cada dialeto faz - inclusive os que NAO suportam, que
   precisam levantar excecao NOMEADA em vez de estourar a pilha ou emitir SQL mudo.
 
-  Os dialetos efetivamente registrados vem de Source\FluentSQL.inc, nao dos
-  DEFINEs do .dpr: Register.pas inclui o proprio .inc. Hoje o .inc liga
-  FIREBIRD/MSSQL/MYSQL/SQLITE/ORACLE/POSTGRESQL/MONGODB e deixa
-  INTERBASE/DB2 desligados - por isso estes dois caem em
-  EFluentSQLDriverNotRegistered antes mesmo de chegar ao MERGE.
+  QUAIS DIALETOS ESTAO REGISTRADOS - leia com cuidado, ja custou um bloqueador.
+
+  Register.pas inclui Source\FluentSQL.inc e liga um driver por IFDEF. O
+  conjunto de defines que ele enxerga tem DUAS fontes, e nao uma:
+
+    (a) o proprio Source\FluentSQL.inc - hoje liga FIREBIRD, MSSQL, MYSQL,
+        SQLITE, ORACLE, POSTGRESQL e MONGODB, e deixa INTERBASE e DB2
+        comentados;
+    (b) os -D da LINHA DE COMANDO do compilador, que sao globais e valem para
+        toda unit. Compilar com -DDB2 -DINTERBASE liga os dois, e isso e acao
+        SUPORTADA - o proprio CHANGELOG a recomenda a quem precisa desses
+        dialetos.
+
+  O que NAO conta e o DEFINE escrito dentro de um .dpr: ele tem escopo de
+  ARQUIVO e nunca chega a Register.pas.
+
+  Consequencia para esta matriz: INTERBASE e DB2 nao tem celula fixa. Com eles
+  desligados a chamada morre em EFluentSQLDriverNotRegistered, antes de chegar
+  ao MERGE; com eles ligados o driver existe, o MERGE e que nao, e a chamada cai
+  em EFluentSQLStatementNotSupported - a MESMA celula dos outros cinco sem
+  serializador. As duas sao corretas, cada uma na sua build, e por isso a classe
+  esperada e escolhida em RUNTIME (ver _DriverEstaRegistrado abaixo) e nao por
+  IFDEF - assim o teste continua valido tanto se o dono ligar o driver no
+  .inc quanto se o consumidor o ligar por -D.
   ------------------------------------------------------------------------------
 }
 
@@ -27,6 +46,7 @@ interface
 uses
   DUnitX.TestFramework,
   FluentSQL,
+  FluentSQL.Register,
   FluentSQL.Interfaces;
 
 type
@@ -36,6 +56,7 @@ type
     function BuildMerge(const ADialect: TFluentSQLDriver; const AValue: string;
       out ASql: string): IFluentSQL;
     function DialectOf(const AName: string): TFluentSQLDriver;
+    function _DriverEstaRegistrado(const ADialect: TFluentSQLDriver): Boolean;
   public
     /// <summary>
     ///   Dialeto COM serializador de MERGE: o valor do usuario vira :pN e o texto
@@ -59,13 +80,22 @@ type
     procedure TestMerge_Unsupported_RaisesNamedException(const ADialectName: string);
 
     /// <summary>
-    ///   Dialeto que nem chega a ser registrado no build corrente (.inc desligado):
-    ///   excecao nomeada de driver nao registrado, nunca AV nem SQL silencioso.
+    ///   Dialeto OPCIONAL - desligado no .inc, mas ligavel por -D na linha de
+    ///   comando. A celula muda de classe conforme a build, e as duas classes
+    ///   sao corretas:
+    ///
+    ///     driver NAO compilado -> EFluentSQLDriverNotRegistered
+    ///                             (morre antes de chegar ao MERGE)
+    ///     driver compilado     -> EFluentSQLStatementNotSupported
+    ///                             (o driver existe, o MERGE dele e que nao)
+    ///
+    ///   O que o teste trava, nas duas builds, e o mesmo: excecao NOMEADA,
+    ///   nunca AV, nunca EStackOverflow, nunca SQL silencioso.
     /// </summary>
     [Test]
     [TestCase('Interbase', 'Interbase')]
     [TestCase('DB2',       'DB2')]
-    procedure TestMerge_DriverNotCompiledIn_RaisesNamedException(const ADialectName: string);
+    procedure TestMerge_OptionalDriver_RaisesNamedException(const ADialectName: string);
 
     /// <summary>
     ///   FRONTEIRA CONHECIDA, NAO CORRIGIDA NESTA TAREFA: o MongoDB nao tem MERGE
@@ -157,20 +187,67 @@ begin
     'nao EStackOverflow nem SQL invalido.');
 end;
 
-procedure TTestMergeMatrix.TestMerge_DriverNotCompiledIn_RaisesNamedException(
+/// <summary>
+///   O driver tem serializador registrado NESTA build? Perguntado ao registro
+///   em runtime, e nao deduzido por {$IFDEF} no proprio teste - porque o
+///   conjunto de defines que Register.pas enxerga vem do .inc E dos -D da linha
+///   de comando, e um {$IFDEF} escrito aqui so acompanharia o segundo se esta
+///   unit tambem incluisse o .inc. Mesmo padrao ja usado por
+///   test.driver.functions.matrix.pas (_EstaRegistrado).
+///
+///   O canal e independente do codigo sob teste: aqui pergunta-se ao registro
+///   direto, la a chamada percorre TFluentSQL.Query -> Merge -> Serialize.
+/// </summary>
+function TTestMergeMatrix._DriverEstaRegistrado(
+  const ADialect: TFluentSQLDriver): Boolean;
+var
+  LRegister: TFluentSQLRegister;
+begin
+  Result := True;
+  LRegister := TFluentSQLRegister.Create;
+  try
+    try
+      LRegister.Serialize(ADialect);
+    except
+      on E: EFluentSQLDriverNotRegistered do
+        Result := False;
+    end;
+  finally
+    LRegister.Free;
+  end;
+end;
+
+procedure TTestMergeMatrix.TestMerge_OptionalDriver_RaisesNamedException(
   const ADialectName: string);
 var
   LSql: string;
   LDialect: TFluentSQLDriver;
+  LEsperada: ExceptClass;
+  LPorque: string;
 begin
   LDialect := DialectOf(ADialectName);
+  if _DriverEstaRegistrado(LDialect) then
+  begin
+    // Build com -DDB2 / -DINTERBASE (ou com o .inc alterado): o driver existe,
+    // e a celula e a MESMA dos outros cinco sem serializador de MERGE.
+    LEsperada := EFluentSQLStatementNotSupported;
+    LPorque := ' esta compilado nesta build, entao o MERGE tem de cair na ' +
+      'mesma excecao dos demais dialetos sem serializador.';
+  end
+  else
+  begin
+    LEsperada := EFluentSQLDriverNotRegistered;
+    LPorque := ' nao esta compilado nesta build, entao a chamada tem de morrer ' +
+      'em erro nomeado de driver ausente, antes de chegar ao MERGE.';
+  end;
+
   Assert.WillRaise(
     procedure
     begin
       BuildMerge(LDialect, HOSTILE, LSql);
     end,
-    EFluentSQLDriverNotRegistered,
-    ADialectName + ': driver desligado no .inc tem de dar erro nomeado.');
+    LEsperada,
+    ADialectName + LPorque);
 end;
 
 procedure TTestMergeMatrix.TestMerge_MongoDB_DropsMergeSilently_KnownGap;

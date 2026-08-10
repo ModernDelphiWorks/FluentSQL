@@ -143,7 +143,9 @@ Apenas o **MSSQL** possui serializador de `MERGE`. Nos demais, a chamada **levan
 | **SQLite** | ❌ Não suportado | `EFluentSQLStatementNotSupported`. Não há `MERGE` em SQLite; equivalente é `INSERT ... ON CONFLICT`. |
 | **Firebird** | ❌ Não suportado | `EFluentSQLStatementNotSupported`. Firebird tem `MERGE` nativo; falta o serializador. |
 | **MongoDB** | ⚠️ Lacuna conhecida | A cláusula é **descartada em silêncio** e a saída é `{}`. Não levanta. |
-| **Interbase**, **DB2** | ⚪ Desligados | `EFluentSQLDriverNotRegistered` — desligados por omissão no `FluentSQL.inc`. |
+| **Interbase**, **DB2** | ⚪ Opcionais, desligados por omissão | **Depende da sua compilação** — veja a nota abaixo. |
+
+> **Interbase e DB2 não têm uma resposta fixa, e isso é por desenho.** Eles vêm desligados no `Source\FluentSQL.inc`, e nessa compilação o `MERGE` nem chega a ser tentado: a chamada morre antes, em **`EFluentSQLDriverNotRegistered`**. Se você os liga — editando o `.inc` ou passando `-DDB2` / `-DINTERBASE` ao compilador, as duas formas suportadas —, o driver passa a existir e a resposta vira **`EFluentSQLStatementNotSupported`**, a mesma dos cinco dialetos acima. Nas duas compilações a garantia é a mesma: exceção **nomeada**, nunca `EStackOverflow` nem SQL emitido pela metade. O `{$DEFINE}` escrito no seu `.dpr` **não** conta: tem escopo de ficheiro e não alcança `FluentSQL.Register.pas`.
 
 Até a v1.5.1 os cinco dialetos sem serializador não levantavam: entravam em recursão infinita e terminavam em **`EStackOverflow`**, derrubando o processo. Se o seu código captura `EStackOverflow` para tratar isso, troque por `EFluentSQLStatementNotSupported`.
 
