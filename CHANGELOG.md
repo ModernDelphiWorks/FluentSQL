@@ -17,6 +17,23 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (SQL emitido) — Oracle: o apelido de TABELA perdeu a palavra `AS`.** O Oracle **não aceita** `AS` antes de apelido de tabela, view ou subconsulta, e o núcleo emitia `AS` para todo apelido sem consultar dialeto nenhum (`FluentSQL.Name.pas:114`, `Result := TUtils.Concat([Result, 'AS', FAlias])`). Todo `From(tabela, apelido)` e as **quatro** sobrecargas de join com apelido (`InnerJoin`/`LeftJoin`/`RightJoin`/`FullJoin`) produziam SQL que o Oracle recusa. **Quem compara o SQL gerado com string fixa para `dbnOracle` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
+
+  | Construção | Antes (Oracle) | Depois (Oracle) | Motor real |
+  |---|---|---|---|
+  | `From('CLIENTES','CLI')` | `SELECT * FROM CLIENTES AS CLI` | `SELECT * FROM CLIENTES CLI` | antes: **`ORA-03048`** |
+  | `LeftJoin('B','X')` | `... LEFT JOIN B AS X ON ...` | `... LEFT JOIN B X ON ...` | antes: **`ORA-02000`** |
+  | `InnerJoin`/`RightJoin`/`FullJoin` `('B','X')` | `... JOIN B AS X ON ...` | `... JOIN B X ON ...` | antes: **`ORA-02000`** |
+  | `Delete.From('A','AP')` | `DELETE FROM A AS AP WHERE ...` | `DELETE FROM A AP WHERE ...` | antes: **`ORA-03048`** |
+  | `From('(SELECT ...)')` + `Alias` | `... AS S` | `... S` | antes: **`ORA-03048`** |
+  | **`Column('NOME').Alias('N')`** | `SELECT NOME AS N` | **inalterado** | aceito nos dois |
+
+  **O apelido de COLUNA não mudou, em dialeto nenhum** — e é esse contraste que sustenta a correção. A documentação do `SELECT` do Oracle define `t_alias` (tabela/view/subconsulta) sem citar `AS` em momento algum, e define `c_alias` (coluna) dizendo *"The `AS` keyword is optional"*: declara opcional onde é permitido e omite onde não é. Como `TFluentSQLName` serve os **dois** papéis com o mesmo `Serialize`, tirar o `AS` do serializador consertaria a tabela e quebraria a coluna.
+
+  Os códigos acima foram **medidos**, não presumidos — o palpite corrente era `ORA-00933` e não é nenhum dos dois. As execuções brutas, incluindo o `docker run` e a versão do motor (Oracle AI Database 26ai Free Release 23.26.2.0.0), estão em `Test Delphi\Common_tests\test.alias.oracle.sql`.
+
+  **Os outros seis dialetos relacionais não mudaram uma vírgula.** A alternativa "emitir sem `AS` em todos" — gramaticalmente válida nos sete — foi recusada: trocaria o texto de seis dialetos para consertar um. A palavra passou a vir de `IFluentSQLSerialize.RelationAliasKeyword` (`'AS'` na base, `''` só no Oracle). Ela mora no **serializador**, e não no qualificador, por duas razões: o qualificador não alcança o `JOIN` (serializado por `FluentSQL.Joins.pas`), e `TFluentSQLSelectDB2` instancia o qualificador **do Oracle** (`FluentSQL.SelectDB2.pas:46`) — hospedar a regra ali faria o **DB2** herdar calado a forma do Oracle. Medido: o DB2 continua em `tabela AS apelido`.
+
 - **BREAKING CHANGE (SQL emitido) — a paginação mudou de forma em 5 dos 7 dialetos ativos.** O framework anunciava paginação nos sete e ela só estava correta em dois (PostgreSQL e MongoDB). Quem compara o SQL gerado com string fixa **precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita. Com `Skip(20)` sozinho, antes → depois:
 
   | Dialeto | Antes | Depois |
