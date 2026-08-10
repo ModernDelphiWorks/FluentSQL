@@ -44,8 +44,25 @@
   From(IFluentSQLCriteriaExpression) (FluentSQL.pas:908) e From(IFluentSQL)
   (FluentSQL.pas:913) tambem desaguam na de 918 - passando a subconsulta como
   texto entre parenteses -, a regra da relacao vale para elas pelo mesmo
-  caminho, sem codigo proprio. E o que
-  TestApelidoDeSubconsultaSegueARegraDaRelacao afirma.
+  caminho, sem codigo proprio.
+
+  TestApelidoDeSubconsultaSegueARegraDaRelacao trava isso com uma celula por
+  dialeto para CADA UMA das tres portas que levam uma subconsulta ao FROM:
+
+    1. From(const ATableName: String) (FluentSQL.pas:918) com o texto ja
+       parentizado pelo chamador;
+    2. From(const AQuery: IFluentSQL) (FluentSQL.pas:913);
+    3. From(const AExpression: IFluentSQLCriteriaExpression)
+       (FluentSQL.pas:908), com o criterio obtido de
+       TFluentSQL.Expression(const ATerm: String) (FluentSQL.pas:903) - a
+       porta da API fluente para montar um IFluentSQLCriteriaExpression a
+       partir de texto (a irma da 896 recebe array of const).
+
+  A celula 3 nao esta ai por simetria decorativa, e sim porque a ausencia dela
+  foi MEDIDA: reescrever a 908 para montar o no por conta propria, sem
+  "AliasKeyword := _RelationAliasKeyword", devolvia a Oracle ao
+  "FROM (SELECT ...) AS S" do ORA-03048 com a suite INTEIRA verde - nenhum dos
+  590 testes caia. Com a celula 3, a mesma mutacao derruba este teste.
 
   A Oracle trata os dois de forma OPOSTA: aceita "col AS ap" e RECUSA
   "tabela AS ap". Por isso a correcao nao pode ser "tirar o AS do Serialize" -
@@ -266,9 +283,14 @@ var
 begin
   // A linha da tabela do CHANGELOG que faltava travar. A subconsulta apelidada
   // e t_alias como qualquer relacao, e nao tem UMA linha de codigo propria: as
-  // tres sobrecargas de From desaguam na de String, que e quem marca o no. Este
-  // teste existe para que a equivalencia nao se perca numa refatoracao que
-  // "otimize" uma das sobrecargas para montar o no por conta propria.
+  // duas sobrecargas que recebem subconsulta - From(IFluentSQL) na
+  // FluentSQL.pas:913 e From(IFluentSQLCriteriaExpression) na 908 - desaguam na
+  // de String (918), que e quem marca o no.
+  // Este teste existe para que a equivalencia nao se perca numa refatoracao que
+  // "otimize" QUALQUER uma das sobrecargas para montar o no por conta propria -
+  // por isso ele tem celula para as TRES portas, e nao so para a mais usada.
+  // Falsificado por mutacao, nao deduzido: quando so havia as celulas 1 e 2,
+  // reescrever a 908 para montar o no sozinha passava com os 590 testes verdes.
   // Medido na Oracle: "FROM (SELECT ...) AS S" devolve ORA-03048; sem o AS,
   // devolve linha (secoes 10 e 11 de test.alias.oracle.sql).
   LCelulas := 0;
@@ -290,6 +312,18 @@ begin
       Query(LDriver).Select.All
         .From(Query(LDriver).Select.Column('ID').From('A')).Alias('S').AsString,
       False, cDIALETO[LDriver] + ': From(IFluentSQL) + Alias.');
+
+    // 3) subconsulta passada como IFluentSQLCriteriaExpression - a TERCEIRA
+    // porta, a unica que ficou sem celula ate aqui. O criterio nasce em
+    // TFluentSQL.Expression(const ATerm: String) (FluentSQL.pas:903), que e a
+    // unica forma publica de obter um IFluentSQLCriteriaExpression a partir de
+    // texto; From(IFluentSQLCriteriaExpression) (FluentSQL.pas:908) so
+    // parentiza o AsString dele e repassa para a sobrecarga de String.
+    Assert.AreEqual('SELECT * FROM ' +
+      _ComApelido(LDriver, '(SELECT ID FROM A)', 'S'),
+      Query(LDriver).Select.All
+        .From(Query(LDriver).Expression('SELECT ID FROM A')).Alias('S').AsString,
+      False, cDIALETO[LDriver] + ': From(IFluentSQLCriteriaExpression) + Alias.');
   end;
   Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
 end;
