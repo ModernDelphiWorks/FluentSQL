@@ -84,6 +84,7 @@ type
     FCase: IFluentSQLCase;
     FLastExpression: IFluentSQLCriteriaExpression;
     function _GetCase: IFluentSQLCase;
+    procedure _AssertHaveWhen(const AMethod, AKeyword: String);
   public
     constructor Create(const AOwner: IFluentSQL; const AExpression: String);
     destructor Destroy; override;
@@ -288,6 +289,7 @@ end;
 
 function TFluentSQLCriteriaCase.ElseIf(const AValue: String): IFluentSQLCriteriaCase;
 begin
+  _AssertHaveWhen('ElseIf', 'ELSE');
   FLastExpression := TFluentSQLCriteriaExpression.Create(AValue, FOwner.Params);
   FCase.ElseExpression := FLastExpression.Expression;
   Result := Self;
@@ -306,6 +308,41 @@ end;
 function TFluentSQLCriteriaCase._GetCase: IFluentSQLCase;
 begin
   Result := FCase;
+end;
+
+/// <summary>
+///   THEN e ELSE sao ramos de um WHEN: sem nenhum WHEN na lista, nem um nem
+///   outro tem onde se prender e o que sai nao e CASE de dialeto nenhum.
+///
+///   Isto era um Assert (FluentSQL.Cases.pas:340 antes desta mudanca), o que
+///   significa que a guarda existia so em build de debug. Com {$C-} - que e o
+///   default de qualquer build de release - o Assert some e o IfThen cai direto
+///   em WhenList[-1], ou seja EArgumentOutOfRangeException vinda de dentro da
+///   TList, com pilha que nao aponta para a chamada que causou o erro. O
+///   ElseIf nao tinha guarda nenhuma e emitia calado "CASE ELSE x END".
+///
+///   Medido, motor por motor, com o CASE sem WHEN (oraculo em
+///   test.cases.guards.matrix.sql):
+///     PostgreSQL 16.14   ERROR: syntax error at or near "ELSE"
+///     SQL Server 2022    Msg 156 Incorrect syntax near the keyword 'ELSE'.
+///     Oracle 26ai        ORA-00923: FROM keyword not found where expected
+///
+///   Zero motor aceita. Vale aqui a mesma regua ja aplicada em
+///   TUtils._AssertSingleValue e em TFluentSQLMerge: entre emitir SQL que o
+///   motor recusa e recusar a chamada na linha que a causou, recusa - e com a
+///   chamada nomeada na mensagem.
+/// </summary>
+procedure TFluentSQLCriteriaCase._AssertHaveWhen(const AMethod, AKeyword: String);
+begin
+  if FCase.WhenList.Count > 0 then
+    Exit;
+  raise EArgumentException.CreateFmt(
+    'IFluentSQLCriteriaCase.%s chamado antes de When: o CASE nao tem nenhum ' +
+    'ramo WHEN, e %s so existe dentro de um. A forma que sairia ' +
+    '("CASE %s <valor> END") nao e aceita por dialeto nenhum: PostgreSQL 16 ' +
+    'responde "syntax error at or near", SQL Server 2022 "Msg 156 Incorrect ' +
+    'syntax near", Oracle 26ai "ORA-00923". Chame When(...) antes de %s.',
+    [AMethod, AKeyword, AKeyword, AMethod]);
 end;
 
 function TFluentSQLCriteriaCase.OrOpe(const AExpression: String): IFluentSQLCriteriaCase;
@@ -337,7 +374,7 @@ end;
 
 function TFluentSQLCriteriaCase.IfThen(const AValue: String): IFluentSQLCriteriaCase;
 begin
-  Assert(FCase.WhenList.Count > 0, 'TFluentSQLCriteriaCase.IfThen: Missing When');
+  _AssertHaveWhen('IfThen', 'THEN');
   FLastExpression := TFluentSQLCriteriaExpression.Create(AValue, FOwner.Params);
   FCase.WhenList[FCase.WhenList.Count-1].ThenExpression := FLastExpression.Expression;
   Result := Self;

@@ -832,10 +832,36 @@ begin
   Result := Self;
 end;
 
+/// <summary>
+///   Desc marca a ULTIMA coluna do ORDER BY, logo exige que exista uma.
+///
+///   A guarda era um Assert (FluentSQL.pas:838 antes desta mudanca) e tinha
+///   dois problemas independentes:
+///
+///   1. Assert some com {$C-}, o default de release. Sem ele, .OrderBy().Desc
+///      cai em Columns[-1] e o erro que chega ao chamador e um
+///      EArgumentOutOfRangeException de dentro da TList, sem nome de metodo.
+///   2. Afirmava sobre FAST.ASTColumns e indexava FAST.OrderBy.Columns. Hoje as
+///      duas sao o MESMO objeto enquanto a secao e secOrderBy - quem as liga e
+///      _DefineSectionOrderBy (FluentSQL.pas:794, "FAST.ASTColumns :=
+///      FAST.OrderBy.Columns") e _SetSection nao tem caminho de saida que
+///      desfaca isso antes do _AssertSection([secOrderBy]) daqui. Ou seja: a
+///      afirmacao NAO estava medindo colecao errada na pratica. Continuava
+///      sendo o nome errado para ler, e passa a citar a colecao que de fato
+///      indexa.
+///
+///   Nao ha Asc para receber a mesma guarda: a interface nao tem esse metodo
+///   (dirAscending e o default de TFluentSQLOrderByColumn). Desc e o unico
+///   modificador de direcao da API.
+/// </summary>
 function TFluentSQL.Desc: IFluentSQL;
 begin
   _AssertSection([secOrderBy]);
-  Assert(FAST.ASTColumns.Count > 0, 'TCriteria.Desc: No columns set up yet');
+  if FAST.OrderBy.Columns.Count = 0 then
+    raise EArgumentException.Create(
+      'IFluentSQL.Desc chamado sem nenhuma coluna no ORDER BY: Desc marca a ' +
+      'ultima coluna da clausula, e nao ha ultima. Passe a coluna em OrderBy ' +
+      '(".OrderBy(''NOME'').Desc") em vez de ".OrderBy().Desc".');
   (FAST.OrderBy.Columns[FAST.OrderBy.Columns.Count -1] as IFluentSQLOrderByColumn).Direction := dirDescending;
   Result := Self;
 end;
