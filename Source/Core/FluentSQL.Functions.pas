@@ -232,9 +232,17 @@ end;
 //   dftString  -> 'VARCHAR' sem largura e erro no Firebird (-104) e na Oracle
 //                 (ORA-00906), e no SQL Server TRUNCA EM SILENCIO em 30;
 //   dftDate    -> no SQLite, CAST('2026-08-10' AS DATE) devolve 2026.
+//
+// A GUARDA VEM ANTES DO DESPACHO, e essa ordem e a politica inteira. Se o tipo
+// fosse ao driver primeiro, a resposta dependeria do dialeto - dftGuid passaria no
+// PostgreSQL e levantaria na Oracle - e a sobrecarga que se apresenta como PORTAVEL
+// estaria devolvendo a uniao dos sete em vez da intersecao. Recusando aqui, no
+// core, a resposta e a mesma nos nove drivers e o programador descobre o problema
+// na primeira execucao, nao na primeira troca de banco.
 function TFluentSQLFunctions.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   Result := FRegister.Functions(FDatabase).Cast(AExpression, ADataType, ALength);
 end;
 

@@ -191,15 +191,24 @@ end;
 // Emitir RAW(16) daria SQL que passa no teste com hex puro e explode quando o GUID
 // vier na forma normal - pior que recusar.
 //
-// dftBoolean e BOOLEAN e SO funciona porque este motor e 23ai+; em 19c e anterior
-// nao ha BOOLEAN em SQL. O FluentSQL nao tem como saber a versao do servidor, entao
-// esta celula assume 23ai - registrado como risco no relatorio da T17.
+// SO OS TRES DA INTERSECAO, e a Oracle traz o argumento que sozinho fecharia a
+// questao: dftBoolean FOI medido aqui e funciona - mas so porque este motor e
+// 23ai+. Em 19c e anterior nao existe BOOLEAN em SQL, e o FluentSQL NAO TEM COMO
+// SABER A VERSAO DO SERVIDOR. Uma celula cuja validade depende de informacao que a
+// biblioteca nao possui nao pode fazer parte da API portavel: ela nao seria uma
+// promessa, seria um palpite. DATE e TIMESTAMP saem pelo motivo geral (o SQLite
+// devolve 2026 para os dois).
+//
+// dftText ja sairia sozinho por ORA-22849 e dftGuid por ORA-01465 - as duas
+// medicoes estao acima e seguem valendo para quem for escrever a grafia a mao pela
+// sobrecarga de String.
 function TFluentSQLFunctionsOracle.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 var
   LType: String;
   LLength: Integer;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   LLength := ALength;
   if LLength <= 0 then
     LLength := cFluentSQLCastDefaultLength;
@@ -207,20 +216,9 @@ begin
     dftString:   LType := 'VARCHAR2(' + IntToStr(LLength) + ')';
     dftInteger:  LType := 'INTEGER';
     dftFloat:    LType := 'BINARY_DOUBLE';
-    dftDate:     LType := 'DATE';
-    dftDateTime: LType := 'TIMESTAMP';
-    dftBoolean:  LType := 'BOOLEAN';
-    dftText:     raise EFluentSQLFunctionNotSupported.Create('Cast(dftText)',
-                   'Oracle (ORA-22849: Type CLOB is not supported for this function ' +
-                   'or operator; a forma Oracle e TO_CLOB, nao CAST)');
-    dftGuid:     raise EFluentSQLFunctionNotSupported.Create('Cast(dftGuid)',
-                   'Oracle (nao ha tipo GUID; RAW(16) recusa a forma textual com ' +
-                   'hifens com ORA-01465: invalid hex number)');
-    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
-                   'Oracle (ORA-00902: invalid datatype; ARRAY nao e alvo de CAST)');
   else
-    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
-      'Oracle (dftUnknown nao e tipo; nao ha grafia a emitir)');
+    _RaiseCastCellMissing('Oracle', ADataType);
+    LType := '';
   end;
   Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;

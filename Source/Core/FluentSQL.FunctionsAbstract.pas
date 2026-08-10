@@ -29,6 +29,26 @@ const
 
 type
   TFluentSQLFunctionAbstract = class(TInterfacedObject, IFluentSQLFunctions)
+  protected
+    /// <summary>
+    ///   A PORTA UNICA da politica de intersecao estrita do Cast portavel. Fica
+    ///   aqui, e nao copiada em cada driver, porque a recusa e a MESMA nos sete -
+    ///   se cada driver escrevesse a propria, a mensagem derivaria e a politica
+    ///   viraria uma colecao de opinioes. Chamada como PRIMEIRA linha de todo
+    ///   override de Cast(TFluentSQLDataFieldType), inclusive o do core.
+    /// </summary>
+    class procedure _AssertCastTypeIsPortable(const ADataType: TFluentSQLDataFieldType);
+    /// <summary>
+    ///   Rede de seguranca do lado do driver: o tipo esta na intersecao portavel
+    ///   mas ESTE driver nao tem grafia para ele. Hoje isso so acontece em
+    ///   InterBase (nao medido) e MongoDB (fora da intersecao relacional); nos
+    ///   sete e inalcancavel. Existe para o dia em que alguem acrescentar um
+    ///   membro a cFluentSQLCastPortableTypes e esquecer um dos nove drivers:
+    ///   nesse dia o resultado e erro nomeado, e nao string vazia dentro de
+    ///   'CAST(C AS )'.
+    /// </summary>
+    class procedure _RaiseCastCellMissing(const ADialect: String;
+      const ADataType: TFluentSQLDataFieldType);
   public
     function Count(const AValue: String): String; virtual;
     function Upper(const AValue: String): String; virtual;
@@ -69,6 +89,21 @@ type
 implementation
 
 { TFluentSQLFunctionAbstract }
+
+class procedure TFluentSQLFunctionAbstract._AssertCastTypeIsPortable(
+  const ADataType: TFluentSQLDataFieldType);
+begin
+  if not (ADataType in cFluentSQLCastPortableTypes) then
+    raise EFluentSQLFunctionNotSupported.CreateCastNotPortable(
+      DataFieldTypeName(ADataType));
+end;
+
+class procedure TFluentSQLFunctionAbstract._RaiseCastCellMissing(
+  const ADialect: String; const ADataType: TFluentSQLDataFieldType);
+begin
+  raise EFluentSQLFunctionNotSupported.Create(
+    'Cast(' + DataFieldTypeName(ADataType) + ')', ADialect);
+end;
 
 function TFluentSQLFunctionAbstract.Abs(const AValue: String): String;
 begin

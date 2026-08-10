@@ -176,15 +176,25 @@ end;
 // consistencia" com Firebird/Oracle colocaria um teto de 4000 onde hoje nao ha teto
 // nenhum. Largura so vai se o chamador pedir explicitamente.
 //
-// dftArray levanta porque nao existe alvo generico: 'ARRAY' sozinho e erro de
-// sintaxe (ERROR: syntax error at or near "ARRAY"); o PostgreSQL exige o tipo do
-// ELEMENTO - INTEGER[], TEXT[] - e o enum nao carrega essa informacao. Quem precisa
-// disso usa a sobrecarga Cast(String, String), que e o escape hatch.
+// dftArray nao existe nem aqui, o unico dialeto que chegaria perto: 'ARRAY' sozinho
+// e erro de sintaxe (ERROR: syntax error at or near "ARRAY"); o PostgreSQL exige o
+// tipo do ELEMENTO - INTEGER[], TEXT[] - e o enum nao carrega essa informacao.
+//
+// SO OS TRES DA INTERSECAO, e este e o driver onde a politica DOI: o PostgreSQL
+// tem 8 das 10 celulas medidas, e as cinco que ele perde aqui - DATE, TEXT,
+// TIMESTAMP, UUID, BOOLEAN - funcionam perfeitamente neste motor. Foi exatamente
+// esse o argumento a favor de recusar por celula, e e ele que a decisao rejeita:
+// Cast(x, dftGuid) respondendo aqui e levantando na Oracle e no MySQL nao seria
+// uma API portavel com lacunas, seria uma API que depende do banco - e essa e a
+// coisa que este framework existe para nao ser. A recusa e uniforme, e o dev do PG
+// ve a mesma mensagem que o dev do Oracle. Quem quer UUID no PostgreSQL escreve
+// Cast(x, 'UUID'), e a linha passa a dizer a verdade sobre si mesma.
 function TFluentSQLFunctionsPostgreSQL.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 var
   LType: String;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   case ADataType of
     dftString:
       if ALength > 0 then
@@ -193,17 +203,9 @@ begin
         LType := 'VARCHAR';
     dftInteger:  LType := 'INTEGER';
     dftFloat:    LType := 'DOUBLE PRECISION';
-    dftDate:     LType := 'DATE';
-    dftText:     LType := 'TEXT';
-    dftDateTime: LType := 'TIMESTAMP';
-    dftGuid:     LType := 'UUID';
-    dftBoolean:  LType := 'BOOLEAN';
-    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
-                   'PostgreSQL (ARRAY sozinho e erro de sintaxe; o motor exige o ' +
-                   'tipo do elemento, como INTEGER[], que o enum nao carrega)');
   else
-    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
-      'PostgreSQL (dftUnknown nao e tipo; nao ha grafia a emitir)');
+    _RaiseCastCellMissing('PostgreSQL', ADataType);
+    LType := '';
   end;
   Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;

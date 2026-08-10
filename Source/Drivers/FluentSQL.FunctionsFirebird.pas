@@ -175,18 +175,21 @@ end;
 // Ou seja, o Firebird nunca corrompe calado aqui - por isso a largura default
 // generosa (4000) e segura.
 //
-// dftGuid e dftArray levantam: 'UUID' e 'ARRAY' nao sao nomes de tipo conhecidos,
-// e o motor responde
-//   -SQL error code = -607 / -Specified domain or source column UUID does not exist
-// O Firebird guarda GUID como CHAR(16) CHARACTER SET OCTETS e converte por
-// UUID_TO_CHAR/CHAR_TO_UUID; nao ha CAST direto de/para a forma textual com
-// hifens, entao qualquer grafia que puséssemos aqui mentiria sobre o valor.
+// SO OS TRES DA INTERSECAO. O Firebird tambem aceita DATE, TIMESTAMP, BOOLEAN e
+// BLOB SUB_TYPE TEXT - foi medido e esta na matriz - e mesmo assim eles NAO sao
+// oferecidos aqui: a sobrecarga de enum e a portavel, e portavel quer dizer igual
+// nos sete. dftDate existe aqui e DESTROI o dado no SQLite; dftText existe aqui e
+// e ORA-22849 na Oracle. Quem quiser essas celulas no Firebird pede
+// Cast(x, 'TIMESTAMP') e assume a escolha. O que o Firebird nao tem em nenhuma
+// sobrecarga sao UUID e ARRAY (-607: "Specified domain or source column UUID does
+// not exist"): GUID aqui e CHAR(16) CHARACTER SET OCTETS via CHAR_TO_UUID.
 function TFluentSQLFunctionsFirebird.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 var
   LType: String;
   LLength: Integer;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   LLength := ALength;
   if LLength <= 0 then
     LLength := cFluentSQLCastDefaultLength;
@@ -194,18 +197,9 @@ begin
     dftString:   LType := 'VARCHAR(' + IntToStr(LLength) + ')';
     dftInteger:  LType := 'INTEGER';
     dftFloat:    LType := 'DOUBLE PRECISION';
-    dftDate:     LType := 'DATE';
-    dftText:     LType := 'BLOB SUB_TYPE TEXT';
-    dftDateTime: LType := 'TIMESTAMP';
-    dftBoolean:  LType := 'BOOLEAN';
-    dftGuid:     raise EFluentSQLFunctionNotSupported.Create('Cast(dftGuid)',
-                   'Firebird (nao ha tipo UUID; CAST AS UUID da -607. GUID e ' +
-                   'CHAR(16) CHARACTER SET OCTETS, convertido por CHAR_TO_UUID)');
-    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
-                   'Firebird (CAST AS ARRAY da -607; array nao e alvo de CAST)');
   else
-    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
-      'Firebird (dftUnknown nao e tipo; nao ha grafia a emitir)');
+    _RaiseCastCellMissing('Firebird', ADataType);
+    LType := '';
   end;
   Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;

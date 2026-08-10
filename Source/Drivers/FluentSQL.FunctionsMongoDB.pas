@@ -181,9 +181,15 @@ end;
 // Continuam em silencio, porque continuam no padrao A: Abs, Upper, Lower, Round,
 // Floor - e a sobrecarga Cast(String, String), que por decisao permanece no padrao
 // A. Ver a nota MONGODB em Source\Core\FluentSQL.Functions.pas.
+//
+// A guarda de portabilidade vem ANTES do raise proprio de proposito: para um tipo
+// fora da intersecao, quem pediu dftGuid aqui recebe a MESMA mensagem que receberia
+// no PostgreSQL. Recusa uniforme so e uniforme se valer tambem nos drivers que
+// recusam tudo - senao a mensagem viraria pista de qual driver esta ligado.
 function TFluentSQLFunctionsMongoDB.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   raise EFluentSQLFunctionNotSupported.Create('Cast(TFluentSQLDataFieldType)', cDIALECT);
 end;
 

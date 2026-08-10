@@ -179,38 +179,32 @@ end;
 //   CAST('6F9619FF-8B86-...'   AS UUID)     -> 6
 //   CAST('abc'                 AS BANANA)   -> aceito, afinidade integer
 // Nenhuma dessas linhas levanta. A data vira o ano, o GUID vira o digito 6, e a
-// consulta segue. Por isso dftDate/dftDateTime/dftGuid/dftBoolean LEVANTAM aqui,
-// mesmo o motor "aceitando": erro nomeado e melhor que SQL que o motor aceita com
-// semantica errada.
+// consulta segue.
 //
-// So TEXT, INTEGER, REAL e BLOB tem significado real. Largura e ignorada pelo
-// motor - medido, CAST('abcdefghij' AS TEXT(4)) devolve 'abcdefghij' inteiro -
-// entao ALength e deliberadamente descartado em vez de emitido como enfeite.
+// ESTE DRIVER E A PROVA DE QUE A INTERSECAO TEM DE SER ESTRITA. dftDate,
+// dftDateTime, dftGuid e dftBoolean existem no PostgreSQL, e quatro delas tambem
+// no SQL Server; se a API oferecesse a UNIAO, o mesmo Cast(x, dftDate) que roda
+// certo no PG chegaria aqui, nao levantaria nada, e devolveria 2026. O bug nao
+// apareceria em teste, apareceria em relatorio - e so meses depois. So TEXT,
+// INTEGER, REAL e BLOB tem significado real neste motor, e a intersecao dos sete
+// e ainda menor: dftString, dftInteger, dftFloat.
+//
+// Largura e ignorada pelo motor - medido, CAST('abcdefghij' AS TEXT(4)) devolve
+// 'abcdefghij' inteiro - entao ALength e deliberadamente descartado aqui em vez de
+// emitido como enfeite que mente.
 function TFluentSQLFunctionsSQLite.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 var
   LType: String;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   case ADataType of
-    dftString, dftText: LType := 'TEXT';
-    dftInteger:         LType := 'INTEGER';
-    dftFloat:           LType := 'REAL';
-    dftDate:     raise EFluentSQLFunctionNotSupported.Create('Cast(dftDate)',
-                   'SQLite (nao ha tipo DATE; CAST(''2026-08-10'' AS DATE) devolve ' +
-                   '2026 por afinidade numerica, sem erro)');
-    dftDateTime: raise EFluentSQLFunctionNotSupported.Create('Cast(dftDateTime)',
-                   'SQLite (nao ha tipo DATETIME; CAST devolve 2026 por afinidade ' +
-                   'numerica, sem erro)');
-    dftGuid:     raise EFluentSQLFunctionNotSupported.Create('Cast(dftGuid)',
-                   'SQLite (nao ha tipo UUID; CAST do GUID textual devolve 6)');
-    dftBoolean:  raise EFluentSQLFunctionNotSupported.Create('Cast(dftBoolean)',
-                   'SQLite (nao ha tipo BOOLEAN; CAST(''true'' AS BOOLEAN) devolve 0)');
-    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
-                   'SQLite (nao ha tipo ARRAY; a palavra seria aceita e resolvida ' +
-                   'por afinidade numerica)');
+    dftString:  LType := 'TEXT';
+    dftInteger: LType := 'INTEGER';
+    dftFloat:   LType := 'REAL';
   else
-    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
-      'SQLite (dftUnknown nao e tipo; nao ha grafia a emitir)');
+    _RaiseCastCellMissing('SQLite', ADataType);
+    LType := '';
   end;
   Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;

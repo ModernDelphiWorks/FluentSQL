@@ -143,10 +143,17 @@ end;
 // trunca. Supor semelhanca aqui seria repetir o defeito que esta tarefa matou.
 //
 // Levantar erro nomeado nao custa nada a quem nao usa InterBase (driver DESLIGADO
-// em FluentSQL.inc) e custa uma linha por celula a quem for medi-lo um dia.
+// em FluentSQL.inc) e custa uma linha por celula a quem for medi-lo um dia. Note
+// que o "um dia" encolheu: com a intersecao estrita, medir o InterBase e medir
+// TRES celulas - dftString, dftInteger, dftFloat - e nao dez.
+//
+// A guarda de portabilidade vem ANTES, pelo mesmo motivo do MongoDB: quem pedir
+// dftGuid recebe a mensagem de POLITICA, igual a dos sete, e nao a de "nao medido"
+// deste driver. Sao duas causas diferentes e a mensagem tem de dizer qual e.
 function TFluentSQLFunctionsInterbase.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   raise EFluentSQLFunctionNotSupported.Create('Cast(TFluentSQLDataFieldType)',
     'InterBase (matriz de CAST nao medida: nao ha imagem publica do motor. ' +
     'A grafia NAO foi inferida do Firebird de proposito - ver comentario no driver. ' +

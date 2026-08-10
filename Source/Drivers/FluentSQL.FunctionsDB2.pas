@@ -122,19 +122,26 @@ end;
 // LENGTH 300 - o DB2 nao impoe teto default nem trunca calado, entao acrescentar
 // VARCHAR(4000) so criaria um teto que hoje nao existe.
 //
-// dftText e CLOB, e aqui o DB2 diverge da Oracle: la CLOB nao e alvo de CAST
-// (ORA-22849), aqui CAST('abcdefghij' AS CLOB) devolve LENGTH 10 normalmente.
+// dftText medido como CLOB, e aqui o DB2 diverge da Oracle: la CLOB nao e alvo de
+// CAST (ORA-22849), aqui CAST('abcdefghij' AS CLOB) devolve LENGTH 10 normalmente.
+// E justamente por isso que dftText NAO entra na intersecao - dois motores de
+// grande porte, a mesma palavra, respostas opostas.
 //
-// dftGuid e dftArray levantam - o DB2 nao conhece nenhum dos dois nomes:
+// UUID e ARRAY nao existem em nenhuma sobrecarga - o DB2 nao conhece os nomes:
 //   CAST('...' AS UUID)   SQL0204N  "UUID" is an undefined name.  SQLSTATE=42704
 //   CAST('x'   AS ARRAY)  SQL0204N  "ARRAY" is an undefined name. SQLSTATE=42704
 // (O DB2 guarda GUID como CHAR(16) FOR BIT DATA, que tem o mesmo problema da
 // RAW(16) da Oracle: recusa a forma textual com hifens.)
+//
+// SO OS TRES DA INTERSECAO. DATE, TIMESTAMP, CLOB e BOOLEAN foram medidos e
+// funcionam neste motor; ficam registrados na matriz e acessiveis pela sobrecarga
+// de String.
 function TFluentSQLFunctionsDB2.Cast(const AExpression: String;
   const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
 var
   LType: String;
 begin
+  _AssertCastTypeIsPortable(ADataType);
   case ADataType of
     dftString:
       if ALength > 0 then
@@ -143,18 +150,9 @@ begin
         LType := 'VARCHAR';
     dftInteger:  LType := 'INTEGER';
     dftFloat:    LType := 'DOUBLE';
-    dftDate:     LType := 'DATE';
-    dftText:     LType := 'CLOB';
-    dftDateTime: LType := 'TIMESTAMP';
-    dftBoolean:  LType := 'BOOLEAN';
-    dftGuid:     raise EFluentSQLFunctionNotSupported.Create('Cast(dftGuid)',
-                   'DB2 (SQL0204N: "UUID" is an undefined name; GUID e CHAR(16) FOR ' +
-                   'BIT DATA e nao aceita a forma textual com hifens)');
-    dftArray:    raise EFluentSQLFunctionNotSupported.Create('Cast(dftArray)',
-                   'DB2 (SQL0204N: "ARRAY" is an undefined name)');
   else
-    raise EFluentSQLFunctionNotSupported.Create('Cast(dftUnknown)',
-      'DB2 (dftUnknown nao e tipo; nao ha grafia a emitir)');
+    _RaiseCastCellMissing('DB2', ADataType);
+    LType := '';
   end;
   Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
