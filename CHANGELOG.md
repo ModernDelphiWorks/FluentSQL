@@ -229,6 +229,36 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`IFluentSQLFunctions.Cast` ganhou sobrecarga por dialeto: `Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType; const ALength: Integer = 0)`.** `Cast` era a última função escalar no **padrão A** — o núcleo emitia `'CAST(' + AExpression + ' AS ' + ADataType + ')'` sem consultar o driver, e **nenhum** dos nove drivers a sobrescrevia. Uma grafia respondia pelos sete dialetos. É o mesmo defeito estrutural que já queimou `CEIL`/`LENGTH`, com um agravante: aqui a célula errada frequentemente **não levanta**.
+
+  A matriz **10 tipos × 7 dialetos foi medida contra motor real** — `Test Delphi\Common_tests\test.cast.matrix.sql` traz `docker run`, versão e transcrição literal dos erros. **Das 70 células, 46 existem e 24 não.** Nenhum dialeto tem as 10; só `dftString`, `dftInteger` e `dftFloat` existem nos sete — e mesmo `dftString` sai em **seis grafias distintas**, sob **duas políticas de largura opostas**:
+
+  | | Firebird 5.0.4 | SQL Server 2022 | MySQL 8.4.11 | SQLite 3.53.4 | Oracle 26ai | PostgreSQL 16.14 | DB2 12.1.5.0 |
+  |---|---|---|---|---|---|---|---|
+  | `dftString` | `VARCHAR(4000)` | `NVARCHAR(4000)` | `CHAR` | `TEXT` | `VARCHAR2(4000)` | `VARCHAR` | `VARCHAR` |
+  | `dftInteger` | `INTEGER` | `INT` | `SIGNED` | `INTEGER` | `INTEGER` | `INTEGER` | `INTEGER` |
+  | `dftFloat` | `DOUBLE PRECISION` | `FLOAT` | `DOUBLE` | `REAL` | `BINARY_DOUBLE` | `DOUBLE PRECISION` | `DOUBLE` |
+  | `dftDate` | `DATE` | `DATE` | `DATE` | — | `DATE` | `DATE` | `DATE` |
+  | `dftText` | `BLOB SUB_TYPE TEXT` | `NVARCHAR(MAX)` | `CHAR` | `TEXT` | — | `TEXT` | `CLOB` |
+  | `dftDateTime` | `TIMESTAMP` | `DATETIME` | `DATETIME` | — | `TIMESTAMP` | `TIMESTAMP` | `TIMESTAMP` |
+  | `dftGuid` | — | `UNIQUEIDENTIFIER` | — | — | — | `UUID` | — |
+  | `dftBoolean` | `BOOLEAN` | `BIT` | — | — | `BOOLEAN` | `BOOLEAN` | `BOOLEAN` |
+  | `dftArray` / `dftUnknown` | — | — | — | — | — | — | — |
+
+  Célula marcada `—` levanta `EFluentSQLFunctionNotSupported`, com a mensagem do motor escrita no driver. **Três achados sustentam cada `—`, e os três foram medidos:**
+
+  1. **A palavra sozinha não é o tipo inteiro, e o erro é silencioso.** `CAST(x AS NVARCHAR)` sem `(n)` no SQL Server **trunca calado em 30**: 40 caracteres entram, 30 saem, sem erro nem aviso. Um mapeamento ingênuo `dftString → 'NVARCHAR'` trocaria uma incoerência de API por **corrupção silenciosa de dado**. No Firebird (`-104`) e na Oracle (`ORA-00906`) a mesma forma é **erro de sintaxe**, e no PostgreSQL a largura é que **introduz** truncamento (`VARCHAR(4)` sobre 10 caracteres devolve 4, calado). Por isso a largura é decisão **por driver**, não carimbo do núcleo.
+  2. **A grafia ANSI é erro de sintaxe no MySQL.** O alvo de `CAST` no MySQL é **lista fechada** na gramática: `INTEGER`, `TEXT`, `BOOLEAN` e `UUID` dão `ERROR 1064`. O núcleo emitia `CAST(x AS INTEGER)` para todos, e o próprio teste da casa exercitava essa string dando-a por boa nos sete.
+  3. **O SQLite nunca recusa, e destrói o dado.** Qualquer palavra é aceita e resolvida por afinidade — inclusive `BANANA`. `CAST('2026-08-10' AS DATE)` devolve **`2026`**; `CAST('true' AS BOOLEAN)` devolve **`0`**; `CAST('6F9619FF-…' AS UUID)` devolve **`6`**. Nenhuma levanta. É o único modo de falha pior que emitir SQL inválido, e é por isso que `dftDate`/`dftDateTime`/`dftGuid`/`dftBoolean` levantam no driver SQLite **mesmo o motor "aceitando"**.
+
+  **A largura default é `cFluentSQLCastDefaultLength = 4000`, e não é número redondo escolhido a esmo:** é o maior valor simultaneamente legal nos dois motores mais restritivos — `VARCHAR2(4001)` dá `ORA-00910` e `NVARCHAR(4001)` dá `Msg 131 … exceeds the maximum allowed for any data type (4000)`. Está com folga sob o teto do Firebird em UTF8 (8191, medido). Quem precisar de outra passa `ALength` explícito.
+
+  **A sobrecarga `Cast(String, String)` permanece, inalterada e no padrão A**, como escape hatch para o que o enum não exprime (`'DECIMAL(10,2)'`). **Nenhum SQL hoje emitido muda** — o corpo dela tem diff vazio, e há teste fixando que ela continua verbatim nos nove dialetos. **A ressalva de compatibilidade é outra e é só de compilação:** `IFluentSQLFunctions` ganhou membro, então quem implementa a interface **do zero** (sem herdar de `TFluentSQLFunctionAbstract`) precisa acrescentar o método. Quem herda não faz nada.
+
+  **InterBase levanta nas dez células, de propósito:** não há imagem pública do motor, nenhuma célula foi medida, e a grafia **não foi inferida do Firebird**. Esta própria matriz mostra por que a recusa não é preciosismo — Oracle e DB2 divergem em `CLOB`, Firebird e DB2 divergem na obrigatoriedade da largura. MongoDB levanta pela doutrina já escrita no driver (a interseção é relacional); isso **fecha uma** das seis células de MQL inválido em silêncio que a T3 deixou registradas como dívida.
+
+  **Isto desbloqueia o slot de valor do `CASE`** (a lacuna declarada em *Known issues*). Firebird e DB2 recusavam `CASE WHEN c THEN :p1 ELSE :p2 END` no `PREPARE` (`-804 Data type unknown` / `SQL0418N untyped parameter marker`); medido agora com **as strings exatas que estes drivers emitem**, os dois passam do `PREPARE`: `CAST(:p1 AS VARCHAR(4000))` no Firebird e `CAST(? AS VARCHAR)` no DB2 — no DB2 o `SQL0313N` que responde é o CLP pedindo valores, ou seja o `PREPARE` passou. As duas strings estão travadas por teste; o slot de valor **não** foi implementado nesta entrega.
+- Matriz `Test Delphi\Common_tests\test.cast.matrix.pas` (6 testes, ligada em `TestFluentSQL_Common.dpr`), declarando o **texto literal esperado** de cada uma das 90 células (9 drivers × 10 tipos) — não "não levanta", mas a grafia exata. A comparação é **case-sensitive** de propósito (`Assert.AreEqual(..., False, ...)`), porque o default do DUnitX ignora caixa e deixaria `nvarchar` passar por `NVARCHAR`. Cada dialeto teve uma célula quebrada por mutação dirigida para provar que o teste é load-bearing.
 - `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
 - `EFluentSQLQualifierNotSupported` em `FluentSQL.Interfaces.pas`. Substitui oito cópias de `raise Exception.Create('... Unknown qualifier')` — quatro delas nomeando o driver errado na mensagem.
 - Matriz `Test Delphi\Common_tests\test.builder.guards.pas` (11 testes, ligada em `TestFluentSQL_Common.dpr`) fixando as três guardas de ordem do builder que eram `Assert` ou não existiam — `IfThen`, `ElseIf` e `Desc`, cada uma com célula para "levanta" e célula para "a mensagem nomeia a chamada", mais dois controles de que o caminho legítimo continua emitindo o mesmo SQL. **Os testes rodam idênticos com `{$C+}` e com `-$C-`**, porque a exceção esperada é `EArgumentException`, que nenhum `Assert` produz.
@@ -305,6 +335,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | InterBase | não medido — sem imagem de container pública | não medido |
 
   Isolado: no Firebird o `-804` **não é do `CASE`** — `SELECT :a FROM RDB$DATABASE` dá o mesmo erro. É o marcador sem tipo em posição onde nada lhe dá tipo. Com `CAST` nos dois ramos, os dois motores aceitam. Fazer o slot funcionar nos sete exigiria emitir `CAST(:pN AS <tipo do dialeto>)` — despacho por driver, desenho novo, e colide com a tarefa já catalogada sobre `Cast` sem despacho. **Por isso a assinatura não mudou nesta entrega**, e a escolha entre emitir `CAST` nos sete, parametrizar só onde o motor aceita, ou manter só o slot de expressão, fica para o dono. Versões, `docker run`, forma exata do `PREPARE` em cada cliente e saída bruta de cada motor em `Test Delphi\Common_tests\test.cases.bind.matrix.sql`.
+
+  **Atualização: o bloqueio caiu, a lacuna continua.** A tarefa do `Cast` sem despacho foi feita (ver *Added*): `Cast` saiu do padrão A e cada dialeto devolve a própria grafia. Medido com **as strings exatas que os drivers hoje emitem**, os dois motores que recusavam passam do `PREPARE` — `CAST(:p1 AS VARCHAR(4000))` no Firebird devolve `yes`, e `CAST(? AS VARCHAR)` no DB2 responde `SQL0313N`, que é o CLP pedindo valores depois de preparar. Transcrição em `Test Delphi\Common_tests\test.cast.matrix.sql`. **O slot de valor do `CASE` continua não existindo** — `IfThen`/`ElseIf` seguem em posição de expressão, inalterados; o que mudou é que criá-lo deixou de depender de desenho novo. A escolha entre as três alternativas acima continua sendo do dono.
 
   **Atenção a quem citar a versão do Oracle:** a tag `gvenzl/oracle-free:23-slim` entrega **Oracle AI Database 26ai 23.26.2.0.0**, não 23c.
 - **`FluentSQL.Select.pas` — `TFluentSQLSelect.Serialize` é código morto.** Os 9 drivers sobrescrevem `Serialize` e `FluentSQL.Ast.pas` sempre pega a instância do `Register`; reverter a linha corrigida não derruba teste algum. A forma neutra foi corrigida ali por coerência, não por efeito observável.
