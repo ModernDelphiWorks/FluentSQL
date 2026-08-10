@@ -53,7 +53,9 @@ type
     // Null handling
     function Coalesce(const AValues: array of String): String; override;
     // Type conversion
-    function Cast(const AExpression: String; const ADataType: String): String; override;
+    function Cast(const AExpression: String; const ADataType: String): String; overload; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
     // Date functions
     function Date(const AValue: String; const AFormat: String): String; overload; override;
     function Date(const AValue: String): String; overload; override;
@@ -86,8 +88,9 @@ uses FluentSQL;
     Ex.: Result := 'COUNT(' + AValue + ')';
     Use APENAS quando a forma ANSI for comprovadamente valida nos 7 dialetos
     ativos (Firebird, MSSQL, MySQL, SQLite, Oracle, PostgreSQL, MongoDB).
-    Hoje em A: Count, Sum, Min, Max, Average, Abs, Upper, Lower, Cast, Round,
-               Floor.
+    Hoje em A: Count, Sum, Min, Max, Average, Abs, Upper, Lower, Round, Floor,
+               e a sobrecarga Cast(String, String) - esta ultima por decisao, nao
+               por omissao: ver o comentario dela na implementacao.
     Custo de manutencao: zero. Risco: se um dialeto divergir, o core emite SQL
     invalido EM SILENCIO - foi exatamente o que aconteceu com CEIL no MSSQL.
 
@@ -95,7 +98,8 @@ uses FluentSQL;
     Ex.: Result := FRegister.Functions(FDatabase).Trim(AValue);
     Obrigatorio sempre que UM dialeto que seja divirja da forma ANSI.
     Hoje em B: Length, Ceil, Trim, LTrim, RTrim, SubString, Concat, Coalesce,
-               Date, Day, Month, Year, CurrentDate, CurrentTimestamp, Modulus.
+               Date, Day, Month, Year, CurrentDate, CurrentTimestamp, Modulus,
+               e a sobrecarga Cast(String, TFluentSQLDataFieldType, Integer).
 
   ADICIONAR UMA FUNCAO NO PADRAO B custa 6 pontos de toque, TODOS obrigatorios:
     1. FluentSQL.Interfaces.pas ......... assinatura em IFluentSQLFunctions
@@ -208,9 +212,71 @@ begin
   Result := FRegister.Functions(FDatabase).Coalesce(AValues);
 end;
 
+// PADRAO A DE PROPOSITO, e a UNICA sobrecarga que continua nele. O chamador
+// escreveu a grafia do tipo; ele assumiu a responsabilidade pelo dialeto e o
+// core so envelopa. Nao ha o que despachar: nao existe traducao de 'DECIMAL(10,2)'
+// que o driver pudesse fazer melhor que quem escreveu.
+//
+// Fique claro que isto NAO e portavel: Cast('C', 'INTEGER') e erro de sintaxe no
+// MySQL 8.4 (ERROR 1064, o CAST do MySQL so aceita SIGNED). Quem quer portabilidade
+// usa a sobrecarga de TFluentSQLDataFieldType logo abaixo.
 function TFluentSQLFunctions.Cast(const AExpression: String; const ADataType: String): String;
 begin
   Result := 'CAST(' + AExpression + ' AS ' + ADataType + ')';
+end;
+
+// PADRAO B: nao ha grafia ANSI unica que sirva aos sete. Medido contra motor real
+// (Test Delphi\Common_tests\test.cast.matrix.sql), a mesma celula diverge em
+// SINTAXE, em LARGURA OBRIGATORIA e em SEMANTICA:
+//   dftInteger -> 'INTEGER' vale em 5, mas o MySQL exige SIGNED (ERROR 1064);
+//   dftString  -> 'VARCHAR' sem largura e erro no Firebird (-104) e na Oracle
+//                 (ORA-00906), e no SQL Server TRUNCA EM SILENCIO em 30;
+//   dftDate    -> no SQLite, CAST('2026-08-10' AS DATE) devolve 2026.
+//
+// A GUARDA VEM ANTES DO DESPACHO, e ESTA e a guarda que o caminho vivo atravessa.
+// A API fluente so expoe o objeto do CORE - Func (FluentSQL.pas:278) e
+// TFluentSQL.AsFun (FluentSQL.pas:315) devolvem TFluentSQLFunctions -, entao todo
+// Cast escrito pelo consumidor entra por aqui e faz CURTO-CIRCUITO: para tipo fora
+// da intersecao, o Cast do driver nem chega a rodar.
+//
+// A MESMA guarda e a primeira linha dos nove Cast de driver, e ali ela e
+// REDUNDANTE PARA O CAMINHO FLUENTE. A redundancia e DELIBERADA, porque as duas
+// camadas fecham portas diferentes:
+//
+//   * tirar esta, do core, faria a garantia depender de todo driver futuro lembrar
+//     de chamar a guarda; quem esquecesse reintroduziria a uniao EM SILENCIO, que e
+//     o modo de falha que esta politica existe para matar. E e SO ESTA camada que
+//     defende o cenario do IFluentSQLFunctions de TERCEIRO: RegisterFunctions faz
+//     AddOrSetValue (FluentSQL.Register.pas:249), ou seja SUBSTITUI o nosso objeto,
+//     e com ele vai embora a guarda do nosso driver. Medido: com um terceiro
+//     registrado em dbnPostgreSQL, a chamada pela porta do core e barrada AQUI, e
+//     a chamada pela porta do driver CHEGA ao terceiro. Some-se que um terceiro
+//     registrado nem sequer e alcancavel pela API fluente - Func e Query constroem
+//     CADA UM o seu proprio TFluentSQLRegister (FluentSQL.pas:267 e :694) e nao ha
+//     construtor nem propriedade para injetar um de fora;
+//
+//   * tirar as dos drivers faria a garantia depender de o consumidor entrar pela
+//     porta do core, e a porta do driver e PUBLICA:
+//     TFluentSQLRegister.Functions(D).Cast(x, dftGuid) sobre os NOSSOS drivers e
+//     caminho real e alcancavel, e e a guarda do driver que o barra - medido. Essa
+//     razao basta sozinha. O que NAO se deve escrever aqui e que a biblioteca use
+//     essa porta como entrada independente: as unicas chamadas a
+//     TFluentSQLRegister.Functions(D) no Source/ estao no despacho deste proprio
+//     arquivo, sempre DEPOIS da guarda do core.
+//
+// Custo de manter as duas: uma linha por driver. A mensagem tem fonte unica em
+// TFluentSQLFunctionAbstract._AssertCastTypeIsPortable, entao nao deriva.
+//
+// LACUNA DECLARADA, e ela e desta linha: NENHUM teste da suite observa esta guarda.
+// Apagar esta linha nao deixa um unico teste vermelho, porque o driver logo abaixo
+// recusa com a MESMA mensagem. Apagar as guardas dos drivers, essas sim, ficam
+// vermelhas (TestRecusaDeTipoForaDaIntersecaoEUniforme varre a porta do driver).
+// A camada de baixo e observavel; esta aqui nao e, e fica mesmo assim.
+function TFluentSQLFunctions.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  Result := FRegister.Functions(FDatabase).Cast(AExpression, ADataType, ALength);
 end;
 
 function TFluentSQLFunctions.Date(const AValue: String): String;

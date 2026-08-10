@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -43,13 +44,14 @@ type
     function Modulus(const AValue, ADivisor: String): String; override;
     function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsPostgreSQL }
 
@@ -161,6 +163,51 @@ end;
 function TFluentSQLFunctionsPostgreSQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEIL(' + AValue + ')';
+end;
+
+// Medido em PostgreSQL 16.14. E o dialeto mais completo da matriz: das dez celulas
+// do enum so dftArray e dftUnknown nao tem alvo.
+//
+// dftString emite VARCHAR SEM largura DE PROPOSITO, e isto e o INVERSO da regra do
+// SQL Server. Medido:
+//   CAST('<40 chars>'  AS VARCHAR)    -> 40 caracteres, nada truncado
+//   CAST('abcdefghij'  AS VARCHAR(4)) -> 'abcd', truncado EM SILENCIO
+// Ou seja, aqui a largura e que INTRODUZ corrupcao. Emitir VARCHAR(4000) "por
+// consistencia" com Firebird/Oracle colocaria um teto de 4000 onde hoje nao ha teto
+// nenhum. Largura so vai se o chamador pedir explicitamente.
+//
+// dftArray nao existe nem aqui, o unico dialeto que chegaria perto: 'ARRAY' sozinho
+// e erro de sintaxe (ERROR: syntax error at or near "ARRAY"); o PostgreSQL exige o
+// tipo do ELEMENTO - INTEGER[], TEXT[] - e o enum nao carrega essa informacao.
+//
+// SO OS TRES DA INTERSECAO, e este e o driver onde a politica DOI: o PostgreSQL
+// tem 8 das 10 celulas medidas, e as cinco que ele perde aqui - DATE, TEXT,
+// TIMESTAMP, UUID, BOOLEAN - funcionam perfeitamente neste motor. Foi exatamente
+// esse o argumento a favor de recusar por celula, e e ele que a decisao rejeita:
+// Cast(x, dftGuid) respondendo aqui e levantando na Oracle e no MySQL nao seria
+// uma API portavel com lacunas, seria uma API que depende do banco - e essa e a
+// coisa que este framework existe para nao ser. A recusa e uniforme, e o dev do PG
+// ve a mesma mensagem que o dev do Oracle. Quem quer UUID no PostgreSQL escreve
+// Cast(x, 'UUID'), e a linha passa a dizer a verdade sobre si mesma.
+function TFluentSQLFunctionsPostgreSQL.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  case ADataType of
+    dftString:
+      if ALength > 0 then
+        LType := 'VARCHAR(' + IntToStr(ALength) + ')'
+      else
+        LType := 'VARCHAR';
+    dftInteger:  LType := 'INTEGER';
+    dftFloat:    LType := 'DOUBLE PRECISION';
+  else
+    _RaiseCastCellMissing('PostgreSQL', ADataType);
+    LType := '';
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

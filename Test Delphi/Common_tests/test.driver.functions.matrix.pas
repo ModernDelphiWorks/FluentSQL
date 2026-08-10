@@ -34,10 +34,10 @@
 
   A tabela so tem poder real sobre as funcoes do PADRAO B, as que delegam ao
   driver (ver o bloco de padroes em Source\Core\FluentSQL.Functions.pas). Para as
-  do PADRAO A - Count, Sum, Min, Max, Average, Abs, Cast, Upper, Lower, Round,
-  Floor - o core emite SQL ANSI fixo SEM consultar o driver, entao a chamada
-  sempre devolve texto e a tabela as marca "suportado" TRIVIALMENTE, para todo
-  dialeto. Isso nao e evidencia de que o SQL gerado seja valido naquele motor.
+  do PADRAO A - Count, Sum, Min, Max, Average, Abs, Cast(String,String), Upper,
+  Lower, Round, Floor - o core emite SQL ANSI fixo SEM consultar o driver, entao a
+  chamada sempre devolve texto e a tabela as marca "suportado" TRIVIALMENTE, para
+  todo dialeto. Isso nao e evidencia de que o SQL gerado seja valido naquele motor.
 
   A tabela NAO detecta divergencia de dialeto no padrao A. Foi exatamente esse o
   buraco por onde passaram TRES celulas erradas: CEIL(...) no MSSQL (T-SQL so tem
@@ -49,6 +49,25 @@
   dbnMongoDB na tabela, e a divida no CHANGELOG). Suspeita de divergencia numa
   funcao do padrao A se investiga lendo a documentacao do dialeto, nao rodando
   esta suite.
+
+  O CASO 'Cast' NESTA TABELA - leia antes de citar a linha dele como prova.
+
+  Depois da T17, Cast tem DUAS sobrecargas e elas estao em padroes diferentes:
+
+    Cast(x, ADataType: TFluentSQLDataFieldType) .. PADRAO B, ciente de dialeto,
+      coberta celula a celula por test.cast.matrix.pas. NAO e o que esta tabela
+      exercita.
+    Cast(x, ADataType: String) ................... PADRAO A por decisao, emite
+      verbatim. E ESTA que _Invoke chama, com 'INTEGER'.
+
+  Logo, a celula 'Cast' desta tabela afirma UMA coisa so: o escape hatch continua
+  devolvendo texto em todo dialeto. Ela NAO afirma que o texto roda. E nao roda em
+  toda parte: Cast('C', 'INTEGER') produz CAST(C AS INTEGER), que e ERROR 1064 no
+  MySQL 8.4 - o alvo de CAST do MySQL e lista fechada e a grafia dele e SIGNED
+  (medido; transcricao em test.cast.matrix.sql). A celula fica verde assim mesmo, e
+  esta certo que fique: quem chama a sobrecarga de String assumiu a portabilidade
+  por contrato. Quem quer a garantia do framework chama Cast(x, dftInteger), que
+  em MySQL emite SIGNED.
 
   Adicionou uma funcao nova em IFluentSQLFunctions? Acrescente-a em _Invoke e em
   cFUNCTIONS. Se ela for do padrao B (delega ao driver), a matriz vai ficar
@@ -136,6 +155,9 @@ begin
   else if AName = 'Max' then Result := AFunctions.Max('C')
   else if AName = 'Average' then Result := AFunctions.Average('C')
   else if AName = 'Abs' then Result := AFunctions.Abs('C')
+  // Sobrecarga de String (padrao A), NAO a de enum. 'INTEGER' e ERROR 1064 no
+  // MySQL: esta linha mede que o escape hatch responde, nao que o SQL roda.
+  // A cobertura por dialeto da sobrecarga portavel esta em test.cast.matrix.pas.
   else if AName = 'Cast' then Result := AFunctions.Cast('C', 'INTEGER')
   else if AName = 'Year' then Result := AFunctions.Year('C')
   else if AName = 'Month' then Result := AFunctions.Month('C')

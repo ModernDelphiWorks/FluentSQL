@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -43,13 +44,14 @@ type
     function Modulus(const AValue, ADivisor: String): String; override;
     function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsMSSQL }
 
@@ -167,6 +169,54 @@ end;
 function TFluentSQLFunctionsMSSQL.Ceil(const AValue: String): String;
 begin
   Result := 'CEILING(' + AValue + ')';
+end;
+
+// Medido em Microsoft SQL Server 2022 (RTM-CU26) 16.0.4265.3.
+//
+// ESTE E O DIALETO QUE JUSTIFICA A LARGURA EXPLICITA. Um mapeamento ingenuo
+// dftString -> 'NVARCHAR' compila, roda, NAO da erro e CORROMPE:
+//   SELECT LEN(CAST('<40 chars>' AS NVARCHAR)), CAST('<40 chars>' AS NVARCHAR)
+//     len_varchar  len_nvarchar  v
+//     30           30            123456789012345678901234567890
+// 40 caracteres entram, 30 saem, sem erro e sem aviso - o comprimento default de
+// CAST/CONVERT no T-SQL e 30. Trocar a incoerencia de API de hoje por isso seria
+// estritamente pior que nao mexer. Por isso a largura vai SEMPRE explicita.
+//
+// O teto e 4000: CAST('ab' AS NVARCHAR(4001)) da
+//   Msg 131 ... The size (4001) given to the convert specification 'nvarchar'
+//   exceeds the maximum allowed for any data type (4000).
+// Para texto sem teto o alvo e NVARCHAR(MAX) - medido, e fora da intersecao.
+//
+// SO OS TRES DA INTERSECAO, e este driver e o que mais "perde" com isso: o SQL
+// Server tem 8 das 10 celulas, o melhor placar da matriz junto com o PostgreSQL.
+// UNIQUEIDENTIFIER, BIT, DATE, DATETIME e NVARCHAR(MAX) existem e foram medidos -
+// e continuam registrados na matriz - mas nao sao oferecidos pela sobrecarga de
+// enum, que promete o que vale nos SETE. dftGuid e o exemplo limpo: e
+// UNIQUEIDENTIFIER aqui e nao existe em Firebird, MySQL, SQLite, Oracle nem DB2;
+// oferece-lo so aqui seria vender portabilidade que nao ha, e o programador so
+// descobriria na migracao. Quem quer UNIQUEIDENTIFIER escreve
+// Cast(x, 'UNIQUEIDENTIFIER') - e ai a escolha esta visivel no codigo dele.
+// O que nem a sobrecarga de String salva e ARRAY:
+//   Msg 243 ... Type ARRAY is not a defined system type.
+function TFluentSQLFunctionsMSSQL.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+  LLength: Integer;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  LLength := ALength;
+  if LLength <= 0 then
+    LLength := cFluentSQLCastDefaultLength;
+  case ADataType of
+    dftString:   LType := 'NVARCHAR(' + IntToStr(LLength) + ')';
+    dftInteger:  LType := 'INT';
+    dftFloat:    LType := 'FLOAT';
+  else
+    _RaiseCastCellMissing('SQL Server', ADataType);
+    LType := '';
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

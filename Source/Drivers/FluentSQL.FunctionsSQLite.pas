@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -43,13 +44,14 @@ type
     function CurrentTimestamp: String; override;
     function Ceil(const AValue: String): String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsSQLite }
 
@@ -166,6 +168,45 @@ end;
 function TFluentSQLFunctionsSQLite.Modulus(const AValue, ADivisor: String): String;
 begin
   Result := '(' + AValue + ' % ' + ADivisor + ')';
+end;
+
+// Medido em SQLite 3.53.4. O SQLite e o caso PERIGOSO desta matriz: ele nunca
+// recusa um alvo de CAST. Qualquer palavra e aceita e resolvida pelas regras de
+// AFINIDADE, entao um mapeamento ingenuo nao gera erro - gera DADO ERRADO:
+//   CAST('2026-08-10'          AS DATE)     -> 2026     (typeof integer)
+//   CAST('2026-08-10 12:34:56' AS DATETIME) -> 2026     (typeof integer)
+//   CAST('true'                AS BOOLEAN)  -> 0
+//   CAST('6F9619FF-8B86-...'   AS UUID)     -> 6
+//   CAST('abc'                 AS BANANA)   -> aceito, afinidade integer
+// Nenhuma dessas linhas levanta. A data vira o ano, o GUID vira o digito 6, e a
+// consulta segue.
+//
+// ESTE DRIVER E A PROVA DE QUE A INTERSECAO TEM DE SER ESTRITA. dftDate,
+// dftDateTime, dftGuid e dftBoolean existem no PostgreSQL, e quatro delas tambem
+// no SQL Server; se a API oferecesse a UNIAO, o mesmo Cast(x, dftDate) que roda
+// certo no PG chegaria aqui, nao levantaria nada, e devolveria 2026. O bug nao
+// apareceria em teste, apareceria em relatorio - e so meses depois. So TEXT,
+// INTEGER, REAL e BLOB tem significado real neste motor, e a intersecao dos sete
+// e ainda menor: dftString, dftInteger, dftFloat.
+//
+// Largura e ignorada pelo motor - medido, CAST('abcdefghij' AS TEXT(4)) devolve
+// 'abcdefghij' inteiro - entao ALength e deliberadamente descartado aqui em vez de
+// emitido como enfeite que mente.
+function TFluentSQLFunctionsSQLite.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  case ADataType of
+    dftString:  LType := 'TEXT';
+    dftInteger: LType := 'INTEGER';
+    dftFloat:   LType := 'REAL';
+  else
+    _RaiseCastCellMissing('SQLite', ADataType);
+    LType := '';
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

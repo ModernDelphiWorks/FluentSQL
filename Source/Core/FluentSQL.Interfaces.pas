@@ -51,6 +51,14 @@ type
   EFluentSQLFunctionNotSupported = class(Exception)
   public
     constructor Create(const AFunction, ADialect: String); reintroduce;
+    /// <summary>
+    ///   Recusa da sobrecarga PORTAVEL de Cast (a de TFluentSQLDataFieldType) para
+    ///   um tipo que NAO esta na intersecao dos sete dialetos. Construtor proprio
+    ///   porque a mensagem e de POLITICA, nao de dialeto: ela e a MESMA nos sete,
+    ///   inclusive naqueles em que a celula existiria. Ver
+    ///   cFluentSQLCastPortableTypes.
+    /// </summary>
+    constructor CreateCastNotPortable(const ADataTypeName: String);
   end;
 
   /// <summary>
@@ -85,6 +93,68 @@ type
   TFluentSQLDataFieldType = (dftUnknown, dftString, dftInteger, dftFloat, dftDate,
     dftArray, dftText, dftDateTime, dftGuid, dftBoolean);
 
+const
+  /// <summary>
+  ///   Largura default do alvo de CAST para tipo de texto, usada pelos dialetos
+  ///   que EXIGEM largura (Firebird, Oracle) ou que corrompem sem ela (SQL
+  ///   Server). Nao e numero redondo escolhido a esmo: 4000 e o MAIOR valor
+  ///   simultaneamente legal nos dois motores mais restritivos, medido contra
+  ///   motor real (ver Test Delphi\Common_tests\test.cast.matrix.sql):
+  ///
+  ///     Oracle AI 26ai .. CAST('ab' AS VARCHAR2(4001))
+  ///                       ORA-00910: specified length too long for its datatype
+  ///     SQL Server 2022 . CAST('ab' AS NVARCHAR(4001))
+  ///                       Msg 131 ... exceeds the maximum allowed for any data
+  ///                       type (4000)
+  ///
+  ///   Subir daqui quebra Oracle e SQL Server; descer daqui trunca texto que
+  ///   hoje passa. Quem precisar de outra largura passa ALength explicito em
+  ///   IFluentSQLFunctions.Cast.
+  /// </summary>
+  cFluentSQLCastDefaultLength = 4000;
+
+  /// <summary>
+  ///   A INTERSECAO ESTRITA: os unicos TFluentSQLDataFieldType que a sobrecarga
+  ///   portavel de Cast aceita. Nao e uma lista de conveniencia - e o resultado da
+  ///   matriz 10 tipos x 7 dialetos medida contra motor real na T17 (transcricao
+  ///   completa em Test Delphi\Common_tests\test.cast.matrix.sql).
+  ///
+  ///   Das 70 celulas, 46 existem e 24 nao. Mas "existe em 6 dos 7" NAO basta para
+  ///   entrar aqui: a API do FluentSQL e a INTERSECAO dos dialetos, nao a uniao.
+  ///   Uma celula que responde no PostgreSQL e levanta na Oracle nao e API comum -
+  ///   e uma armadilha que so aparece na troca de banco. So estes TRES existem nos
+  ///   sete:
+  ///
+  ///     dftString   VARCHAR(4000) / NVARCHAR(4000) / VARCHAR2(4000) / VARCHAR /
+  ///                 CHAR / TEXT      - seis grafias, duas politicas de largura
+  ///     dftInteger  INTEGER / INT / SIGNED
+  ///     dftFloat    DOUBLE PRECISION / FLOAT / DOUBLE / REAL / BINARY_DOUBLE
+  ///
+  ///   Os outros sete foram medidos e ficaram DE FORA de proposito, cada um com um
+  ///   dialeto que os nega (o "-" da matriz):
+  ///
+  ///     dftUnknown  nao e tipo, em nenhum lugar
+  ///     dftArray    nenhum dos sete aceita ARRAY como alvo de CAST
+  ///     dftDate     SQLite: CAST('2026-08-10' AS DATE) devolve 2026, SEM ERRO
+  ///     dftDateTime SQLite: idem, devolve 2026
+  ///     dftText     Oracle ORA-22849 (CLOB nao e alvo de CAST); MySQL ERROR 1064
+  ///     dftGuid     Firebird -607, Oracle ORA-01465, MySQL/SQLite/DB2 sem tipo
+  ///     dftBoolean  MySQL ERROR 1064, SQLite devolve 0 calado, e na Oracle a
+  ///                 celula depende da VERSAO do servidor (so 23ai+) - informacao
+  ///                 que esta biblioteca nao tem e nao pode adivinhar
+  ///
+  ///   ALARGAR esta lista e aditivo e barato; ESTREITA-LA depois e BREAKING. Por
+  ///   isso comeca apertada. Quem precisa de um tipo fora daqui tem duas portas
+  ///   explicitas, e as duas dizem ao leitor que a portabilidade passou a ser dele:
+  ///   Cast(AExpression, 'GRAFIA_DO_BANCO') ou ForDialectOnly.
+  ///
+  ///   MEXER AQUI SEM REMEDIR e o unico jeito de errar: acrescentar um membro
+  ///   obriga a implementa-lo em CADA Source\Drivers\FluentSQL.Functions*.pas e a
+  ///   atualizar a matriz medida.
+  /// </summary>
+  cFluentSQLCastPortableTypes = [dftString, dftInteger, dftFloat];
+
+type
   IFluentSQL = interface;
   IFluentSQLAST = interface;
   IFluentSQLFunctions = interface;
@@ -875,7 +945,31 @@ type
     // Null handling
     function Coalesce(const AValues: array of String): String;
     // Type conversion
-    function Cast(const AExpression: String; const ADataType: String): String;
+    /// <summary>
+    ///   ESCAPE HATCH - PADRAO A. O chamador escreve a grafia do tipo e assume a
+    ///   responsabilidade por ela; o core so envelopa em CAST(... AS ...). Existe
+    ///   para o que o enum nao exprime, tipicamente largura/precisao explicita
+    ///   ('DECIMAL(10,2)'). NAO e portavel por construcao: 'INTEGER' aqui e erro
+    ///   de sintaxe no MySQL, que so aceita SIGNED.
+    /// </summary>
+    function Cast(const AExpression: String; const ADataType: String): String; overload;
+    /// <summary>
+    ///   PADRAO B, E A SOBRECARGA PORTAVEL. Aceita EXCLUSIVAMENTE os tipos de
+    ///   cFluentSQLCastPortableTypes - dftString, dftInteger, dftFloat - que sao
+    ///   os que a matriz medida encontrou nos sete dialetos. Qualquer outro
+    ///   levanta EFluentSQLFunctionNotSupported de forma UNIFORME, no dialeto em
+    ///   que a celula falta e igualmente naquele em que ela existiria.
+    ///
+    ///   O contrato das duas sobrecargas fica assim, e a diferenca e o ponto:
+    ///     Cast(x, dftString)  ..... roda igual nos sete; a garantia e do framework
+    ///     Cast(x, 'VARCHAR2')  .... voce escolheu a palavra; a garantia e sua
+    ///
+    ///   Cada dialeto devolve a propria grafia. ALength = 0 pede a largura default
+    ///   do dialeto (ver cFluentSQLCastDefaultLength); os dialetos em que largura
+    ///   nao faz sentido a ignoram, e os que corrompem com ela nao a emitem.
+    /// </summary>
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload;
     // Date functions
     function Date(const AValue: String; const AFormat: String): String; overload;
     function Date(const AValue: String): String; overload;
@@ -1648,6 +1742,16 @@ type
 /// </summary>
 function DriverName(const ADriver: TFluentSQLDriver): String;
 
+/// <summary>
+///   Nome do membro de TFluentSQLDataFieldType como o programador o escreveu no
+///   codigo. Existe para que a mensagem de recusa possa NOMEAR o tipo pedido -
+///   "Cast(dftGuid)" e acionavel, "tipo invalido" nao e. Escrito a mao, e nao via
+///   TypInfo.GetEnumName, pelo mesmo motivo de CDriverNames logo abaixo: a tabela
+///   posicional quebra a compilacao (E2072) se alguem mexer no enum sem refletir
+///   a mudanca aqui.
+/// </summary>
+function DataFieldTypeName(const AType: TFluentSQLDataFieldType): String;
+
 implementation
 
 /// <summary>
@@ -1667,12 +1771,51 @@ begin
   Result := CDriverNames[ADriver];
 end;
 
+const
+  CDataFieldTypeNames: array[TFluentSQLDataFieldType] of string = (
+    'dftUnknown', 'dftString', 'dftInteger', 'dftFloat', 'dftDate',
+    'dftArray', 'dftText', 'dftDateTime', 'dftGuid', 'dftBoolean'
+  );
+
+function DataFieldTypeName(const AType: TFluentSQLDataFieldType): String;
+begin
+  Result := CDataFieldTypeNames[AType];
+end;
+
 { EFluentSQLFunctionNotSupported }
 
 constructor EFluentSQLFunctionNotSupported.Create(const AFunction, ADialect: String);
 begin
   inherited CreateFmt('A funcao "%s" nao existe no dialeto %s. ' +
     'Use uma expressao equivalente suportada por esse motor.', [AFunction, ADialect]);
+end;
+
+/// <summary>
+///   A mensagem ENSINA de proposito. Quem le isto esta com o dedo na linha errada
+///   e e o unico momento em que a explicacao chega barata: dizer so "nao
+///   suportado" desperdicaria esse momento e o programador iria trocar de dialeto
+///   achando que o problema e do banco dele - e nao e, a recusa e igual nos sete.
+///   Por isso a mensagem nomeia o tipo pedido, diz o que a sobrecarga garante, e
+///   entrega as DUAS saidas com a grafia da chamada pronta para copiar.
+/// </summary>
+constructor EFluentSQLFunctionNotSupported.CreateCastNotPortable(
+  const ADataTypeName: String);
+begin
+  inherited CreateFmt(
+    'Cast(%s) foi recusado. A sobrecarga de TFluentSQLDataFieldType e a PORTAVEL: ' +
+    'ela so aceita os tipos que existem em TODOS os dialetos relacionais que o ' +
+    'FluentSQL atende, medidos um a um contra motor real - e sao dftString, ' +
+    'dftInteger e dftFloat. %s nao esta nessa intersecao e por isso e recusado ' +
+    'em TODOS os dialetos, inclusive naqueles onde a celula existiria - a API do ' +
+    'FluentSQL e a intersecao, nao a uniao, e celula que so funciona em alguns ' +
+    'motores e armadilha na hora de trocar de banco. ' +
+    'Duas saidas, ambas explicitas sobre a portabilidade passar a ser sua: ' +
+    '(1) Cast(AExpression, ''GRAFIA_DO_BANCO'') - a sobrecarga de String, que ' +
+    'emite verbatim o que voce escrever, ex.: Cast(''C'', ''UNIQUEIDENTIFIER''); ' +
+    '(2) ForDialectOnly, para registrar o fragmento so no motor em que ele vale. ' +
+    'A matriz medida contra motor real que sustenta esta lista esta em ' +
+    'Test Delphi\Common_tests\test.cast.matrix.sql.',
+    [ADataTypeName, ADataTypeName]);
 end;
 
 { EFluentSQLQualifierNotSupported }

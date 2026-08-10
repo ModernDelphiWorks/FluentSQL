@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -36,13 +37,14 @@ type
     function Concat(const AValue: array of String): String; override;
     function Length(const AValue: String): String; override;
     function Ceil(const AValue: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsDB2 }
 
@@ -110,6 +112,49 @@ end;
 function TFluentSQLFunctionsDB2.Ceil(const AValue: String): String;
 begin
   Result := 'CEIL(' + AValue + ')';
+end;
+
+// Medido em DB2 v12.1.5.0 (DB2/LINUXX8664), driver DESLIGADO em FluentSQL.inc -
+// medido assim mesmo, para que ligar {$DEFINE DB2} nao encontre celula inventada.
+//
+// dftString emite VARCHAR SEM largura, como o PostgreSQL e ao contrario de
+// Firebird/Oracle/SQL Server. Medido: CAST(REPEAT('x',300) AS VARCHAR) devolve
+// LENGTH 300 - o DB2 nao impoe teto default nem trunca calado, entao acrescentar
+// VARCHAR(4000) so criaria um teto que hoje nao existe.
+//
+// dftText medido como CLOB, e aqui o DB2 diverge da Oracle: la CLOB nao e alvo de
+// CAST (ORA-22849), aqui CAST('abcdefghij' AS CLOB) devolve LENGTH 10 normalmente.
+// E justamente por isso que dftText NAO entra na intersecao - dois motores de
+// grande porte, a mesma palavra, respostas opostas.
+//
+// UUID e ARRAY nao existem em nenhuma sobrecarga - o DB2 nao conhece os nomes:
+//   CAST('...' AS UUID)   SQL0204N  "UUID" is an undefined name.  SQLSTATE=42704
+//   CAST('x'   AS ARRAY)  SQL0204N  "ARRAY" is an undefined name. SQLSTATE=42704
+// (O DB2 guarda GUID como CHAR(16) FOR BIT DATA, que tem o mesmo problema da
+// RAW(16) da Oracle: recusa a forma textual com hifens.)
+//
+// SO OS TRES DA INTERSECAO. DATE, TIMESTAMP, CLOB e BOOLEAN foram medidos e
+// funcionam neste motor; ficam registrados na matriz e acessiveis pela sobrecarga
+// de String.
+function TFluentSQLFunctionsDB2.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  case ADataType of
+    dftString:
+      if ALength > 0 then
+        LType := 'VARCHAR(' + IntToStr(ALength) + ')'
+      else
+        LType := 'VARCHAR';
+    dftInteger:  LType := 'INTEGER';
+    dftFloat:    LType := 'DOUBLE';
+  else
+    _RaiseCastCellMissing('DB2', ADataType);
+    LType := '';
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -42,13 +43,14 @@ type
     function CurrentTimestamp: String; override;
     function Ceil(const AValue: String): String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
 uses
-  FluentSQL.Register,
-  FluentSQL.Interfaces;
+  FluentSQL.Register;
 
 { TFluentSQLFunctionsFirebird }
 
@@ -159,6 +161,47 @@ end;
 function TFluentSQLFunctionsFirebird.Modulus(const AValue, ADivisor: String): String;
 begin
   Result := 'MOD(' + AValue + ', ' + ADivisor + ')';
+end;
+
+// Medido em Firebird 5.0.4 (LI-V5.0.4.1812); transcricao literal dos erros em
+// Test Delphi\Common_tests\test.cast.matrix.sql.
+//
+// LARGURA E OBRIGATORIA para VARCHAR: 'CAST(x AS VARCHAR)' NAO trunca calado como
+// no SQL Server, nem passa como no PostgreSQL - e erro de sintaxe:
+//   SQLSTATE = 42000 / -SQL error code = -104 / -Token unknown - line 1, column 78
+// E, com largura, o estouro tambem e ERRO e nao truncamento silencioso:
+//   CAST('<40 chars>' AS VARCHAR(20))
+//   SQLSTATE = 22001 / -string right truncation / -expected length 20, actual 40
+// Ou seja, o Firebird nunca corrompe calado aqui - por isso a largura default
+// generosa (4000) e segura.
+//
+// SO OS TRES DA INTERSECAO. O Firebird tambem aceita DATE, TIMESTAMP, BOOLEAN e
+// BLOB SUB_TYPE TEXT - foi medido e esta na matriz - e mesmo assim eles NAO sao
+// oferecidos aqui: a sobrecarga de enum e a portavel, e portavel quer dizer igual
+// nos sete. dftDate existe aqui e DESTROI o dado no SQLite; dftText existe aqui e
+// e ORA-22849 na Oracle. Quem quiser essas celulas no Firebird pede
+// Cast(x, 'TIMESTAMP') e assume a escolha. O que o Firebird nao tem em nenhuma
+// sobrecarga sao UUID e ARRAY (-607: "Specified domain or source column UUID does
+// not exist"): GUID aqui e CHAR(16) CHARACTER SET OCTETS via CHAR_TO_UUID.
+function TFluentSQLFunctionsFirebird.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+var
+  LType: String;
+  LLength: Integer;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  LLength := ALength;
+  if LLength <= 0 then
+    LLength := cFluentSQLCastDefaultLength;
+  case ADataType of
+    dftString:   LType := 'VARCHAR(' + IntToStr(LLength) + ')';
+    dftInteger:  LType := 'INTEGER';
+    dftFloat:    LType := 'DOUBLE PRECISION';
+  else
+    _RaiseCastCellMissing('Firebird', ADataType);
+    LType := '';
+  end;
+  Result := 'CAST(' + AExpression + ' AS ' + LType + ')';
 end;
 
 end.

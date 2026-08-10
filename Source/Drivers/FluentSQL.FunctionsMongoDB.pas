@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  FluentSQL.Interfaces,
   FluentSQL.FunctionsAbstract;
 
 type
@@ -73,12 +74,13 @@ type
     // Numeric
     function Ceil(const AValue: String): String; override;
     function Modulus(const AValue, ADivisor: String): String; override;
+    // Type conversion
+    function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType;
+      const ALength: Integer = 0): String; overload; override;
   end;
 
 implementation
 
-uses
-  FluentSQL.Interfaces;
 
 const
   cDIALECT = 'MongoDB';
@@ -167,6 +169,19 @@ end;
 function TFluentSQLFunctionsMongoDB.Modulus(const AValue, ADivisor: String): String;
 begin
   raise EFluentSQLFunctionNotSupported.Create('Modulus', cDIALECT);
+end;
+
+// A sobrecarga de enum entra na regra geral desta classe: escalar levanta erro
+// nomeado. Ver a nota MONGODB em Source\Core\FluentSQL.Functions.pas.
+//
+// A chamada a _AssertCastTypeIsPortable e aplicacao mecanica da mesma linha que os
+// outros oito drivers tem, e nao um argumento de politica erguido a partir deste
+// dialeto: a politica de intersecao e RELACIONAL e se decide nos seis relacionais.
+function TFluentSQLFunctionsMongoDB.Cast(const AExpression: String;
+  const ADataType: TFluentSQLDataFieldType; const ALength: Integer): String;
+begin
+  _AssertCastTypeIsPortable(ADataType);
+  raise EFluentSQLFunctionNotSupported.Create('Cast(TFluentSQLDataFieldType)', cDIALECT);
 end;
 
 end.
