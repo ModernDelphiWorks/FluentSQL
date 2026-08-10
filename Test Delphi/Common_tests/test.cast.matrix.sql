@@ -370,8 +370,14 @@
 
   Nenhuma dessas linhas levanta. Um mapeamento ingenuo dftDate -> 'DATE' no SQLite
   nao produziria SQL invalido: produziria SQL VALIDO COM O DADO ERRADO, que e o
-  unico modo de falha pior que os outros dois. E a razao de dftDate, dftDateTime,
-  dftGuid e dftBoolean LEVANTAREM no driver SQLite mesmo o motor "aceitando".
+  unico modo de falha pior que os outros dois.
+
+  E este o dialeto que decidiu a politica. Se a sobrecarga de enum oferecesse a
+  UNIAO - cada celula em que o motor responde - o mesmo Cast(x, dftDate) que roda
+  certo no PostgreSQL chegaria aqui, nao levantaria nada, e devolveria 2026. O bug
+  nao apareceria em teste, apareceria em relatorio, meses depois. Por isso dftDate,
+  dftDateTime, dftGuid e dftBoolean nao sao oferecidos pela sobrecarga de enum em
+  NENHUM dialeto - nem naqueles em que funcionam.
 
   ==============================================================================
   O QUE DESBLOQUEIA A T13 - PARAMETRO EM POSICAO DE THEN/ELSE
@@ -475,9 +481,26 @@
   A MATRIZ - 10 TIPOS x 7 DIALETOS MEDIDOS
   ==============================================================================
 
-  "-" = celula NAO EXISTE no dialeto; o driver levanta
-        EFluentSQLFunctionNotSupported. A justificativa de cada "-" esta escrita
-        no proprio driver, com a mensagem do motor.
+  "-" = celula NAO EXISTE no dialeto, medido contra o motor.
+
+  LEIA ISTO ANTES DE USAR A TABELA COMO MAPA DA API. Ela e o retrato dos MOTORES,
+  nao a lista do que a sobrecarga portavel oferece. As duas nao coincidem, e a
+  diferenca e deliberada:
+
+    a tabela abaixo ...... 46 celulas existem, 24 nao
+    Cast(x, dftTipo) ..... oferece TRES: dftString, dftInteger, dftFloat
+
+  A sobrecarga de enum e a INTERSECAO dos sete, e so estes tres estao nos sete.
+  Todas as outras celulas - inclusive as 43 que EXISTEM em algum motor - sao
+  recusadas por ela em TODOS os dialetos, com a mesma mensagem, inclusive naquele
+  em que a celula funciona. A lista canonica esta em cFluentSQLCastPortableTypes
+  (Source\Core\FluentSQL.Interfaces.pas) e o porque esta em test.cast.matrix.pas.
+
+  Isso NAO torna as 43 inalcancaveis: elas continuam acessiveis pela sobrecarga
+  Cast(AExpression, ADataType: String), que emite verbatim, e por ForDialectOnly.
+  O que muda e de quem e a garantia de portabilidade. E por isso que esta tabela
+  segue viva: ela e a fonte para quem for escrever a grafia a mao, e e o que
+  impede alguem de alargar cFluentSQLCastPortableTypes sem remedir.
 
                  Firebird 5.0.4   SQL Server 2022    MySQL 8.4.11    SQLite 3.53.4
   dftUnknown     -                -                  -               -
@@ -520,10 +543,15 @@
   ==============================================================================
 
   * Interbase, em nenhuma celula - sem imagem publica. As dez levantam.
-  * Oracle 19c e anteriores: a celula dftBoolean foi medida em 23ai, onde BOOLEAN
+  * Oracle 19c e anteriores: a celula BOOLEAN foi medida em 23ai, onde BOOLEAN
     existe em SQL. Em 19c nao existe, e o FluentSQL nao tem como saber a versao do
-    servidor. Quem usar dftBoolean em Oracle antiga recebera erro do motor.
-  * SQL Server: dftText emite NVARCHAR(MAX); nao foi medido se algum consumidor
+    servidor. Foi este o argumento decisivo para dftBoolean ficar FORA da
+    intersecao: uma celula cuja validade depende de informacao que a biblioteca
+    nao possui nao e promessa, e palpite. Hoje Cast(x, dftBoolean) e recusado em
+    todos os dialetos; quem quiser assumir o risco escreve Cast(x, 'BOOLEAN') e a
+    escolha fica visivel na linha dele.
+  * SQL Server: a grafia sem teto e NVARCHAR(MAX), alcancavel pela sobrecarga de
+    String (dftText nao esta na intersecao). Nao foi medido se algum consumidor
     dependia do TEXT deprecado.
   * Comportamento de CAST sobre COLUNA com dado real - todas as medicoes acima usam
     literal. O que se mediu foi a GRAFIA aceita e o comportamento de largura, que

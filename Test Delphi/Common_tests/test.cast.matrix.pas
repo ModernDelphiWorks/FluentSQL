@@ -26,11 +26,38 @@
                   nas regras de afinidade e o dado e destruido sem erro:
                   CAST('2026-08-10' AS DATE) devolve 2026.
 
-  A terceira e a pior, e e a razao de varias celulas desta matriz LEVANTAREM em
-  vez de emitir SQL. A regra da casa vale na ordem: erro nomeado > SQL que o motor
+  A terceira e a pior, e e a razao de a sobrecarga de enum LEVANTAR onde o motor
+  responderia. A regra da casa vale na ordem: erro nomeado > SQL que o motor
   recusa > SQL que o motor aceita com semantica errada.
 
-  O QUE ESTA MATRIZ TRAVA
+  A POLITICA QUE ESTE ARQUIVO TRAVA: INTERSECAO ESTRITA
+
+  A medicao encontrou 46 celulas que EXISTEM em 70. A sobrecarga portavel oferece
+  TRES. Isso nao e a matriz e o codigo discordando - e a decisao, e ela e o ponto:
+
+    a API do FluentSQL e a INTERSECAO dos dialetos, nao a uniao.
+
+  So dftString, dftInteger e dftFloat existem nos SETE. Todo o resto e recusado em
+  TODOS os dialetos, INCLUSIVE naqueles em que a celula existe e foi medida:
+  dftGuid levanta no PostgreSQL (onde UUID funciona), dftBoolean levanta no SQL
+  Server (onde BIT funciona), dftText levanta no DB2 (onde CLOB funciona).
+
+  Se a recusa fosse por celula, Cast(x, dftGuid) responderia no PG e explodiria na
+  Oracle - e o programador so descobriria na migracao, que e o momento mais caro
+  possivel. Uma sobrecarga que se apresenta como portavel e devolve a uniao nao e
+  uma API com lacunas, e uma API que depende do banco.
+
+  Tres razoes secundarias, todas verificaveis aqui:
+    * alargar a lista depois e ADITIVO; estreitar depois e BREAKING. Comecar
+      apertado e de graca enquanto nada depende disso.
+    * dftBoolean na Oracle depende da VERSAO do servidor (so 23ai+), e esta
+      biblioteca nao sabe a versao. Celula que depende de informacao que o
+      framework nao tem nao pode ser promessa.
+    * as duas sobrecargas passam a ter contrato legivel:
+        Cast(x, dftString) .... a garantia de portabilidade e do framework
+        Cast(x, 'VARCHAR2') ... voce escolheu a palavra, a garantia e sua
+
+  O QUE ESTA MATRIZ TRAVA, ENTAO
 
   Cada par (dialeto, TFluentSQLDataFieldType) tem valor esperado LITERAL declarado
   em _Esperado. Nao e "nao levanta": e o texto exato. Consequencia pratica:
@@ -38,15 +65,24 @@
     * trocar NVARCHAR(4000) por NVARCHAR no MSSQL ........ VERMELHO
       (e essa mutacao e a que reintroduziria o truncamento silencioso em 30)
     * trocar SIGNED por INTEGER no MySQL ................. VERMELHO
-    * fazer o SQLite responder dftDate em vez de levantar  VERMELHO
     * fazer o PostgreSQL emitir VARCHAR(4000) ............ VERMELHO
       (largura no PG INTRODUZ truncamento; ver o driver)
+    * devolver dftGuid no PostgreSQL "porque la funciona"  VERMELHO
+      (TestRecusaDeTipoForaDaIntersecaoEUniforme, que e a trava da POLITICA:
+       quebrar a recusa em UM SO dialeto ja fica vermelho)
+    * apagar a explicacao da mensagem de erro ............ VERMELHO
+      (TestMensagemDeRecusaEnsinaASaida)
 
   A comparacao e CASE-SENSITIVE de proposito: Assert.AreEqual de string no DUnitX
   ignora caixa por default, e 'nvarchar' passando por 'NVARCHAR' esconderia
   exatamente o tipo de divergencia que esta matriz existe para pegar.
 
-  NAO MEDIDO: InterBase - nao ha imagem de container publica. Todas as dez celulas
+  A MATRIZ MEDIDA COMPLETA - as 70 celulas e o motivo de cada uma das 24 que nao
+  existem - fica em test.cast.matrix.sql, ao lado. Ela NAO foi jogada fora quando
+  a politica encolheu para tres: e a justificativa da politica, e e o que impede
+  alguem de alargar a lista sem remedir.
+
+  NAO MEDIDO: InterBase - nao ha imagem de container publica. Todas as celulas
   dele levantam, e isso e deliberado: a grafia NAO foi inferida do Firebird. Ver
   FluentSQL.FunctionsInterbase.pas. MongoDB tambem levanta em todas, pela doutrina
   ja escrita em FluentSQL.FunctionsMongoDB.pas (a intersecao e relacional).
@@ -67,6 +103,19 @@ type
     /// <summary>Cada celula devolve o texto exato declarado, ou levanta o erro nomeado.</summary>
     [Test]
     procedure TestMatrizCastCelulaPorCelula;
+    /// <summary>
+    ///   A TRAVA DA POLITICA. Tipo fora de cFluentSQLCastPortableTypes levanta em
+    ///   TODO dialeto registrado, com a MESMA mensagem - inclusive nos que teriam
+    ///   a celula. Quebrar a recusa em um so dialeto ja e vermelho.
+    /// </summary>
+    [Test]
+    procedure TestRecusaDeTipoForaDaIntersecaoEUniforme;
+    /// <summary>A lista portavel e exatamente tres, e sao os tres medidos nos sete.</summary>
+    [Test]
+    procedure TestListaPortavelEExatamenteOsTresUniversais;
+    /// <summary>A mensagem de recusa nomeia o tipo e entrega as duas saidas.</summary>
+    [Test]
+    procedure TestMensagemDeRecusaEnsinaASaida;
     /// <summary>Dialeto registrado nunca cai no corpo abstrato (EAbstractError).</summary>
     [Test]
     procedure TestNenhumaCelulaLevantaEAbstractError;
@@ -104,6 +153,12 @@ const
 ///   A TABELA. Texto literal esperado de Cast('C', <tipo>) com largura default.
 ///   Cada linha desta funcao e uma afirmacao sobre motor real; a transcricao dos
 ///   erros que a sustentam esta em test.cast.matrix.sql.
+///
+///   SO HA TRES LINHAS POR DIALETO, e a ausencia das outras e informacao, nao
+///   esquecimento. As celulas medidas que EXISTEM em cada motor mas nao estao aqui
+///   vao anotadas em comentario: elas continuam verdadeiras sobre o motor e
+///   continuam alcancaveis pela sobrecarga de String; o que elas nao sao e
+///   portaveis, e a sobrecarga de enum so promete o portavel.
 /// </summary>
 function _Esperado(const ADriver: TFluentSQLDriver;
   const AType: TFluentSQLDataFieldType): String;
@@ -112,90 +167,74 @@ begin
   case ADriver of
     // Firebird 5.0.4. Largura OBRIGATORIA (sem ela: -104). Estouro de largura e
     // erro (22001), nunca truncamento calado.
+    // Medidas e fora da intersecao: DATE, TIMESTAMP, BOOLEAN, BLOB SUB_TYPE TEXT.
     dbnFirebird:
       case AType of
         dftString:   Result := 'CAST(C AS VARCHAR(4000))';
         dftInteger:  Result := 'CAST(C AS INTEGER)';
         dftFloat:    Result := 'CAST(C AS DOUBLE PRECISION)';
-        dftDate:     Result := 'CAST(C AS DATE)';
-        dftText:     Result := 'CAST(C AS BLOB SUB_TYPE TEXT)';
-        dftDateTime: Result := 'CAST(C AS TIMESTAMP)';
-        dftBoolean:  Result := 'CAST(C AS BOOLEAN)';
       end;
 
     // SQL Server 2022 CU26. NVARCHAR SEMPRE com largura: 'AS NVARCHAR' nu trunca
     // em 30 sem erro nem aviso. Teto 4000 (Msg 131 em 4001).
+    // Medidas e fora da intersecao: DATE, DATETIME, NVARCHAR(MAX),
+    // UNIQUEIDENTIFIER, BIT - 5 celulas, o maior preco pago por um dialeto aqui.
     dbnMSSQL:
       case AType of
         dftString:   Result := 'CAST(C AS NVARCHAR(4000))';
         dftInteger:  Result := 'CAST(C AS INT)';
         dftFloat:    Result := 'CAST(C AS FLOAT)';
-        dftDate:     Result := 'CAST(C AS DATE)';
-        dftText:     Result := 'CAST(C AS NVARCHAR(MAX))';
-        dftDateTime: Result := 'CAST(C AS DATETIME)';
-        dftGuid:     Result := 'CAST(C AS UNIQUEIDENTIFIER)';
-        dftBoolean:  Result := 'CAST(C AS BIT)';
       end;
 
     // MySQL 8.4.11. Alvo de CAST e LISTA FECHADA: INTEGER/TEXT/BOOLEAN/UUID sao
     // ERROR 1064. CHAR sem largura nao trunca.
+    // Medidas e fora da intersecao: DATE, DATETIME.
     dbnMySQL:
       case AType of
         dftString:   Result := 'CAST(C AS CHAR)';
-        dftText:     Result := 'CAST(C AS CHAR)';
         dftInteger:  Result := 'CAST(C AS SIGNED)';
         dftFloat:    Result := 'CAST(C AS DOUBLE)';
-        dftDate:     Result := 'CAST(C AS DATE)';
-        dftDateTime: Result := 'CAST(C AS DATETIME)';
       end;
 
-    // SQLite 3.53.4. So TEXT/INTEGER/REAL/BLOB tem significado. Date, DateTime,
-    // Guid e Boolean LEVANTAM embora o motor "aceite": ele destroi o dado calado.
+    // SQLite 3.53.4. So TEXT/INTEGER/REAL/BLOB tem significado, e o motor nao
+    // recusa NADA - nem 'BANANA'. E o dialeto que prova a intersecao estrita.
     dbnSQLite:
       case AType of
         dftString:   Result := 'CAST(C AS TEXT)';
-        dftText:     Result := 'CAST(C AS TEXT)';
         dftInteger:  Result := 'CAST(C AS INTEGER)';
         dftFloat:    Result := 'CAST(C AS REAL)';
       end;
 
     // Oracle AI 26ai 23.26.2.0.0. Largura OBRIGATORIA (ORA-00906), teto 4000
-    // (ORA-00910). dftText levanta: CLOB nao e alvo de CAST (ORA-22849).
+    // (ORA-00910).
+    // Medidas e fora da intersecao: DATE, TIMESTAMP e BOOLEAN - esta ultima so
+    // valida em 23ai+, versao que o framework nao tem como conhecer.
     dbnOracle:
       case AType of
         dftString:   Result := 'CAST(C AS VARCHAR2(4000))';
         dftInteger:  Result := 'CAST(C AS INTEGER)';
         dftFloat:    Result := 'CAST(C AS BINARY_DOUBLE)';
-        dftDate:     Result := 'CAST(C AS DATE)';
-        dftDateTime: Result := 'CAST(C AS TIMESTAMP)';
-        dftBoolean:  Result := 'CAST(C AS BOOLEAN)';
       end;
 
     // PostgreSQL 16.14. VARCHAR SEM largura de proposito: aqui a largura e que
     // trunca em silencio (VARCHAR(4) sobre 10 chars devolve 4).
+    // Medidas e fora da intersecao: DATE, TEXT, TIMESTAMP, UUID, BOOLEAN.
     dbnPostgreSQL:
       case AType of
         dftString:   Result := 'CAST(C AS VARCHAR)';
         dftInteger:  Result := 'CAST(C AS INTEGER)';
         dftFloat:    Result := 'CAST(C AS DOUBLE PRECISION)';
-        dftDate:     Result := 'CAST(C AS DATE)';
-        dftText:     Result := 'CAST(C AS TEXT)';
-        dftDateTime: Result := 'CAST(C AS TIMESTAMP)';
-        dftGuid:     Result := 'CAST(C AS UUID)';
-        dftBoolean:  Result := 'CAST(C AS BOOLEAN)';
       end;
 
     // DB2 v12.1.5.0. VARCHAR sem largura nao trunca (300 chars entram, 300 saem).
-    // CLOB E alvo valido aqui, ao contrario da Oracle.
+    // Medidas e fora da intersecao: DATE, CLOB, TIMESTAMP, BOOLEAN. CLOB E alvo
+    // valido aqui e NAO e na Oracle - o par que mostra que familia nao prediz
+    // celula.
     dbnDB2:
       case AType of
         dftString:   Result := 'CAST(C AS VARCHAR)';
         dftInteger:  Result := 'CAST(C AS INTEGER)';
         dftFloat:    Result := 'CAST(C AS DOUBLE)';
-        dftDate:     Result := 'CAST(C AS DATE)';
-        dftText:     Result := 'CAST(C AS CLOB)';
-        dftDateTime: Result := 'CAST(C AS TIMESTAMP)';
-        dftBoolean:  Result := 'CAST(C AS BOOLEAN)';
       end;
 
     // NAO MEDIDO (sem imagem publica) e NAO inferido do Firebird. Todas levantam.
@@ -314,6 +353,199 @@ begin
       'Esperado ao menos 70 celulas conferidas (7 dialetos x 10 tipos); ' +
       'conferidas ' + IntToStr(LConferidas) + '. Driver desligado no .inc ' +
       'reduz a cobertura desta matriz.');
+  finally
+    LRegister.Free;
+  end;
+end;
+
+/// <summary>
+///   A TRAVA DA POLITICA, e ela e UMA afirmacao so: para tipo fora da intersecao,
+///   a resposta NAO DEPENDE DO DIALETO. Repare que nao basta "levanta em todos" -
+///   a MENSAGEM tem de ser a mesma, caractere a caractere. Se cada driver
+///   respondesse com o proprio texto, o erro viraria pista de qual driver esta
+///   ligado, e a recusa seria uniforme so no papel: o programador leria "MySQL
+///   nao suporta" e concluiria, errado, que trocar de banco resolve.
+///
+///   E daqui que vem a exigencia de a guarda ser a PRIMEIRA linha de Cast tambem
+///   em MongoDB e InterBase, que recusam TUDO com mensagem propria de dialeto. Se
+///   a guarda viesse depois do raise proprio deles, Cast('C', dftGuid) devolveria
+///   a mensagem do MongoDB no MongoDB e a mensagem de politica no PostgreSQL -
+///   duas respostas para a mesma pergunta. Trocar a ordem daquelas duas linhas em
+///   qualquer um dos dois fica VERMELHO aqui.
+/// </summary>
+procedure TTestCastMatrix.TestRecusaDeTipoForaDaIntersecaoEUniforme;
+var
+  LRegister: TFluentSQLRegister;
+  LDriver: TFluentSQLDriver;
+  LType: TFluentSQLDataFieldType;
+  LMensagemReferencia: String;
+  LDriverReferencia: String;
+  LMensagem: String;
+  LLevantou: Boolean;
+  LObtido: String;
+  LConferidas: Integer;
+begin
+  LConferidas := 0;
+  LRegister := TFluentSQLRegister.Create;
+  try
+    for LType := Low(TFluentSQLDataFieldType) to High(TFluentSQLDataFieldType) do
+    begin
+      if LType in cFluentSQLCastPortableTypes then
+        Continue;
+      LMensagemReferencia := '';
+      LDriverReferencia := '';
+      for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+      begin
+        if not _EstaRegistrado(LRegister, LDriver) then
+          Continue;
+        LLevantou := False;
+        LMensagem := '';
+        LObtido := '';
+        try
+          LObtido := _Funcoes(LRegister, LDriver).Cast('C', LType);
+        except
+          on E: EFluentSQLFunctionNotSupported do
+          begin
+            LLevantou := True;
+            LMensagem := E.Message;
+          end;
+        end;
+        Inc(LConferidas);
+
+        Assert.IsTrue(LLevantou,
+          'Celula ' + _Celula(LDriver, LType) + ' respondeu "' + LObtido +
+          '" em vez de levantar. ' + _NomeTipo(LType) + ' nao esta em ' +
+          'cFluentSQLCastPortableTypes, logo a sobrecarga de enum tem de recusar ' +
+          'AQUI TAMBEM - inclusive se a celula existir neste motor. Oferece-la so ' +
+          'onde ela existe e devolver a UNIAO dos dialetos por uma porta que se ' +
+          'apresenta como portavel.');
+
+        if LDriverReferencia = '' then
+        begin
+          LMensagemReferencia := LMensagem;
+          LDriverReferencia := DriverName(LDriver);
+        end
+        else
+          // ignoreCase = False: a mensagem e o contrato visivel da politica.
+          Assert.AreEqual(LMensagemReferencia, LMensagem, False,
+            'A recusa de ' + _NomeTipo(LType) + ' em ' + DriverName(LDriver) +
+            ' tem texto diferente da recusa em ' + LDriverReferencia + '. A ' +
+            'recusa e de POLITICA, nao de dialeto, e por isso e a MESMA nos ' +
+            'nove drivers. Mensagem por dialeto aqui significa que a guarda ' +
+            '_AssertCastTypeIsPortable deixou de ser a primeira linha do Cast ' +
+            'deste driver, ou que alguem a duplicou com texto proprio.');
+      end;
+    end;
+    Assert.IsTrue(LConferidas >= 49,
+      'Esperado ao menos 49 recusas conferidas (7 tipos fora da intersecao x 7 ' +
+      'dialetos ligados por default); conferidas ' + IntToStr(LConferidas) + '.');
+  finally
+    LRegister.Free;
+  end;
+end;
+
+/// <summary>
+///   A lista e exatamente tres, e a ORDEM da checagem segue o enum. Este teste e
+///   o que torna caro alargar a intersecao por descuido: acrescentar um membro a
+///   cFluentSQLCastPortableTypes fica vermelho aqui, e consertar o vermelho
+///   obriga a escrever o nome do tipo novo nesta linha - uma linha de diff que o
+///   revisor ve, e que o obriga a perguntar em que medicao aquilo se apoia.
+///
+///   O segundo bloco confere DataFieldTypeName membro a membro. CDataFieldTypeNames
+///   e uma tabela POSICIONAL: acrescentar um membro no fim quebra a compilacao
+///   (E2072), mas REORDENAR o enum nao quebra nada - so faz a mensagem de erro
+///   passar a nomear o tipo errado, calada. Como a mensagem de recusa existe
+///   justamente para nomear o tipo, uma tabela deslocada esvazia a feature inteira.
+/// </summary>
+procedure TTestCastMatrix.TestListaPortavelEExatamenteOsTresUniversais;
+var
+  LType: TFluentSQLDataFieldType;
+  LLista: String;
+begin
+  LLista := '';
+  for LType := Low(TFluentSQLDataFieldType) to High(TFluentSQLDataFieldType) do
+    if LType in cFluentSQLCastPortableTypes then
+    begin
+      if LLista <> '' then
+        LLista := LLista + ',';
+      LLista := LLista + _NomeTipo(LType);
+    end;
+
+  Assert.AreEqual('dftString,dftInteger,dftFloat', LLista, False,
+    'cFluentSQLCastPortableTypes mudou. Esses tres sao os UNICOS tipos que a ' +
+    'matriz medida contra motor real encontrou nos sete dialetos relacionais ' +
+    '(ver test.cast.matrix.sql). Alargar a lista e aditivo e permitido, mas ' +
+    'exige medir o tipo novo nos sete E implementa-lo em cada ' +
+    'Source\Drivers\FluentSQL.Functions*.pas; estreita-la e BREAKING.');
+
+  for LType := Low(TFluentSQLDataFieldType) to High(TFluentSQLDataFieldType) do
+    Assert.AreEqual(_NomeTipo(LType), DataFieldTypeName(LType), False,
+      'DataFieldTypeName saiu de sincronia com TFluentSQLDataFieldType. A tabela ' +
+      'CDataFieldTypeNames e posicional: reordenar o enum nao quebra a ' +
+      'compilacao, so faz a mensagem de recusa nomear o tipo ERRADO - e nomear o ' +
+      'tipo pedido e a unica coisa que aquela mensagem tem de fazer.');
+end;
+
+/// <summary>
+///   A mensagem de recusa e parte do contrato, nao enfeite: e o unico momento em
+///   que a explicacao chega barata ao programador que errou a linha. Este teste
+///   trava os quatro fatos que ela precisa carregar - o tipo pedido pelo nome, o
+///   que a sobrecarga garante, as DUAS saidas, e onde esta a medicao que sustenta
+///   a lista. Reduzir a mensagem a "nao suportado" fica vermelho.
+/// </summary>
+procedure TTestCastMatrix.TestMensagemDeRecusaEnsinaASaida;
+var
+  LRegister: TFluentSQLRegister;
+  LDriver: TFluentSQLDriver;
+  LEncontrado: Boolean;
+  LMensagem: String;
+
+  procedure _Exige(const ATrecho, APorque: String);
+  begin
+    Assert.IsTrue(Pos(ATrecho, LMensagem) > 0,
+      'A mensagem de recusa de Cast(dftGuid) perdeu "' + ATrecho + '". ' +
+      APorque + sLineBreak + 'Mensagem atual: ' + LMensagem);
+  end;
+
+begin
+  LEncontrado := False;
+  LMensagem := '';
+  LRegister := TFluentSQLRegister.Create;
+  try
+    for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+    begin
+      if not _EstaRegistrado(LRegister, LDriver) then
+        Continue;
+      try
+        _Funcoes(LRegister, LDriver).Cast('C', dftGuid);
+      except
+        on E: EFluentSQLFunctionNotSupported do
+        begin
+          LMensagem := E.Message;
+          LEncontrado := True;
+        end;
+      end;
+      Break;
+    end;
+    Assert.IsTrue(LEncontrado,
+      'Nenhum dialeto registrado recusou Cast(C, dftGuid). Sem recusa nao ha ' +
+      'mensagem, e a politica de intersecao estrita deixou de existir.');
+
+    _Exige('dftGuid',
+      'A mensagem tem de NOMEAR o tipo pedido: "Cast(dftGuid) foi recusado" e ' +
+      'acionavel, "tipo invalido" manda o programador adivinhar.');
+    _Exige('dftString',
+      'A mensagem tem de dizer o que a sobrecarga ACEITA, senao o proximo passo ' +
+      'do leitor e tentar os outros nove tipos um a um.');
+    _Exige('intersecao',
+      'A mensagem tem de dizer que a recusa e de intersecao, e nao do banco ' +
+      'dele - sem isso o leitor troca de dialeto achando que resolve.');
+    _Exige('Cast(AExpression, ''GRAFIA_DO_BANCO'')',
+      'Primeira saida: a sobrecarga de String, com a grafia da chamada pronta.');
+    _Exige('ForDialectOnly',
+      'Segunda saida: registrar o fragmento so no motor em que ele vale.');
+    _Exige('test.cast.matrix.sql',
+      'Sem o ponteiro para a medicao, o proximo dev alarga a lista no palpite.');
   finally
     LRegister.Free;
   end;
