@@ -17,7 +17,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **BREAKING CHANGE (SQL emitido) — Oracle: o apelido de TABELA perdeu a palavra `AS`.** O Oracle **não aceita** `AS` antes de apelido de tabela, view ou subconsulta, e o núcleo emitia `AS` para todo apelido sem consultar dialeto nenhum (`FluentSQL.Name.pas:114`, `Result := TUtils.Concat([Result, 'AS', FAlias])`). Todo `From(tabela, apelido)` e as **quatro** sobrecargas de join com apelido (`InnerJoin`/`LeftJoin`/`RightJoin`/`FullJoin`) produziam SQL que o Oracle recusa. **Quem compara o SQL gerado com string fixa para `dbnOracle` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
+- **BREAKING CHANGE (SQL emitido) — Oracle: o apelido de TABELA perdeu a palavra `AS`.** O Oracle **não aceita** `AS` antes de apelido de tabela, view ou subconsulta, e o núcleo emitia `AS` para todo apelido sem consultar dialeto nenhum — a linha era `Result := TUtils.Concat([Result, 'AS', FAlias])`, em `FluentSQL.Name.pas:114` **na árvore anterior à correção** (commit `eb48337`); no HEAD atual essa linha não existe mais, e o ponto equivalente é `FluentSQL.Name.pas:161`, já lendo `FAliasKeyword`. Todo `From(tabela, apelido)` e as **quatro** sobrecargas de join com apelido (`InnerJoin`/`LeftJoin`/`RightJoin`/`FullJoin`) produziam SQL que o Oracle recusa. **Quem compara o SQL gerado com string fixa para `dbnOracle` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
 
   | Construção | Antes (Oracle) | Depois (Oracle) | Motor real |
   |---|---|---|---|
@@ -102,15 +102,15 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   | # | Ponto de entrada | Implementado em |
   |---|---|---|
-  | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1422` |
-  | 2 | `IFluentSQL.AndOpe(array)` | `FluentSQL.pas:367` |
-  | 3 | `IFluentSQL.OrOpe(array)` | `FluentSQL.pas:372` |
-  | 4 | `IFluentSQL.Column(array)` | `FluentSQL.pas:664` |
-  | 5 | `IFluentSQL.Having(array)` | `FluentSQL.pas:968` |
-  | 6 | `IFluentSQL.OnCond(array)` | `FluentSQL.pas:420` |
-  | 7 | `IFluentSQL.CaseExpr(array)` | `FluentSQL.pas:342` |
-  | 8 | `IFluentSQL.ForDialectOnly(dialeto, array)` | `FluentSQL.pas:325` |
-  | 9 | `IFluentSQL.Expression(array)` | `FluentSQL.pas:873` |
+  | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1446` |
+  | 2 | `IFluentSQL.AndOpe(array)` | `FluentSQL.pas:368` |
+  | 3 | `IFluentSQL.OrOpe(array)` | `FluentSQL.pas:373` |
+  | 4 | `IFluentSQL.Column(array)` | `FluentSQL.pas:686` |
+  | 5 | `IFluentSQL.Having(array)` | `FluentSQL.pas:992` |
+  | 6 | `IFluentSQL.OnCond(array)` | `FluentSQL.pas:421` |
+  | 7 | `IFluentSQL.CaseExpr(array)` | `FluentSQL.pas:343` |
+  | 8 | `IFluentSQL.ForDialectOnly(dialeto, array)` | `FluentSQL.pas:326` |
+  | 9 | `IFluentSQL.Expression(array)` | `FluentSQL.pas:896` |
   | 10 | `IFluentSQLCriteriaExpression.AndOpe(array)` | `FluentSQL.Expression.pas:261` |
   | 11 | `IFluentSQLCriteriaExpression.OrOpe(array)` | `FluentSQL.Expression.pas:344` |
   | 12 | `IFluentSQLCriteriaExpression.Ope(array)` | `FluentSQL.Expression.pas:358` |
@@ -169,7 +169,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **O que fazer:** passe **exatamente um** valor por coluna; **omita a coluna** se ela deve ficar `NULL`; e, se o que você queria era uma expressão (`CURRENT_TIMESTAMP`, `A + 1`), veja o parágrafo seguinte — não há forma de exprimi-la em slot de valor.
 
-  **O que fazer (parametrização):** se você dependia de passar fragmento de SQL por esse array — por exemplo `.SetValue('DATA', ['CURRENT_TIMESTAMP'])` — ele agora vira **dado**, e a coluna recebe a string `CURRENT_TIMESTAMP`. **Não há substituto hoje:** o overload tipado `SetValue(const AColumnName, AColumnValue: String)` também parametriza (`FluentSQL.pas:404-411`), e sempre parametrizou. Ou seja, o `INSERT`/`UPDATE` do FluentSQL **não exprime expressão em slot de valor** — nem antes nem depois; o que existia era um caminho que funcionava *por acidente*, e apenas quando o texto passado calhava de ser SQL válido no dialeto alvo. Isso está registrado em *Known issues* como a distinção **valor × expressão**, que é tarefa de arquitetura própria.
+  **O que fazer (parametrização):** se você dependia de passar fragmento de SQL por esse array — por exemplo `.SetValue('DATA', ['CURRENT_TIMESTAMP'])` — ele agora vira **dado**, e a coluna recebe a string `CURRENT_TIMESTAMP`. **Não há substituto hoje:** o overload tipado `SetValue(const AColumnName, AColumnValue: String)` também parametriza (`FluentSQL.pas:405-412`), e sempre parametrizou. Ou seja, o `INSERT`/`UPDATE` do FluentSQL **não exprime expressão em slot de valor** — nem antes nem depois; o que existia era um caminho que funcionava *por acidente*, e apenas quando o texto passado calhava de ser SQL válido no dialeto alvo. Isso está registrado em *Known issues* como a distinção **valor × expressão**, que é tarefa de arquitetura própria.
 
 - **BREAKING CHANGE (comportamento) — nove formas de `MERGE` que não levantavam nada passaram a levantar `EArgumentException`.** Quase todas emitiam SQL que **nenhum motor executa**, e o faziam em silêncio: o erro só aparecia no banco do consumidor, longe da linha que o causou. *(A tabela abaixo é a lista completa; uma versão anterior desta entrada dizia "quatro" e listava cinco linhas, e a seguinte dizia "seis" antes de os irmãos do `nil` serem medidos.)*
 
