@@ -102,22 +102,22 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   | # | Ponto de entrada | Implementado em |
   |---|---|---|
-  | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1446` |
+  | 1 | `IFluentSQL.Where(array)` | `FluentSQL.pas:1472` |
   | 2 | `IFluentSQL.AndOpe(array)` | `FluentSQL.pas:368` |
   | 3 | `IFluentSQL.OrOpe(array)` | `FluentSQL.pas:373` |
   | 4 | `IFluentSQL.Column(array)` | `FluentSQL.pas:686` |
-  | 5 | `IFluentSQL.Having(array)` | `FluentSQL.pas:992` |
+  | 5 | `IFluentSQL.Having(array)` | `FluentSQL.pas:1018` |
   | 6 | `IFluentSQL.OnCond(array)` | `FluentSQL.pas:421` |
   | 7 | `IFluentSQL.CaseExpr(array)` | `FluentSQL.pas:343` |
   | 8 | `IFluentSQL.ForDialectOnly(dialeto, array)` | `FluentSQL.pas:326` |
-  | 9 | `IFluentSQL.Expression(array)` | `FluentSQL.pas:896` |
+  | 9 | `IFluentSQL.Expression(array)` | `FluentSQL.pas:922` |
   | 10 | `IFluentSQLCriteriaExpression.AndOpe(array)` | `FluentSQL.Expression.pas:261` |
   | 11 | `IFluentSQLCriteriaExpression.OrOpe(array)` | `FluentSQL.Expression.pas:344` |
   | 12 | `IFluentSQLCriteriaExpression.Ope(array)` | `FluentSQL.Expression.pas:358` |
   | 13 | `IFluentSQLCriteriaExpression.Fun(array)` | `FluentSQL.Expression.pas:318` |
-  | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:346` |
-  | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:267` |
-  | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:317` |
+  | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:383` |
+  | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:268` |
+  | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:354` |
   | 17 | `IFluentSQLMerge.On(array)` | `FluentSQL.Merge.pas:376` |
 
   Quatro amostras do que os 11 omitidos emitem de fato, medidas com o payload `x'; DROP TABLE U; --`:
@@ -209,10 +209,30 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - **InterBase (`dbnInterbase`, desligado por omissão) — `Length` e `Ceil` passaram a levantar `EFluentSQLFunctionNotSupported`** em vez de emitir `LENGTH(...)` / `CEIL(...)`. O InterBase divergiu do tronco comum antes de o Firebird 2.1 introduzir `CHAR_LENGTH` e `CEIL`/`CEILING`, e a forma correta para esse dialeto não foi verificada — emitir a forma do Firebird seria repetir o defeito do `CEIL` no MSSQL. Se você liga `{$DEFINE INTERBASE}` e precisa dessas duas funções, implemente-as em `FluentSQL.FunctionsInterbase.pas` e remova-as da tabela de suporte em `Test Delphi\Common_tests\test.driver.functions.matrix.pas`.
 
+- **BREAKING CHANGE (classe de exceção, e uma chamada que antes não levantava) — as três guardas de ordem do builder deixaram de ser `Assert`.** O `Source/` inteiro tinha **exatamente dois** `Assert`, e os dois guardavam a mesma coisa: um método que só faz sentido depois de outro ter sido chamado e que, sem ele, indexa `Count-1` numa coleção vazia. `Assert` é removido pelo compilador com `{$C-}`, **que é o default de qualquer build de release** — ou seja, em produção não havia guarda nenhuma.
+
+  | Chamada | Antes (`{$C+}`, debug) | Antes (`{$C-}`, release) | Depois (nas duas) |
+  |---|---|---|---|
+  | `.CaseExpr('T').IfThen('X')` sem `When` | `EAssertionFailed`: `TFluentSQLCriteriaCase.IfThen: Missing When` | `EArgumentOutOfRangeException`: `List index out of bounds (-1). TList<...IFluentSQLCaseWhenThen> is empty` | `EArgumentException` nomeando `IFluentSQLCriteriaCase.IfThen` e `When` |
+  | `.CaseExpr('T').ElseIf('X')` sem `When` | **não levantava** — emitia `CASE ELSE X END` | **não levantava** — idem | `EArgumentException` nomeando `IFluentSQLCriteriaCase.ElseIf` |
+  | `.OrderBy().Desc` sem coluna | `EAssertionFailed`: `TCriteria.Desc: No columns set up yet` | `EArgumentOutOfRangeException`: `List index out of bounds (-1). TList<...IFluentSQLName> is empty` | `EArgumentException` nomeando `IFluentSQL.Desc` e `ORDER BY` |
+
+  **O `ElseIf` é o caso que muda comportamento, não só classe de exceção:** ele não tinha guarda alguma e emitia calado `CASE ELSE <valor> END`, que **nenhum motor aceita** — PostgreSQL 16.14 `ERROR: syntax error at or near "ELSE"`, SQL Server 2022 `Msg 156 Incorrect syntax near the keyword 'ELSE'`, Oracle 26ai `ORA-00923: FROM keyword not found where expected`. Saída bruta em `Test Delphi\Common_tests\test.cases.guards.matrix.sql`. É a mesma régua já publicada em `TUtils._AssertSingleValue` e em `FluentSQL.Merge.pas:297`: entre emitir SQL que o motor recusa e recusar a chamada na linha que a causou, recusa.
+
+  **Quem captura `EAssertionFailed` (ou compila com `{$C-}` e captura `EArgumentOutOfRangeException`) para tratar esses três casos deve trocar por `EArgumentException`.** Quem chama na ordem certa não vê diferença: `IfThen`/`ElseIf` depois de `When` e `Desc` depois de `OrderBy('COLUNA')` continuam emitindo exatamente o mesmo SQL, byte a byte.
+
+  Detalhe conferido e **não** corrigido às cegas: o `Assert` do `Desc` afirmava sobre `FAST.ASTColumns` e indexava `FAST.OrderBy.Columns`. As duas **são o mesmo objeto** enquanto a seção é `secOrderBy` — quem as liga é `_DefineSectionOrderBy` (`FluentSQL.pas:794`), e `_SetSection` não tem caminho que desfaça a ligação. A afirmação não estava medindo coleção errada na prática; era só o nome errado para ler, e passou a citar a coleção que de fato indexa. Há teste dedicado a essa porta (`TestDescComColunaNoSelectMasNenhumaNoOrderByLevanta`), porque a equivalência vale enquanto `_DefineSectionOrderBy` a mantiver.
+
+  **Não existe `Asc` para receber a guarda equivalente.** `IFluentSQL` declara só `Desc` (`FluentSQL.Interfaces.pas:245`); `dirAscending` é o default de `TOrderByDirection`. Varridas as duas famílias no `Source/` inteiro: na árvore anterior (`283512c`) `Assert(` devolvia 2 ocorrências — `FluentSQL.Cases.pas:340` e `FluentSQL.pas:838`, as duas acima — e a indexação por `Count-1]` devolvia 2, **exatamente nos mesmos dois métodos** (`FluentSQL.Cases.pas:342` e `FluentSQL.pas:839`; no HEAD desta branch, `FluentSQL.Cases.pas:379` e `FluentSQL.pas:865`). No HEAD desta branch `Assert(` devolve **zero** no `Source/`. Todo o resto de `Count - 1` na biblioteca é limite de `for`. A família está fechada.
+
+  **A fronteira publicada dos 17 `array of const` não mudou — recontada, não presumida.** O critério mecânico continua sendo "passa por `TUtils.SqlArrayOfConstToParameterizedSql`", e a contagem por chamada segue em 14 sítios / 17 pontos de entrada (os 4 de `IFluentSQLCriteriaExpression` compartilham `FluentSQL.Expression.pas:224`). Esta entrega **não acrescentou nem removeu sobrecarga `array of const`**, e **não criou slot de valor**: `IfThen`/`ElseIf` continuam com as duas sobrecargas de sempre (`String` e `Int64`), ambas em posição de expressão. Os quatro slots de valor (`SqlArrayOfConstToParameterizedValue`) também seguem quatro.
+
 ### Added
 
 - `EFluentSQLDriverNotRegistered` e `EFluentSQLFunctionNotSupported` em `FluentSQL.Interfaces.pas`, para que falhas de dialeto sejam tratáveis pelo consumidor em vez de `EAccessViolation` / `EAbstractError`.
 - `EFluentSQLQualifierNotSupported` em `FluentSQL.Interfaces.pas`. Substitui oito cópias de `raise Exception.Create('... Unknown qualifier')` — quatro delas nomeando o driver errado na mensagem.
+- Matriz `Test Delphi\Common_tests\test.builder.guards.pas` (11 testes, ligada em `TestFluentSQL_Common.dpr`) fixando as três guardas de ordem do builder que eram `Assert` ou não existiam — `IfThen`, `ElseIf` e `Desc`, cada uma com célula para "levanta" e célula para "a mensagem nomeia a chamada", mais dois controles de que o caminho legítimo continua emitindo o mesmo SQL. **Os testes rodam idênticos com `{$C+}` e com `-$C-`**, porque a exceção esperada é `EArgumentException`, que nenhum `Assert` produz.
+- Oráculos de motor real em `Test Delphi\Common_tests\`: `test.cases.bind.matrix.sql` (parâmetro em posição de `THEN`/`ELSE` nos 7 dialetos — a medição que sustenta a lacuna declarada em *Known issues*) e `test.cases.guards.matrix.sql` (`CASE` sem nenhum `WHEN`, recusado por PostgreSQL, SQL Server e Oracle). Trazem `docker run`, versão do motor, a forma exata em que cada cliente prepara o parâmetro, e a saída bruta transcrita. O sufixo é `.matrix` e não um dialeto porque a afirmação só existe comparando os motores entre si.
 - Oráculos de paginação em motor real, um por dialeto, em `Test Delphi\Common_tests\`: `test.pagination.{mssql,oracle,firebird,sqlite,mysql,postgresql}.sql` e `test.pagination.mongodb.js`. Trazem o `docker run` exato, a versão do motor e a saída bruta transcrita. Motores medidos: SQL Server 2022 (16.0.4265.3), Oracle Free 23.26.2.0.0, Firebird 5.0.4, MySQL 8.4.11, PostgreSQL 16.14, MongoDB 7.0.39, SQLite 3.50.4 (biblioteca embutida no CPython 3.14, módulo `sqlite3`).
 
   **Duas versões de SQLite aparecem neste CHANGELOG e as duas são medidas, não erro de digitação:** os oráculos de paginação usaram a biblioteca embutida no CPython 3.14 (**3.50.4**); o oráculo de `MERGE` usou a imagem `keinos/sqlite3:latest` (**3.53.4**). Conferido nesta rodada: `docker run --rm -i keinos/sqlite3:latest sqlite3 :memory: "select sqlite_version();"` → `3.53.4`; `python -c "import sqlite3; print(sqlite3.sqlite_version)"` → `3.50.4`. Nenhuma conclusão desta entrega depende da diferença — o SQLite não tem `MERGE` em nenhuma das duas.
@@ -269,6 +289,24 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   **O critério mecânico, para quem for auditar:** passa por `TUtils.SqlArrayOfConstToParameterizedSql` → literal; passa por `TUtils.SqlArrayOfConstToParameterizedValue` → parâmetro. Não há terceiro caminho. Um caminho seguro para expressão está sob tarefa própria.
 
   **Consequência que vale declarar:** como o `INSERT`/`UPDATE` não exprime expressão em slot de valor por nenhum overload (o tipado `SetValue(String, String)` também parametriza), **não há hoje forma suportada de escrever `SET DATA = CURRENT_TIMESTAMP` pelo construtor de valores**. A distinção entre **valor** e **expressão** que separa os dois casos está sob revisão como tarefa própria, e é ela que decidirá se esse caso ganha caminho próprio.
+- **O `CASE` não tem slot de valor, e a medição de motor real mostrou por que criar um não é troca de assinatura.** `IFluentSQLCriteriaCase.IfThen`/`ElseIf` têm duas sobrecargas — `String` e `Int64` — e as duas põem o argumento verbatim no texto do SQL. A de `String` é posição de **expressão**, pela mesma regra dos 17 acima (é o que permite `IfThen('SALARIO * 1.1')`, e é como a própria suíte usa: `IfThen('''FISICA''')`, com o chamador pré-aspando). A de `Int64` passa por `IntToStr` e não pode injetar nada, mas também não vira `:pN`.
+
+  A correção natural — fazer `THEN`/`ELSE` emitirem `:pN` — **foi medida antes de ser escrita, e dois dos sete motores recusam a forma no `PREPARE`**:
+
+  | Motor | `CASE WHEN c THEN :p1 ELSE :p2 END` na projeção | o mesmo dentro do `WHERE` |
+  |---|---|---|
+  | PostgreSQL 16.14 | aceita | aceita |
+  | MySQL 8.4.11 | aceita | aceita |
+  | SQLite 3.53.4 | aceita | aceita |
+  | SQL Server 2022 (16.0.4265.3) | aceita | aceita |
+  | Oracle AI Database 26ai 23.26.2.0.0 | aceita | aceita |
+  | **Firebird 5.0.4** | **`-804 Data type unknown` (SQLSTATE HY004)** | aceita |
+  | **DB2 v12.1.5.0** | **`SQL0418N ... untyped parameter marker` (SQLSTATE 42610)** | **recusa também** |
+  | InterBase | não medido — sem imagem de container pública | não medido |
+
+  Isolado: no Firebird o `-804` **não é do `CASE`** — `SELECT :a FROM RDB$DATABASE` dá o mesmo erro. É o marcador sem tipo em posição onde nada lhe dá tipo. Com `CAST` nos dois ramos, os dois motores aceitam. Fazer o slot funcionar nos sete exigiria emitir `CAST(:pN AS <tipo do dialeto>)` — despacho por driver, desenho novo, e colide com a tarefa já catalogada sobre `Cast` sem despacho. **Por isso a assinatura não mudou nesta entrega**, e a escolha entre emitir `CAST` nos sete, parametrizar só onde o motor aceita, ou manter só o slot de expressão, fica para o dono. Versões, `docker run`, forma exata do `PREPARE` em cada cliente e saída bruta de cada motor em `Test Delphi\Common_tests\test.cases.bind.matrix.sql`.
+
+  **Atenção a quem citar a versão do Oracle:** a tag `gvenzl/oracle-free:23-slim` entrega **Oracle AI Database 26ai 23.26.2.0.0**, não 23c.
 - **`FluentSQL.Select.pas` — `TFluentSQLSelect.Serialize` é código morto.** Os 9 drivers sobrescrevem `Serialize` e `FluentSQL.Ast.pas` sempre pega a instância do `Register`; reverter a linha corrigida não derruba teste algum. A forma neutra foi corrigida ali por coerência, não por efeito observável.
 - **A matriz de paginação vive apenas no projeto Firebird.** `PTestFluentSQLFirebird.dpr` é o único que compila `test.pagination.filter.pas`. Consequência medida: reverter a cauda `LIMIT/OFFSET` do SQLite derruba 4 testes, **todos ali** — `SQLite_tests` não tem teste de paginação nenhum. A cobertura existe, mas mora longe do driver que protege.
 - **MongoDB — `Abs`, `Cast`, `Upper`, `Lower`, `Round` e `Floor` geram MQL inválido em silêncio.** Essas seis são do "padrão A" (o núcleo emite SQL ANSI sem consultar o driver), e `FluentSQL.SerializeMongoDB.pas` só reconhece nome de campo e os prefixos de agregação (`AGG:`, `SUM(`, `COUNT(`, `MIN(`, `MAX(`, `AVG(`, `AVERAGE(`). O resultado é que a coluna é **descartada sem exceção**: `.Column(Fun.Round('v',2))` produz `{"find":"t","filter":{},"projection":{}}` — a projeção sai vazia — enquanto `.Column(Fun.Sum('v'))` produz corretamente `{"aggregate":"t","pipeline":[{"$project":{"x":1,"_id":0}}],...}`. É o mesmo modo de falha que foi corrigido para `Ceil` e `Length`, e sobrevive nestas seis. **Não corrigido nesta entrega** — o conserto exige mover as seis para o "padrão B" (implementação por driver nos 9 dialetos) ou ensinar o serializador MongoDB a montar `$project` com expressão, e nenhum dos dois cabia no escopo. Registrado como dívida; até lá, não use funções escalares na projeção com `dbnMongoDB`.
