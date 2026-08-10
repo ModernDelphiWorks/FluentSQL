@@ -144,7 +144,7 @@
   ==============================================================================
 
   Duas formas que o overload emitia CALADO antes da guarda _AssertSingleValue
-  (FluentSQL.Utils.pas:263, chamada em :285). Medidas em execucao real ANTES da forma
+  (FluentSQL.Utils.pas:326, chamada em :348). Medidas em execucao real ANTES da forma
   da correcao, cada recusa acompanhada de um CONTROLE - sem controle, "o motor
   recusou" nao distingue recusa da FORMA de recusa da INSTRUCAO.
 
@@ -188,8 +188,33 @@
       Oracle Free 23          ORA-00947: not enough values      <-- LEIA ABAIXO
 
       CONTROLE (mesma tabela, mesmos binds, so a virgula muda):
-        INSERT INTO T2 (D,E) VALUES (:p1, :p2)   ACEITO nos SEIS.
-      Logo a recusa e da FORMA justaposta, e nao do INSERT.
+        INSERT INTO T2 (D,E) VALUES (:p1, :p2)
+
+        MSSQL, PostgreSQL, MySQL, SQLite e Oracle: executado e gravado.
+        FIREBIRD - dito com precisao, porque "aceito" e folgado para este
+        motor. O isql nao liga bind nenhum, entao o comando ATRAVESSA a
+        gramatica e para na fase seguinte, a de ligacao:
+
+          $ isql ... -i ctrl.sql
+          INSERT INTO T2 (D,E) VALUES (?, ?);
+          -> Statement failed, SQLSTATE = 07002
+             Dynamic SQL Error / -SQLDA error
+             -No SQLDA for input values provided
+          INSERT INTO T2 (D,E) VALUES (? ?);
+          -> Statement failed, SQLSTATE = 42000
+             -SQL error code = -104 / -Token unknown - line 1, column 32 / -?
+          INSERT INTO T2 (D) VALUES (? ?);
+          -> -104 / -Token unknown - line 1, column 30 / -?
+
+        (Remedido nesta rodada em container proprio,
+         firebirdsql/firebird:5.0.4, ENGINE_VERSION 5.0.4.)
+
+      A conclusao NAO muda, e o contraste acima e justamente o que a sustenta:
+      no MESMO cliente, a forma com virgula passa da gramatica e morre no bind
+      (07002), e a justaposta nem chega la (-104 na coluna do segundo
+      placeholder). Sao fases diferentes. Logo a recusa e da FORMA justaposta e
+      nao do INSERT - mas nao escreva "aceito nos SEIS", porque no Firebird o
+      controle nunca chegou a executar.
 
   --- ORACLE E A EXCECAO, E ELA E PIOR QUE UMA RECUSA
       O Oracle NAO recusa a justaposicao por gramatica. O ORA-00947 acima diz
@@ -234,6 +259,41 @@
       Logo a recusa e da forma SEM WHEN, e nao do MERGE.
 
   ==============================================================================
+  SLOT DE VALOR SEM DADO NENHUM  -  os quatro irmaos do nil
+  ==============================================================================
+
+  Nao ha SQL de motor a medir aqui, porque o defeito nao produzia SQL invalido:
+  produzia SQL VALIDO com o dado ERRADO. Nenhum motor reclama disso - a medicao
+  e da propria biblioteca, lendo AsString e Params.
+
+  A guarda de vtPointer (o `nil`) fechava UMA das cinco portas do mesmo
+  corredor: TUtils._StringVarRecAsParam, compartilhado por SetValue/Values e por
+  Merge.Update/Insert. As outras quatro seguiam abertas. Medido nesta arvore
+  ANTES da guarda desta rodada, dbnPostgreSQL, .SetValue('X', [...]):
+
+    [nil]              -> INSERT INTO T (X) VALUES (:p1)   p1 = '00000000'
+    [TDescarte.Create] -> INSERT INTO T (X) VALUES (:p1)   p1 = 'TDescarte'
+    [TDescarte]        -> INSERT INTO T (X) VALUES (:p1)   p1 = 'TDescarte'
+    [Unassigned]       -> INSERT INTO T (X) VALUES (:p1)   p1 = ''
+    [Null]             -> EVariantTypeCastError: Could not convert variant of
+                          type (Null) into type (OleStr)
+
+  e pelo caminho do MERGE, dbnMSSQL:
+
+    .WhenMatched.Update(['NOME', obj])
+      -> MERGE ... WHEN MATCHED THEN UPDATE SET [NOME] = :p1;   p1 = 'TDescarte'
+
+  Os QUATRO primeiros nao levantavam nada. O quinto levantava, mas com classe da
+  RTL, cuja mensagem nao nomeia a chamada que a causou - quem captura
+  EArgumentException das outras guardas nao o pegava.
+
+  Os cinco passam a levantar EArgumentException, na linha do chamador. Continua
+  NAO havendo semantica de NULL para nenhum deles: isso e decisao de convencao e
+  segue pendente. Fica de fora, de proposito, vtInterface - ele ja levanta hoje
+  ('VarRecToString: Unsupported parameter type'), entao nao ha corrupcao
+  silenciosa a fechar, so mensagem pobre.
+
+  ==============================================================================
   ONDE ISTO ESTA TRAVADO NA SUITE
   ==============================================================================
     Test Delphi\Common_tests\test.core.params.pas
@@ -243,6 +303,10 @@
       TestSetValueArrayOfConstNilRaisesInsteadOfWriting00000000
       TestValuesArrayOfConstNilRaisesInsteadOfWriting00000000
       TestUpdateSetValueArrayOfConstNilRaises
+      TestSetValueArrayOfConstObjectRaisesInsteadOfWritingClassName
+      TestSetValueArrayOfConstClassRefRaisesInsteadOfWritingClassName
+      TestSetValueArrayOfConstVariantNullRaisesNamedInsteadOfRtlCastError
+      TestSetValueArrayOfConstVariantUnassignedRaisesInsteadOfWritingEmptyString
       TestSetValueArrayOfConstEmptyRaisesInsteadOfEmittingValuesEmpty
       TestValuesArrayOfConstEmptyRaises
       TestUpdateSetValueArrayOfConstEmptyRaisesInsteadOfDanglingSet
@@ -251,17 +315,23 @@
 
     Test Delphi\MSSQL_tests\test.merge.mssql.pas
       TestMerge_NoWhenClause_RaisesInsteadOfEmittingHeaderOnly
+      TestMerge_UpdateObjectValue_RaisesInsteadOfWritingClassName
+      TestMerge_UpdateVariantNullValue_RaisesNamedInsteadOfRtlCastError
 
-  Os onze primeiros rodam nos projetos Firebird e MySQL, que sao os dois que
-  compilam test.core.params.pas.
+  Os quinze primeiros rodam nos projetos Firebird e MySQL, que sao os dois que
+  compilam test.core.params.pas - logo contam DUAS vezes na suite.
 
-  Prova de que nao sao decoracao (mutacao no Source, suite inteira recompilada):
-    vtPointer -> "if False"                 6 vermelhos: os 3 de nil, em CADA um
-                                            dos dois projetos. (Antes desta
-                                            rodada essa mutacao so derrubava os
-                                            2 testes de MERGE, no MSSQL.)
-    _AssertSingleValue comentado           10 vermelhos: os 5 de cardinalidade,
-                                            em CADA um dos dois projetos.
+  Prova de que nao sao decoracao (mutacao no Source, projeto recompilado com -B,
+  contagem por projeto: FB = PTestFluentSQLFirebird, MS = TestFluentSQL_MSSQL):
+
+    vtPointer   -> "if False"        FB 3 / MS 2  (os 3 de nil no SetValue e os
+                                                   2 de nil no MERGE)
+    vtObject    -> "if False"        FB 1 / MS 1
+    vtClass     -> "if False"        FB 1 / MS 0
+    VarIsNull   -> "False and ..."   FB 1 / MS 1
+    VarIsEmpty  -> "False and ..."   FB 1 / MS 0
+    _AssertSingleValue comentado    10 vermelhos: os 5 de cardinalidade, em CADA
+                                    um dos dois projetos que compilam o arquivo.
     "FMatchedClauses.Count = 0" -> False     1 vermelho: o de MERGE sem WHEN.
 
   ==============================================================================
@@ -317,7 +387,10 @@
       lista de valores.
       A distincao valor x expressao e tarefa de arquitetura propria.
 
-  (3) nil em posicao de valor NAO virou NULL: passou a LEVANTAR. Ver a secao
-      "nil EM POSICAO DE VALOR" em test.merge.mssql.sql - a causa e o mesmo
-      _StringVarRecAsParam, compartilhado pelos dois caminhos.
+  (3) nil, objeto, referencia de classe, Null e Unassigned em posicao de valor
+      NAO viraram NULL: passaram a LEVANTAR. Ver a secao "SLOT DE VALOR SEM
+      DADO NENHUM" acima e a secao homonima de test.merge.mssql.sql - a causa e
+      o mesmo _StringVarRecAsParam, compartilhado pelos dois caminhos. Dar
+      semantica de NULL a qualquer deles e decisao de convencao e nao foi
+      tomada nesta tarefa.
 */

@@ -121,7 +121,7 @@ end;
 ///   Implementacao BASE de MERGE: nao emite nada, levanta.
 ///
 ///   Este metodo e o fim da linha, nao um despachante. Quem despacha e
-///   TFluentSQLMerge.Serialize (FluentSQL.Merge.pas:226), que ja resolveu o
+///   TFluentSQLMerge.Serialize (FluentSQL.Merge.pas:292), que ja resolveu o
 ///   dialeto via Register antes de chamar aqui. A versao anterior repetia esse
 ///   mesmo LReg.Serialize(ADef.GetDialect).Merge(ADef) - o que, para todo dialeto
 ///   que NAO sobrescreve Merge, reentrava neste proprio metodo indefinidamente e

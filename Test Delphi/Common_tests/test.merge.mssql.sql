@@ -285,10 +285,11 @@
     TestMerge_RaisedGuard_LeavesNoHalfClauseInSql
 
   ==============================================================================
-  nil EM POSICAO DE VALOR  -  corrigido nesta branch
+  SLOT DE VALOR SEM DADO NENHUM  -  nil e os quatro irmaos dele
   ==============================================================================
   Nao ha SQL a medir aqui, porque o defeito nao produzia SQL invalido: produzia
-  SQL VALIDO com o dado ERRADO, o que e pior, porque nenhum motor reclama.
+  SQL VALIDO com o dado ERRADO, o que e pior, porque nenhum motor reclama. A
+  medicao e da propria biblioteca, lendo AsString e Params.
 
   `nil` escrito num array of const chega como vtPointer, e
   TUtils._VarRecToString mapeia vtPointer por IntToHex. Em 32 bits o resultado e
@@ -299,16 +300,35 @@
   e o SQL Server grava OITO ZEROS na coluna NOME, sem erro, sem aviso. O usuario
   escreveu nil querendo NULL e recebeu uma string de lixo.
 
+  E NAO ERA SO O nil. O mesmo _VarRecToString converte em texto plausivel mais
+  quatro TVarRec que nao carregam dado algum, e todos passam pela MESMA porta
+  (_StringVarRecAsParam). Medido nesta arvore antes da guarda desta rodada:
+
+    .Update(['NOME', obj])         ->  SET [NOME] = :p1   p1 = 'TDescarte'
+    .Update(['NOME', TDescarte])   ->  SET [NOME] = :p1   p1 = 'TDescarte'
+    .Update(['NOME', Unassigned])  ->  SET [NOME] = :p1   p1 = ''
+    .Update(['NOME', Null])        ->  EVariantTypeCastError da RTL
+
+  Os tres primeiros sao a mesma corrupcao silenciosa do nil, por outra porta. O
+  quarto ja falhava, mas com classe da RTL: quem captura EArgumentException das
+  demais guardas nao o pegava.
+
   O par nome/valor NAO tem como exprimir NULL: o slot par e sempre ligado como
   parametro e nao existe marcador de nulidade nesta API. Entre gravar lixo
   calado e recusar a chamada, recusa - EArgumentException, mesma classe das
-  outras guardas. Dar semantica de NULL ao nil e decisao de CONVENCAO, nao
-  conserto de defeito, e por isso NAO foi feita aqui: se a coluna deve ficar
-  NULL, omita-a da lista de pares.
+  outras guardas. Dar semantica de NULL a nil/Null/Unassigned e decisao de
+  CONVENCAO, nao conserto de defeito, e por isso NAO foi feita aqui: se a coluna
+  deve ficar NULL, omita-a da lista de pares.
+
+  Fica de fora, de proposito, vtInterface: ele ja levanta hoje, em
+  _VarRecToString ('VarRecToString: Unsupported parameter type'), entao nao ha
+  corrupcao silenciosa a fechar - so a classe e a mensagem sao pobres.
 
   Travado por:
     TestMerge_UpdateNilValue_RaisesInsteadOfCorruptingDataAsHexString
     TestMerge_InsertNilValue_RaisesInsteadOfCorruptingDataAsHexString
+    TestMerge_UpdateObjectValue_RaisesInsteadOfWritingClassName
+    TestMerge_UpdateVariantNullValue_RaisesNamedInsteadOfRtlCastError
 
   ==============================================================================
   FRONTEIRA  -  o que esta correcao NAO fecha
@@ -348,7 +368,7 @@
 
   (2) Merge.On(array of const) CONTINUA INTERPOLANDO VERBATIM.
       Mesmo builder de MERGE, outro caminho: On([...]) passa por
-      SqlArrayOfConstToParameterizedSql (FluentSQL.Merge.pas:298), onde a RN-P3
+      SqlArrayOfConstToParameterizedSql (FluentSQL.Merge.pas:376), onde a RN-P3
       trata string como FRAGMENTO de SQL e nao como valor - por isso nao foi
       tocado aqui. Emitido hoje:
 
@@ -370,8 +390,12 @@
 
   (3) OS OUTROS OITO DIALETOS nao tem oraculo porque nenhum deles emite MERGE:
       cinco levantavam EStackOverflow antes desta branch e agora levantam
-      EFluentSQLStatementNotSupported, dois nao estao compilados no .inc, e o
-      MongoDB descarta a clausula (e ainda acumula 1 parametro orfao). Onde nao
-      ha SQL emitido, nao ha SQL para executar. A matriz completa esta em
+      EFluentSQLStatementNotSupported; DB2 e InterBase estao desligados no .inc
+      e por isso caem antes, em EFluentSQLDriverNotRegistered - mas note que
+      liga-los por -DDB2 / -DINTERBASE na linha de comando e acao suportada, e
+      nessa build eles passam a cair na mesma EFluentSQLStatementNotSupported
+      dos cinco; e o MongoDB descarta a clausula (e ainda acumula 1 parametro
+      orfao). Onde nao ha SQL emitido, nao ha SQL para executar. A matriz
+      completa, com a escolha da classe esperada feita em runtime, esta em
       test.merge.matrix.pas.
 */
