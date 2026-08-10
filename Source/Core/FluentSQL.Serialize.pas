@@ -32,6 +32,7 @@ type
     function AsString(const AAST: IFluentSQLAST): String; virtual;
     function Merge(const ADef: IFluentSQLMergeDef): string; virtual;
     function QuotedName(const AName: string): string; virtual;
+    function RelationAliasKeyword: String; virtual;
   end;
 
 /// <summary>Suffix emitted only for fragments whose dialect matches the query serialization dialect (ADR-016).</summary>
@@ -139,6 +140,27 @@ end;
 function TFluentSQLSerialize.QuotedName(const AName: string): string;
 begin
   Result := AName;
+end;
+
+/// <summary>
+///   Forma PADRAO do apelido de relacao: "tabela AS ap".
+///
+///   Vale para MSSQL, MySQL, Firebird, SQLite, Interbase, DB2 e PostgreSQL - e
+///   e o que esses seis ja emitiam antes desta tarefa, entao herdar esta base
+///   nao muda uma virgula do SQL deles. Quem diverge sobrescreve; hoje so
+///   FluentSQL.SerializeOracle.pas.
+///
+///   Nao se adotou "emitir sem AS em todos", ainda que os sete aceitem a forma
+///   curta: trocar o texto de seis dialetos para consertar um e mais disruptivo
+///   que trocar o do unico que esta errado.
+///
+///   MongoDB herda 'AS' e isso e inofensivo: o serializador de MQL le a
+///   propriedade Alias direto (vira "as":"X" no $lookup e chave do $project) e
+///   nunca chama TFluentSQLName.Serialize para a relacao.
+/// </summary>
+function TFluentSQLSerialize.RelationAliasKeyword: String;
+begin
+  Result := 'AS';
 end;
 
 end.

@@ -30,6 +30,7 @@ type
   TFluentSQLSerializeOracle = class(TFluentSQLSerialize)
   public
     function AsString(const AAST: IFluentSQLAST): String; override;
+    function RelationAliasKeyword: String; override;
   end;
 
 implementation
@@ -51,6 +52,32 @@ begin
   Result := TUtils.Concat([ComposeSqlCore(AAST),
                            AAST.Select.Qualifiers.SerializePagination]);
   Result := Result + DialectOnlySqlSuffix(AAST);
+end;
+
+/// <summary>
+///   Na Oracle o apelido de RELACAO vem SEM palavra nenhuma antes: "T AP", nao
+///   "T AS AP".
+///
+///   A doc do SELECT da Oracle define t_alias (apelido de tabela, view ou
+///   subconsulta) sem citar AS em momento algum, e define c_alias (apelido de
+///   coluna) dizendo "The AS keyword is optional". Declara opcional onde e
+///   permitido e omite onde nao e.
+///
+///   MEDIDO em Oracle AI Database 26ai Free Release 23.26.2.0.0 (imagem
+///   gvenzl/oracle-free:23-slim), com a transcricao completa em
+///   Test Delphi\Common_tests\test.alias.oracle.sql:
+///
+///     SELECT * FROM A AS AP                      -> ORA-03048
+///     SELECT * FROM A LEFT JOIN B AS X ON (...)  -> ORA-02000
+///     DELETE FROM A AS AP WHERE (...)            -> ORA-03048
+///     SELECT A.NOME AS N FROM A                  -> ACEITO (o contraste)
+///
+///   Nao e ORA-00933, que era o palpite corrente: os dois codigos acima sao os
+///   que este motor devolveu.
+/// </summary>
+function TFluentSQLSerializeOracle.RelationAliasKeyword: String;
+begin
+  Result := '';
 end;
 
 end.

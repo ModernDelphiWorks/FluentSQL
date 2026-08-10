@@ -81,6 +81,7 @@ type
     procedure _DefineSectionHaving;
     procedure _DefineSectionOrderBy;
     function _CreateJoin(AjoinType: TJoinType; const ATableName: String): IFluentSQL;
+    function _RelationAliasKeyword: String;
     function _InternalSet(const AColumnName, AColumnValue: String): IFluentSQL;
   public
     constructor Create(const ADatabase: TFluentSQLDriver);
@@ -525,6 +526,27 @@ begin
     raise Exception.Create('TCriteria: Current name is not set');
 end;
 
+/// <summary>
+///   Como ESTE dialeto escreve o apelido de uma RELACAO. Unico ponto do nucleo
+///   que faz a pergunta; From e _CreateJoin marcam o no recem-criado com a
+///   resposta, e TFluentSQLName.Serialize so obedece.
+///
+///   O apelido de COLUNA nao passa por aqui de proposito: TFluentSQLName ja
+///   nasce com 'AS', que os sete relacionais aceitam para c_alias - inclusive a
+///   Oracle. A MESMA classe serve os dois papeis (Column monta em
+///   FAST.ASTColumns, From e _CreateJoin montam em FAST.ASTTableNames e no
+///   JoinedTable), entao aplicar a regra da relacao no Serialize sem distinguir
+///   quebraria o apelido de coluna junto.
+///
+///   FRegister.Serialize levanta para dialeto nao registrado, mas nao ha
+///   caminho novo de excecao aqui: TFluentSQL.Create ja falha antes, em
+///   FRegister.Select, para o mesmo dialeto.
+/// </summary>
+function TFluentSQL._RelationAliasKeyword: String;
+begin
+  Result := FRegister.Serialize(FDatabase).RelationAliasKeyword;
+end;
+
 procedure TFluentSQL._AssertOperator(AOperators: TOperators);
 begin
   if not (FActiveOperator in AOperators) then
@@ -698,6 +720,7 @@ begin
   LJoin := FAST.Joins.Add;
   LJoin.JoinType := AjoinType;
   FAST.ASTName := LJoin.JoinedTable;
+  FAST.ASTName.AliasKeyword := _RelationAliasKeyword;
   FAST.ASTName.Name := ATableName;
   FAST.ASTSection := LJoin;
   FAST.ASTColumns := nil;
@@ -896,6 +919,7 @@ function TFluentSQL.From(const ATableName: String): IFluentSQL;
 begin
   _AssertSection([secSelect, secDelete]);
   FAST.ASTName := FAST.ASTTableNames.Add;
+  FAST.ASTName.AliasKeyword := _RelationAliasKeyword;
   FAST.ASTName.Name := ATableName;
   Result := Self;
 end;
