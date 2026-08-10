@@ -37,25 +37,42 @@ type
     property Name: String read _GetName;
   end;
 
+  /// <summary>
+  ///   ATENCAO - UNIT MORTA. Nenhuma unit do FluentSQL da clausula
+  ///   "uses FluentSQL.Core": estas classes sao uma COPIA parada de
+  ///   FluentSQL.Name.pas e FluentSQL.Section.pas, que sao as que rodam. A unit
+  ///   continua listada nos .dpr, entao compila e precisa satisfazer
+  ///   IFluentSQLName - foi so por isso que a T12 encostou aqui.
+  ///
+  ///   O que a copia acumulou de divergencia em relacao ao original: aqui
+  ///   SerializeDirection devolve '' para dirAscending (FluentSQL.Name.pas
+  ///   devolve 'ASC') e o apelido era concatenado com ' AS ' cru em vez de
+  ///   TUtils.Concat. Apagar esta unit e tarefa propria, nao da T12.
+  /// </summary>
   TFluentSQLName = class(TInterfacedObject, IFluentSQLName)
   strict private
     FAlias: String;
+    FAliasKeyword: String;
     FCase: IFluentSQLCase;
     FName: String;
   protected
     function _GetAlias: String;
+    function _GetAliasKeyword: String;
     function _GetCase: IFluentSQLCase;
     function _GetName: String;
     procedure _SetAlias(const Value: String);
+    procedure _SetAliasKeyword(const Value: String);
     procedure _SetCase(const Value: IFluentSQLCase);
     procedure _SetName(const Value: String);
   public
+    constructor Create;
     destructor Destroy; override;
     procedure Clear;
     function IsEmpty: Boolean;
     function Serialize: String;
     property Name: String read _GetName write _SetName;
     property Alias: String read _GetAlias write _SetAlias;
+    property AliasKeyword: String read _GetAliasKeyword write _SetAliasKeyword;
     property CaseExpr: IFluentSQLCase read _GetCase write _SetCase;
   end;
 
@@ -117,6 +134,12 @@ uses
 
 { TFluentSQLName }
 
+constructor TFluentSQLName.Create;
+begin
+  inherited Create;
+  FAliasKeyword := 'AS';
+end;
+
 procedure TFluentSQLName.Clear;
 begin
   FName := '';
@@ -126,6 +149,11 @@ end;
 function TFluentSQLName._GetAlias: String;
 begin
   Result := FAlias;
+end;
+
+function TFluentSQLName._GetAliasKeyword: String;
+begin
+  Result := FAliasKeyword;
 end;
 
 function TFluentSQLName._GetCase: IFluentSQLCase;
@@ -156,12 +184,17 @@ begin
   else
     Result := FName;
   if FAlias <> '' then
-    Result := Result + ' AS ' + FAlias;
+    Result := TUtils.Concat([Result, FAliasKeyword, FAlias]);
 end;
 
 procedure TFluentSQLName._SetAlias(const Value: String);
 begin
   FAlias := Value;
+end;
+
+procedure TFluentSQLName._SetAliasKeyword(const Value: String);
+begin
+  FAliasKeyword := Value;
 end;
 
 procedure TFluentSQLName._SetCase(const Value: IFluentSQLCase);

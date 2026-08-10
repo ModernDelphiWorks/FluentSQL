@@ -363,9 +363,11 @@ type
   IFluentSQLName = interface
     ['{FA82F4B9-1202-4926-8385-C2100EB0CA97}']
     function _GetAlias: String;
+    function _GetAliasKeyword: String;
     function _GetCase: IFluentSQLCase;
     function _GetName: String;
     procedure _SetAlias(const Value: String);
+    procedure _SetAliasKeyword(const Value: String);
     procedure _SetCase(const Value: IFluentSQLCase);
     procedure _SetName(const Value: String);
     //
@@ -374,6 +376,17 @@ type
     function Serialize: String;
     property Name: String read _GetName write _SetName;
     property Alias: String read _GetAlias write _SetAlias;
+    /// <summary>
+    ///   Palavra que antecede o apelido na serializacao. Vale 'AS', que e a
+    ///   forma do apelido de COLUNA (c_alias) e e aceita pelos sete dialetos
+    ///   relacionais. Quem representa uma RELACAO - tabela, view ou subconsulta
+    ///   em FROM/JOIN - nao pode herdar esse padrao em silencio: recebe aqui o
+    ///   que o serializador do dialeto mandar
+    ///   (IFluentSQLSerialize.RelationAliasKeyword), porque a Oracle RECUSA a
+    ///   palavra AS antes de apelido de relacao (ORA-03048 no FROM, ORA-02000
+    ///   no JOIN) e ACEITA antes de apelido de coluna.
+    /// </summary>
+    property AliasKeyword: String read _GetAliasKeyword write _SetAliasKeyword;
     property CaseExpr: IFluentSQLCase read _GetCase write _SetCase;
   end;
 
@@ -649,6 +662,16 @@ type
     function AsString(const AAST: IFluentSQLAST): String;
     function Merge(const ADef: IFluentSQLMergeDef): string;
     function QuotedName(const AName: string): string;
+    /// <summary>
+    ///   Palavra que este dialeto exige (ou proibe) antes do apelido de uma
+    ///   RELACAO em FROM e em JOIN. 'AS' em seis dos sete relacionais; string
+    ///   vazia na Oracle. Mora aqui, e nao no qualificador, por dois motivos:
+    ///   o qualificador so alcanca o SELECT (o JOIN e serializado por
+    ///   FluentSQL.Joins.pas, que nunca o ve), e TFluentSQLSelectDB2 instancia o
+    ///   qualificador da ORACLE (FluentSQL.SelectDB2.pas:46) - hospedar a regra
+    ///   la faria o DB2 herdar calado a forma da Oracle.
+    /// </summary>
+    function RelationAliasKeyword: String;
   end;
 
   TFluentSQLOperatorCompare = (fcEqual, fcNotEqual,
