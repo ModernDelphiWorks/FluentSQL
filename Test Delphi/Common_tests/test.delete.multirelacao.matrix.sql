@@ -827,46 +827,55 @@ DELETE FRUM A WHERE ID = 999;
      FluentSQL emitia: MQL citando apenas a primeira colecao, com a segunda
      descartada em silencio.
 
-  5. A PORTA IRMA - DELETE COM JOIN - CONTINUA ABERTA, E ESTE ARQUIVO NAO A
-     FECHA. Nao e nota de rodape: e o item que quem ler este arquivo precisa
-     levar junto, porque a guarda desta tarefa NAO o cobre e a decisao la e
-     OUTRA.
+  5. A PORTA IRMA - DELETE COM JOIN - FOI FECHADA DEPOIS, POR GUARDA PROPRIA.
+     Este arquivo nao a fecha, e a guarda de From continua sem cobri-la: quem a
+     cobre e a guarda de TFluentSQL._CreateJoin, medida e travada em
+     test.delete.join.matrix.sql e test.delete.join.pas.
 
-     Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID') emite hoje
-     "DELETE FROM A INNER JOIN B ON B.ID = A.ID". Outra construcao, outra porta:
-     TFluentSQL._CreateJoin nao chama _AssertSection e nao passa por
-     ASTTableNames, entao a guarda de From nunca a ve. LeftJoin idem.
-     PRE-EXISTENTE: identico em main e no HEAD desta tarefa.
+     ⚠️ A PREVISAO QUE ESTE ITEM CARREGAVA ESTAVA ERRADA, e esta corrigida aqui
+     em vez de apagada - porque um mantenedor que lesse a versao anterior
+     concluiria que a guarda do JOIN contraria um plano, e iria reverte-la.
 
-     MEDIDO PELA REVISAO desta tarefa - NAO pela implementacao, e NAO por esta
-     suite. A distincao esta escrita porque importa: quem transcreve nao mediu.
+     O TEXTO ANTERIOR DIZIA, e nao se sustenta: "o irmao e TRADUZIVEL, nao
+     recusavel"; "a construcao SIGNIFICA algo, e por isso pode ser traduzida
+     para a forma nativa de cada dialeto"; "recusa-la seria tirar funcionalidade
+     que da para entregar".
+
+     O QUE O DESMENTIU: a revisao de entao mediu SO o InnerJoin. Medindo os
+     QUATRO tipos, com LeftJoin e SEM WHERE, a forma nativa
+
+       DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID
+       SQL Server 2022   A: 4 -> 0    executou e reportou SUCESSO
+       MySQL 8.4.11      A: 4 -> 0    executou e reportou SUCESSO
+
+     APAGA A TABELA INTEIRA. Na juncao EXTERNA a condicao e DECORATIVA - nao
+     filtra nada, porque a juncao preserva toda linha da relacao da esquerda.
+     InnerJoin filtra (apaga 2 das 4), LeftJoin nao (apaga 4 das 4): a familia
+     NAO tem uma semantica, e traduzi-la escolheria pelo usuario entre dois
+     resultados medidos como diferentes. Mesma classe do achado do Oracle no
+     PR #160 - apagar mais do que se pediu, sem erro.
+
+     O QUE A PREVISAO ACERTAVA, e continua valendo: para o InnerJoin ISOLADO
+     existe forma portavel - "DELETE FROM A WHERE EXISTS (SELECT 1 FROM B WHERE
+     ...)" - aceita pelos SETE, medida. A INTERSECAO NAO E VAZIA. Isso e tarefa
+     propria, com o custo ja levantado.
+
+     A medicao de 5 motores transcrita antes neste item permanece correta como
+     medicao do TEXTO EMITIDO com InnerJoin, e foi depois estendida aos sete em
+     test.delete.join.matrix.sql:
 
        SQL Server 2022   Msg 156
        PostgreSQL 16     syntax error at or near "INNER"
        MySQL 8.4         ERROR 1064
        Firebird 5.0.4    SQL error code = -104
        SQLite 3.53.4     Parse error near "INNER"
-       Oracle, DB2, InterBase   NAO MEDIDOS nesta rodada
+       Oracle, DB2       medidos depois: ORA-03049 e SQL0104N
+       InterBase         NAO MEDIDO - nao existe imagem publica
 
-     E A NUANCE QUE MUDA A RESPOSTA - LEIA ANTES DE COPIAR A DECISAO DAQUI:
-
-       Delete.From('A','X').InnerJoin('B','Y').OnCond(...)   para dbnMSSQL
-       -> DELETE X FROM A AS X INNER JOIN B AS Y ON ...
-       -> ACEITO pelo SQL Server: "(4 rows affected)", medido pela revisao.
-
-     Ou seja: o irmao e TRADUZIVEL, nao recusavel. A razao e estrutural, e nao
-     de gosto. No caso desta tarefa faltavam as duas informacoes que a traducao
-     exige - qual relacao e o ALVO e COMO elas se relacionam. Na porta do JOIN
-     as duas EXISTEM: o alvo e a relacao do From, e a juncao e o OnCond. A
-     construcao SIGNIFICA algo, e por isso pode ser traduzida para a forma
-     nativa de cada dialeto. Recusa-la seria tirar funcionalidade que da para
-     entregar.
-
-     ACHADO PRE-EXISTENTE QUE VAI JUNTO, tambem da revisao:
+     ACHADO PRE-EXISTENTE QUE IA JUNTO - atendido de lado:
        Query(dbnMongoDB).Delete.From('A').InnerJoin('B')...
-       -> EArgumentOutOfRangeException: List index out of bounds (0).
-          TList<IFluentSQLName> is empty
-     Erro cru de TList, sem nome de metodo, em main e no HEAD. Mesmo que a
-     decisao relacional seja traduzir, o MongoDB precisa de recusa NOMEADA em
-     vez de estouro de indice.
+       -> antes: EArgumentOutOfRangeException, erro cru de TList sem nome de
+          metodo. A guarda nova e de NUCLEO e o alcanca pelo mesmo caminho dos
+          demais, entao ele passa a receber recusa NOMEADA. Efeito, nao
+          promessa: o MongoDB esta fora da intersecao relacional.
 */

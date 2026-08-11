@@ -95,9 +95,23 @@ type
   ///   Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql, onde os
   ///   SETE motores recusam por parse o texto que o framework emitia.
   /// </summary>
+  ///   DUAS FORMAS, e a diferenca entre elas e de VERACIDADE, nao de estilo:
+  ///
+  ///   - Create(AConstruct, ASaida) afirma que a construcao nao tem forma
+  ///     valida em dialeto NENHUM. Serve ao caso que criou a classe (DELETE
+  ///     multi-relacao), onde a UNIAO e vazia: nenhum dos sete executa o texto.
+  ///
+  ///   - Create(AConstruct, AMedido, ASaida) NAO faz essa afirmacao. Existe
+  ///     para a recusa cuja razao e o COMPORTAMENTO e nao o parse - onde parte
+  ///     dos motores ACEITA o texto, e e justamente por aceita-lo que a
+  ///     construcao e perigosa. Usar a forma de dois argumentos ali embarcaria,
+  ///     na mensagem, uma generalizacao que a medicao desmente.
+  ///
+  ///   As duas mantem "trocar de dialeto nao resolve", que vale nos dois casos.
   EFluentSQLConstructNotSupported = class(Exception)
   public
-    constructor Create(const AConstruct, ASaida: String); reintroduce;
+    constructor Create(const AConstruct, ASaida: String); reintroduce; overload;
+    constructor Create(const AConstruct, AMedido, ASaida: String); reintroduce; overload;
   end;
 
   /// <summary>ESP-016: one opt-in fragment registered for a specific engine; not portable SQL.</summary>
@@ -1989,6 +2003,24 @@ begin
     'dialetos relacionais suportados - a recusa e a mesma nos sete, nao e ' +
     'limitacao do banco escolhido, e trocar de dialeto nao resolve. %s',
     [AConstruct, ASaida]);
+end;
+
+/// <summary>
+///   Forma para a recusa por COMPORTAMENTO. Note o que ela NAO diz: que a
+///   construcao seja recusada por todo motor. Nao e - e nos motores que a
+///   aceitam esta o perigo. AMedido carrega o numero que justifica a recusa;
+///   sem ele a mensagem viraria opiniao.
+///
+///   Tambem nao nomeia dialeto, pela mesma razao da outra forma: quem le esta
+///   prestes a trocar de banco, e trocar nao da uma forma segura.
+/// </summary>
+constructor EFluentSQLConstructNotSupported.Create(const AConstruct, AMedido,
+  ASaida: String);
+begin
+  inherited CreateFmt('A construcao "%s" foi recusada pelo FluentSQL, e a ' +
+    'recusa e a mesma nos sete dialetos relacionais - nao e limitacao do ' +
+    'banco escolhido, e trocar de dialeto nao resolve. %s %s',
+    [AConstruct, AMedido, ASaida]);
 end;
 
 end.

@@ -53,19 +53,27 @@
   IFluentSQL nao publica o AST, entao IFluentSQLDelete.TableNames.Add nao e
   alcancavel por consumidor.
 
-  O QUE ELE NAO COBRE - LEIA ANTES DE CONCLUIR QUE A SECAO ESTA SELADA. Ela NAO
-  esta. TFluentSQL._CreateJoin e um SEGUNDO ponto de entrada publico que poe
-  outra relacao num DELETE: nao chama _AssertSection e nao passa por
-  ASTTableNames. Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID') continua
-  emitindo "DELETE FROM A INNER JOIN B ON B.ID = A.ID", e NAO ha teste aqui que
-  o trave - de proposito, porque a resposta la e OUTRA.
+  O QUE ELE NAO COBRE: a segunda relacao que entra por TFluentSQL._CreateJoin,
+  que nao passa por ASTTableNames e por isso nunca e vista pela guarda de From.
+  Essa porta TEM GUARDA PROPRIA e TEM TESTE PROPRIO - test.delete.join.pas,
+  nesta mesma pasta. Hoje ela RECUSA os quatro tipos de juncao.
 
-  Medido pela REVISAO desta tarefa, e nao por esta suite: aquela forma e
-  recusada por MSSQL, PostgreSQL, MySQL, Firebird e SQLite; MAS a variante com
-  apelido, "DELETE X FROM A AS X INNER JOIN B AS Y ON ...", e ACEITA pelo SQL
-  Server. Ou seja: o irmao e TRADUZIVEL, nao recusavel. Quem for escrever o
-  teste dele NAO deve copiar as afirmacoes deste arquivo. A divida esta na
-  Parte 8 de test.delete.multirelacao.matrix.sql.
+  ⚠️ A PREVISAO QUE ESTE CABECALHO CARREGAVA ESTAVA ERRADA. Ele dizia que "NAO
+  ha teste aqui que o trave - de proposito, porque a resposta la e OUTRA", que
+  "o irmao e TRADUZIVEL, nao recusavel" e que "quem for escrever o teste dele
+  NAO deve copiar as afirmacoes deste arquivo". Fica corrigido em vez de
+  apagado, porque quem lesse aquilo hoje concluiria que test.delete.join.pas
+  contraria um plano - e ele nao contraria: ele corrige.
+
+  O que desmentiu a previsao: a revisao de entao mediu SO o InnerJoin. Medindo
+  os QUATRO tipos, com LeftJoin e sem WHERE a forma nativa APAGA A TABELA
+  INTEIRA (A: 4 -> 0) e reporta SUCESSO nos dois motores que a analisam - na
+  juncao externa a condicao nao filtra nada. InnerJoin filtra, LeftJoin nao: a
+  familia nao tem UMA semantica.
+
+  O que a previsao ACERTAVA e continua valendo: para o InnerJoin ISOLADO existe
+  forma portavel aceita pelos sete, e a intersecao NAO e vazia. E tarefa
+  propria. Matriz em test.delete.join.matrix.sql.
 
   ANTI-COLATERAL: os testes "TestNao..." afirmam o que NAO podia mudar - DELETE
   com UMA relacao (com e sem apelido) e SELECT com VARIAS relacoes, que e forma

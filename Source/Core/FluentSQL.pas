@@ -712,10 +712,113 @@ begin
   Result := Self;
 end;
 
+/// <summary>
+///   Porta unica dos QUATRO tipos de juncao: InnerJoin, LeftJoin, RightJoin e
+///   FullJoin delegam todos aqui.
+///
+///   ⚠️ PORTA UNICA NAO E CONSTRUCAO FECHADA, e confundir as duas foi
+///   exatamente o erro da primeira versao desta guarda. Que os quatro tipos
+///   passem por aqui garante que a guarda VE todos eles; NAO garante que ela os
+///   RECUSE em toda cadeia que os alcance. O que ela le - e nao por onde ela
+///   esta - e o que fecha a construcao. Ver o bloco sobre a marca duravel,
+///   abaixo.
+///
+///   ⭐ POR QUE O JOIN NAO ENTRA NO DELETE. A razao NAO e "o texto emitido nao
+///   executa" - essa e verdadeira e e a menor das duas. A que decide e o DANO
+///   SILENCIOSO, medido em motor real (transcricao com digest de imagem, versao
+///   perguntada ao motor e contagem antes/depois em
+///   Test Delphi\Common_tests\test.delete.join.matrix.sql):
+///
+///     Delete.From('A','X').LeftJoin('B','Y').OnCond('Y.AID = X.ID')   sem Where
+///     -> forma nativa "DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID"
+///     -> DOIS dos sete motores EXECUTAM, reportam sucesso e deixam
+///        A: 4 -> 0     B: 2 -> 2        apagaram a tabela inteira
+///
+///   Na juncao EXTERNA a condicao e DECORATIVA: nao filtra nada, porque a
+///   juncao preserva toda linha da relacao da esquerda. Quem escreveu aquilo
+///   achava estar filtrando. Mesma classe do achado do Oracle no PR #160 -
+///   apagar MAIS do que se pediu, sem erro; la era a relacao errada, aqui e a
+///   relacao certa por inteiro.
+///
+///   POR QUE A FAMILIA TODA, e nao so o LEFT: dentro do DELETE os membros nao
+///   significam a mesma coisa - o InnerJoin FILTRA (a forma nativa apaga 2 das
+///   4), o LeftJoin NAO (apaga 4 das 4). Liberar so o InnerJoin criaria uma
+///   distincao que a superficie fluente nao insinua e que gramatica nenhuma dos
+///   sete espelha: 5 dos 7 recusam os dois por parse, 2 dos 7 aceitam os dois.
+///
+///   O QUE SE PERDE, dito sem maquiagem: para o InnerJoin ISOLADO existe forma
+///   portavel, medida e aceita pelos SETE - "DELETE FROM A WHERE EXISTS (SELECT
+///   1 FROM B WHERE ...)". A INTERSECAO NAO E VAZIA, e este comentario nao
+///   finge que seja. Entregar so ela e tarefa propria, ja catalogada, com o
+///   custo medido: o WHERE precisa migrar para DENTRO da subconsulta, porque
+///   pode citar a relacao juntada ("WHERE (Y.Status = ?)" e alcancavel), e isso
+///   nao e mudanca local - e ComposeSqlCore deixando de emitir Where.Serialize
+///   na posicao de sempre para UMA secao.
+///
+///   O "ON" PENDURADO tambem morre aqui, e por cima. Sem OnCond o texto saia
+///   "... INNER JOIN B AS Y ON", com ON e sem predicado - nao e produto
+///   cartesiano, e sentenca TRUNCADA, e os sete a recusam (o DB2 e o que nomeia
+///   melhor: espera "<boolean_predicate>"). A CAUSA continua de pe e e de OUTRA
+///   tarefa: TFluentSQLJoins.Serialize (FluentSQL.Joins.pas) concatena 'ON'
+///   incondicionalmente e TUtils.Concat descarta a condicao vazia, o que produz
+///   o mesmo ON pendurado TAMBEM NO SELECT, que esta guarda nao toca.
+///
+///   POR QUE AQUI E NAO NUM SERIALIZADOR: falha na chamada que errou e nao la
+///   adiante no AsString; vale para os dialetos todos sem uma linha por driver;
+///   e nao acrescenta membro a IFluentSQLSerialize.
+///
+///   POR QUE NAO _AssertSection: aquele levanta Exception cru com "Not
+///   supported in this section". Quem recebe esta recusa precisa do TIPO
+///   proprio, para distinguir de outros erros do builder, e da mensagem que
+///   aponta a saida - recusar sem saida seria pior que o defeito.
+///
+///   ⚠️ A PERGUNTA CERTA E "ESTE STATEMENT E UM DELETE?", NAO "O CURSOR ESTA
+///   AGORA NA SECAO DELETE?". A primeira versao desta guarda lia so
+///   FActiveSection, e ISSO ERA O FURO - nao uma virtude, como o comentario
+///   anterior chegou a afirmar. A cadeia fluente e LIVRE: qualquer chamada que
+///   troque a secao entre o From e o join desarmava a leitura do cursor.
+///   Where faz _SetSection(secWhere), OrderBy faz _SetSection(secOrderBy),
+///   GroupBy idem - e Where('') nao emite UMA LETRA, nem aparece na saida:
+///
+///     Delete.From('A','X').Where('').LeftJoin('B','Y').OnCond('Y.AID = X.ID')
+///     -> DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID
+///
+///   que e byte a byte a sentenca medida em A: 4 -> 0. O agravante: Where e
+///   EXATAMENTE a chamada que a mensagem desta guarda recomenda como saida -
+///   a saida apontada e o desvio eram a mesma porta.
+///
+///   Por isso a guarda le DUAS coisas, e nenhuma cobre a outra:
+///
+///     FAST.Delete.IsEmpty = False  e a marca DURAVEL. Quem a estabelece e
+///       _DefineSectionDelete (via From, que alimenta Delete.TableNames) e quem
+///       a limpa e ClearAll - chamado por _DefineSectionSelect, Insert e Update.
+///       Sobrevive a Where/OrderBy/GroupBy, que NAO chamam ClearAll.
+///     FActiveSection = secDelete  cobre o DELETE ainda SEM From, onde a marca
+///       duravel ainda nao existe (Delete.InnerJoin(...) direto).
+///
+///   O QUE CONTINUA LIBERADO, e tem de continuar: trocar para SELECT (ou INSERT
+///   ou UPDATE) na mesma instancia limpa a marca e devolve o JOIN. Travado por
+///   TestSelectDepoisDeDeleteLiberaOJoin e
+///   TestInsertDepoisDeDeleteLimpaAMarcaDuravel.
+/// </summary>
 function TFluentSQL._CreateJoin(AjoinType: TJoinType; const ATableName: String): IFluentSQL;
 var
   LJoin: IFluentSQLJoin;
 begin
+  if (FActiveSection = secDelete) or (not FAST.Delete.IsEmpty) then
+    raise EFluentSQLConstructNotSupported.Create(
+      'JOIN em DELETE',
+      'Medido em motor real: dos sete, cinco recusam o texto por parse e dois ' +
+      'o executam - e sao esses dois o problema. Com LeftJoin e sem WHERE, a ' +
+      'forma nativa apaga a tabela inteira (4 de 4 linhas) e reporta sucesso, ' +
+      'porque na juncao externa a condicao nao filtra nada. Perde-se a tabela ' +
+      'em silencio. O InnerJoin filtra e o LeftJoin nao, entao nao ha traducao ' +
+      'unica para a familia, e liberar so o InnerJoin seria uma distincao que ' +
+      'a API nao insinua.',
+      'Restrinja a relacao alvo pelo WHERE com subconsulta - ' +
+      'Where(...).Exists(''SELECT 1 FROM B WHERE ...''), que sai verbatim e e ' +
+      'aceita pelos sete. Se o que se queria era apagar de duas relacoes, sao ' +
+      'duas instrucoes.');
   FActiveSection := secJoin;
   LJoin := FAST.Joins.Add;
   LJoin.JoinType := AjoinType;
@@ -979,20 +1082,30 @@ end;
 ///   IFluentSQL nao publica o AST, entao IFluentSQLDelete.TableNames.Add nao e
 ///   alcancavel por consumidor.
 ///
-///   O QUE ELA NAO FECHA, e que ninguem deve ler que fecha: a secao DELETE NAO
-///   esta selada. _CreateJoin (nesta mesma unit, em
-///   "function TFluentSQL._CreateJoin(AjoinType: TJoinType; const ATableName:
-///   String): IFluentSQL") e um SEGUNDO ponto de entrada publico que poe outra
-///   relacao num DELETE: ele nao chama _AssertSection e nao passa por
-///   ASTTableNames, entao Delete.From('A').InnerJoin('B').OnCond(...) continua
-///   emitindo "DELETE FROM A INNER JOIN B ON ...".
+///   O QUE ELA NAO FECHA: a segunda relacao que entra por _CreateJoin (nesta
+///   mesma unit, em "function TFluentSQL._CreateJoin(AjoinType: TJoinType;
+///   const ATableName: String): IFluentSQL"), que nao passa por ASTTableNames e
+///   por isso nunca e vista por esta contagem. Essa porta tem GUARDA PROPRIA,
+///   la mesmo, e hoje recusa - leia o comentario dela antes de mexer em
+///   qualquer uma das duas.
 ///
-///   E OUTRA construcao, por OUTRA porta, E COM OUTRA RESPOSTA - registrada
-///   como divida na Parte 8 de
-///   Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql. Ao contrario
-///   do caso desta guarda, a do JOIN e TRADUZIVEL e nao recusavel: medido pela
-///   revisao desta tarefa, "DELETE X FROM A AS X INNER JOIN B AS Y ON ..." e
-///   ACEITO pelo SQL Server. Quem for mexer la NAO deve copiar a decisao daqui.
+///   ⚠️ A PREVISAO QUE ESTE COMENTARIO CARREGAVA ESTAVA ERRADA, e fica escrito
+///   porque um mantenedor que a lesse iria REVERTER a guarda do JOIN achando
+///   que cumpria um plano. O texto anterior dizia que "a do JOIN e TRADUZIVEL e
+///   nao recusavel" e que "quem for mexer la NAO deve copiar a decisao daqui".
+///
+///   O que o desmentiu: a revisao de entao mediu SO o InnerJoin. Medindo os
+///   quatro tipos, com LeftJoin e sem WHERE a forma nativa APAGA A TABELA
+///   INTEIRA - A: 4 -> 0 - e reporta SUCESSO, nos dois motores que a analisam,
+///   porque na juncao externa a condicao nao filtra nada. InnerJoin filtra,
+///   LeftJoin nao: a familia nao tem UMA semantica, e traduzi-la escolheria
+///   pelo usuario entre dois resultados medidos como diferentes. A porta foi
+///   RECUSADA, nao traduzida.
+///
+///   Continua verdadeiro o que aquela previsao acertava: para o InnerJoin
+///   ISOLADO existe forma portavel aceita pelos sete. Isso e tarefa propria - a
+///   intersecao NAO e vazia. Matriz em
+///   Test Delphi\Common_tests\test.delete.join.matrix.sql.
 /// </summary>
 function TFluentSQL.From(const ATableName: String): IFluentSQL;
 begin
