@@ -354,7 +354,7 @@ SELECT 'A' AS TABELA, COUNT(*) AS N FROM A UNION ALL SELECT 'AP', COUNT(*) FROM 
   escolhido por ser "o que mais motores aceitam".
 
   RESSALVA HONESTA sobre o cenario do caso 04b: para chegar ao "2 rows deleted"
-  as duas tabelas precisam ter colunas de nomes diferentes. Com A e AP ambas
+  as duas tabelas precisam ter colunas de nomes DIFERENTES. Com A e AP ambas
   tendo uma coluna ID, a MESMA sentenca devolve
 
     DELETE AP FROM A AP WHERE AP.ID = 1
@@ -362,9 +362,33 @@ SELECT 'A' AS TABELA, COUNT(*) AS N FROM A UNION ALL SELECT 'AP', COUNT(*) FROM 
     ERROR at line 1:
     ORA-00918: ID: column ambiguously specified - appears in AP and A
 
-  e nada e apagado (medido, com as contagens antes e depois iguais). Ou seja: o
-  desastre silencioso depende do schema. Isso NAO o torna menos grave - torna-o
-  intermitente, que e pior para diagnosticar.
+  e nada e apagado - medido, com as contagens antes e depois iguais nas duas
+  tabelas.
+
+  E AQUI ESTA O QUE FAZ ESTE DEFEITO SER PIOR QUE "depende do schema".
+
+  Ele nao e apenas dependente de schema: ele e ANTI-CORRELACIONADO COM O SCHEMA
+  DE DIAGNOSTICO. A condicao que produz o ORA-00918 inofensivo e "as duas
+  tabelas compartilham o nome da coluna citada no WHERE" - e esse e EXATAMENTE o
+  schema que qualquer pessoa escreve num repro minimo:
+
+    CREATE TABLE A  (ID NUMBER, ...);
+    CREATE TABLE AP (ID NUMBER, ...);
+    DELETE AP FROM A AP WHERE AP.ID = 1;   -> ORA-00918, nada apagado
+
+  Ou seja: quem for CONFERIR a bomba recebe um erro limpo, conclui que a Oracle
+  recusa a forma, e vai embora tranquilo. O caminho destrutivo so aparece quando
+  ninguem esta olhando - em schema real, onde cada tabela tem suas proprias
+  colunas e o WHERE cita uma que so existe numa delas.
+
+  Nao e hipotese: foi o que aconteceu na primeira medicao desta sessao. A(ID) e
+  AP(ID) devolveram ORA-00918, e so ao trocar para A(A_ID) e AP(ID) o motor
+  respondeu "2 rows deleted." e esvaziou a tabela errada. As duas execucoes
+  estao transcritas aqui de proposito - a primeira nao substitui a segunda, ela
+  EXPLICA por que a segunda custa a ser acreditada.
+
+  NAO trate o ORA-00918 como prova de que a Oracle recusa a forma. Ela nao
+  recusa a forma. Ela recusa AQUELE schema.
 */
 
 -- === 05 DELETE FROM A  (sem apelido - controle) ===

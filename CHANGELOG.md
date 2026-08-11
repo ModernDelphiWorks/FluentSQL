@@ -50,16 +50,32 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - **BREAKING CHANGE (API) — `IFluentSQLSerialize` ganhou o método `function DeleteClause(const ADelete: IFluentSQLDelete): String;`.** Acrescentar método a interface publicada quebra quem a implementa do zero. É quebra de **compilação**, distinta e independente do BREAKING de **SQL emitido** da entrada acima: aquela atinge quem compara texto gerado para `dbnMSSQL`, esta atinge quem escreve serializador de dialeto próprio — inclusive quem não usa `DELETE` com apelido em lugar nenhum.
 
-  **Impacto real: baixo, e provavelmente não é você.** No repositório o único implementador direto é `TFluentSQLSerialize` (`FluentSQL.Serialize.pas:28`), e os **nove** serializadores de driver **descendem** dela — herdam o novo método de graça, e o mesmo vale para qualquer subclasse externa. Só quebra quem implementa `IFluentSQLSerialize` inteira do zero e a injeta por `TFluentSQLRegister.RegisterSerialize` (`FluentSQL.Register.pas:278`).
+  **Quem é atingido: quem DECLARA `IFluentSQLSerialize` numa classe própria.** Só isso. **Não** é preciso registrar a classe, instanciá-la, nem usá-la — uma implementação engavetada, ou registrada por outro caminho que não `TFluentSQLRegister.RegisterSerialize` (`FluentSQL.Register.pas:278`), quebra igual. Quem **descende** de `TFluentSQLSerialize` (`FluentSQL.Serialize.pas:28`) não é atingido: herda o novo método de graça. É o caso dos **nove** serializadores de driver do repositório, e de qualquer subclasse externa.
 
-  **Medido, não deduzido.** Uma classe de terceiro declarando exatamente os quatro membros anteriores (`AsString`, `Merge`, `QuotedName`, `RelationAliasKeyword`) compila limpo contra `9d0407c` e, contra esta branch, para em:
+  **Medido nos dois cenários, não deduzido.** Uma classe declarando exatamente os quatro membros anteriores (`AsString`, `Merge`, `QuotedName`, `RelationAliasKeyword`) compila limpo contra `9d0407c` e, contra esta branch, para em:
 
   ```
-  terceiro.dpr(9) Error: E2291 Missing implementation of interface method
-                          IFluentSQLSerialize.DeleteClause
+  terceiro.dpr(9)  Error: E2291 Missing implementation of interface method
+                           IFluentSQLSerialize.DeleteClause   <- com RegisterSerialize
+  soDeclara.dpr(8) Error: E2291 Missing implementation of interface method
+                           IFluentSQLSerialize.DeleteClause   <- SEM registrar, sem
+                                                                 instanciar, e sem
+                                                                 FluentSQL.Register no uses
   ```
 
-  **O que fazer:** passar a descender de `TFluentSQLSerialize` — que já traz a forma padrão — ou declarar o método. O corpo honesto para quem não tem regra própria é `Result := ADelete.Serialize;`, que é literalmente o que a base faz e reproduz o comportamento anterior byte a byte. **Não há ressalva de runtime aqui**, ao contrário do `Cast`: a implementação da base é concreta, não abstrata, então quem herda e não sobrescreve não corre risco de `EAbstractError`.
+  O segundo caso é o que define a população atingida: a quebra é da **declaração**, não do uso. Uma redação anterior desta entrada dizia "implementa do zero **e** injeta por `RegisterSerialize`" — estreitava a população e convidava quem não injeta a concluir "não é comigo".
+
+  **O que fazer:** passar a descender de `TFluentSQLSerialize` — que já traz a forma padrão — ou declarar o método. O corpo honesto para quem não tem regra própria é `Result := ADelete.Serialize;`, que é literalmente o que a base faz e reproduz o comportamento anterior byte a byte.
+
+  **Não há ressalva de runtime aqui, ao contrário do `Cast` — e a diferença não é "concreto × abstrato".** Nenhum dos dois é declarado `abstract`: `DeleteClause` é `virtual` (`FluentSQL.Serialize.pas:36`) e as duas sobrecargas de `Cast` também são (`FluentSQL.FunctionsAbstract.pas:73` e `:74`). A distinção que importa é **o que o corpo da base faz**:
+
+  | Membro | Corpo da base | Quem herda e não sobrescreve |
+  |---|---|---|
+  | `DeleteClause` | `Result := ADelete.Serialize;` (`FluentSQL.Serialize.pas:196-199`) | **funciona** — emite o texto de sempre |
+  | `Cast(String, String)` | única instrução é `raise EAbstractError` (`FluentSQL.FunctionsAbstract.pas:129`) | compila limpo e **explode na primeira chamada** |
+  | `Cast(String, TFluentSQLDataFieldType, Integer)` | idem (`FluentSQL.FunctionsAbstract.pas:134`) | idem |
+
+  Vale a pena saber distinguir as duas: é a diferença entre "a base faz o trabalho" e "a base é um contrato que levanta", e ela reaparece em toda a matriz driver × função — é exatamente o que separa as funções cujo núcleo emite ANSI direto das que delegam ao driver.
 
   Está aqui e não em *Added* pela régua que esta mesma lista já aplicou três vezes — `IFluentSQLSelectQualifiers` com `RequestsZeroRows`, `IFluentSQLFunctions` com `Cast`, e `IFluentSQLCriteriaCase` com os dois membros do slot de valor: *"acrescentar método a interface publicada não pode ser rodapé"*. A régua não muda de interface para interface.
 
