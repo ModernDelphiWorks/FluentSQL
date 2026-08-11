@@ -243,7 +243,14 @@ begin
     .ColumnInteger('PRECO')
     .ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')
     .AsString;
-  Assert.AreEqual('CREATE TABLE [VENDAS] ([ID] INT, [QTD] INT, [PRECO] INT, [TOTAL] INT AS (QTD * PRECO))', LSql);
+  // A coluna computada do T-SQL NAO leva tipo. Ate a T27 esta celula fixava
+  // "[TOTAL] INT AS (QTD * PRECO)" e passava - certificava texto que o motor
+  // recusa. Medido no SQL Server 2022 (16.0.4265.3) com SET PARSEONLY ON:
+  //   [TOTAL] INT AS (QTD * PRECO) -> Msg 156, Incorrect syntax near the keyword 'AS'
+  //   [TOTAL] AS (QTD * PRECO)     -> parseia limpo
+  // O tipo continua sendo emitido nas colunas comuns: o que caiu foi so o da
+  // coluna computada.
+  Assert.AreEqual('CREATE TABLE [VENDAS] ([ID] INT, [QTD] INT, [PRECO] INT, [TOTAL] AS (QTD * PRECO))', LSql, False);
 end;
 
 procedure TTestDDLMSSQL.TestAlterTableAlterColumn_MSSQL_TypeAndNullability_GeneratesExpected;

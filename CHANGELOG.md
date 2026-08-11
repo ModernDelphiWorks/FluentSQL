@@ -17,6 +17,34 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (SQL emitido) — SQL Server: coluna computada deixou de carregar o tipo declarado.** O T-SQL **não aceita** tipo em coluna computada: a gramática de `<computed_column_definition>` é `column_name AS computed_column_expression`, sem `<data_type>` — o tipo é derivado da expressão. O FluentSQL emitia para `dbnMSSQL` um texto que o motor **recusa**, e o teste que fixava esse texto estava **verde**. **Quem compara o SQL gerado com string fixa para `dbnMSSQL` precisa atualizar as expectativas**; quem executa o DDL passa a executar SQL que o motor aceita.
+
+  | Construção (`dbnMSSQL`) | Antes | Depois | Motor real |
+  |---|---|---|---|
+  | `.ColumnInteger('TOTAL').ComputedBy('QTD * PRECO')` | `[TOTAL] INT AS (QTD * PRECO)` | `[TOTAL] AS (QTD * PRECO)` | antes: **`Msg 156, Incorrect syntax near the keyword 'AS'`** |
+  | `.ColumnInteger('ID')` (coluna comum) | `[ID] INT` | **inalterado** | aceito nos dois |
+  | coluna computada nos outros dialetos | — | **inalterado** | ver matriz abaixo |
+
+  A recusa foi medida com **`SET PARSEONLY ON`**, que só parseia e nem chega a resolver nome — logo é defeito de **gramática pura**, sem nuance de convenção.
+
+  **Tirar o tipo para todos os dialetos, que seria a correção óbvia, QUEBRARIA o PostgreSQL** — e é esse par de medições que obrigou a correção a ser local. Medido em PostgreSQL 16.14: `"TOTAL" GENERATED ALWAYS AS (...) STORED`, sem o tipo, devolve **`ERROR 42601: syntax error at or near "ALWAYS"`**. A matriz completa, com transcrição literal, `docker run` e versão perguntada a cada motor, está em `Test Delphi\Common_tests\test.computed.column.matrix.sql`:
+
+  | Dialeto | forma emitida | tipo declarado |
+  |---|---|---|
+  | SQL Server 2022 (16.0.4265.3) | `[TOTAL] AS (...)` | **proibido** — `Msg 156` se presente |
+  | PostgreSQL 16.14 | `"TOTAL" INTEGER GENERATED ALWAYS AS (...) STORED` | **exigido** — `42601` se ausente |
+  | MySQL 8.4.11 | `` `TOTAL` INT AS (...) VIRTUAL `` | aceito |
+  | Oracle 23.26.2.0.0 | `"TOTAL" NUMBER(10) GENERATED ALWAYS AS (...) VIRTUAL` | aceito |
+  | Firebird 5.0.4 | `"TOTAL" INTEGER COMPUTED BY (...)` | aceito |
+  | SQLite 3.53.4 | não emite — levanta `ENotSupportedException` | não se aplica |
+  | InterBase | **não medido** — não existe imagem pública | não medido |
+
+  Dos **seis** serializadores DDL: 4 carregam o tipo, 1 o recusa (MSSQL), 1 não emite coluna computada (SQLite). Por isso a regra ficou num gancho de dialeto — `TFluentDDLSerializeAbstract.ComputedColumnCarriesType`, `virtual`, **default `True`**, sobrescrito para `False` só em `FluentSQL.DDL.Serialize.MSSQL.pas`. Quem não sobrescreve continua emitindo **byte a byte** o que emitia: o anti-colateral é estrutural, não apenas testado. O ramo novo em `GetColumnDefinition` é guardado por `(LComputed <> '')`, então **coluna comum não passa por ele em dialeto nenhum**.
+
+  **Ressalva sobre a linha do PostgreSQL, e ela importa:** o enunciado que a suíte fixa para `dbnPostgreSQL` — `"TOTAL" INTEGER GENERATED ALWAYS AS (QTD * PRECO) STORED` — **é recusado pelo motor** (`ERROR 42703: column "qtd" does not exist`), porque o gerador delimita o **nome** da coluna e repassa a **expressão crua**, que o PG dobra para minúscula. O que a matriz acima afirma sobre o PostgreSQL é **apenas** que ele exige o tipo, e isso é verdade. O defeito de delimitação é **anterior a esta mudança, permanece aberto** e é território da tarefa de delimitação de identificador, parada aguardando decisão. Está marcado no ponto exato em `test.computed.column.matrix.pas`.
+
+  **Fronteira declarada:** a interação entre coluna computada e `MapConstraints` (por exemplo `NOT NULL` ou `DEFAULT` junto de `ComputedBy`) **não foi medida** em motor nenhum — nenhum teste da suíte exercita a combinação.
+
 - **BREAKING CHANGE (API) — `Delete.From(A).From(B)` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** O que fechou foi a **lista de relações do `FROM`** de um `DELETE`: antes, a segunda chamada de `From` numa seção `DELETE` acumulava a relação e o framework emitia uma lista separada por vírgula.
 
   ⚠️ **Isto NÃO quer dizer que `DELETE` multi-relação deixou de ser alcançável, e a seção NÃO está selada.** `Delete.From('A').InnerJoin('B').OnCond(…)` continua emitindo `DELETE FROM A INNER JOIN B ON …`, por outra porta — `TFluentSQL._CreateJoin`, que não passa por `ASTTableNames` nem chama `_AssertSection`. Essa porta **não foi medida em motor por esta tarefa** e está registrada como dívida em *Known issues*, com a medição da revisão. **Não escreva a forma com `JOIN` confiando nesta guarda**: ela não a cobre, e a resposta certa lá é **traduzir**, não recusar.

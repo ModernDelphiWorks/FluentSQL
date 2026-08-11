@@ -32,6 +32,7 @@ type
     function GetDialect: TFluentSQLDriver; override;
     function Quote(const AName: string): string; override;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; override;
+    function ComputedColumnCarriesType: Boolean; override;
     function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; override;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; override;
     function GetColumnComment(const ATable: string; const ACol: IFluentDDLColumn): string; override;
@@ -73,6 +74,16 @@ begin
   Result := '';
   if ACol.ComputedExpression <> '' then
     Result := ' AS (' + ACol.ComputedExpression + ')';
+end;
+
+function TFluentDDLSerializerMSSQL.ComputedColumnCarriesType: Boolean;
+begin
+  // O T-SQL deriva o tipo da coluna computada da propria expressao e NAO admite
+  // tipo declarado: a gramatica de <computed_column_definition> e
+  // "column_name AS computed_column_expression", sem <data_type>. Emitir
+  // "[TOTAL] INT AS (QTD * PRECO)" devolve Msg 156 no SQL Server 2022 ja no
+  // PARSEONLY - nem chega a resolver nome. Medido, nao deduzido.
+  Result := False;
 end;
 
 function TFluentDDLSerializerMSSQL.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
