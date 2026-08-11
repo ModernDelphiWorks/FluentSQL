@@ -105,6 +105,11 @@ begin
     runner.UseRTTI := True;
     logger := TDUnitXConsoleLogger.Create(true);
     runner.AddLogger(logger);
+    // Nome do XML DERIVADO DO EXECUTAVEL, nunca uma string fixa: dois .dpr que
+    // gravem 'dunitx-results.xml' no mesmo diretorio se sobrescrevem e a medicao do
+    // primeiro some sem uma linha de aviso. Derivar de ParamStr(0) mantem o nome
+    // unico ate quando alguem copia este .dpr para criar o proximo projeto.
+    TDUnitX.Options.XMLOutputFile := ChangeFileExt(ParamStr(0), '') + '-dunitx-results.xml';
     nunitLogger := TDUnitXXMLNUnitFileLogger.Create(TDUnitX.Options.XMLOutputFile);
     runner.AddLogger(nunitLogger);
     runner.FailsOnNoAsserts := False;
