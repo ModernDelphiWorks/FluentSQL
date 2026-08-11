@@ -22,6 +22,7 @@ uses
   test.alias.matrix in 'test.alias.matrix.pas',
   test.builder.guards in 'test.builder.guards.pas',
   test.cache in 'test.cache.pas',
+  test.cases.value in 'test.cases.value.pas',
   test.cast.matrix in 'test.cast.matrix.pas',
   test.ddl.identity in 'test.ddl.identity.pas',
   test.ddl.numeric in 'test.ddl.numeric.pas',
