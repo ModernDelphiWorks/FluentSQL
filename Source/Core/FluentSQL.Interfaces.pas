@@ -462,14 +462,62 @@ type
     function NotLikeFull(const AValue: String): IFluentSQL;
     function NotLikeLeft(const AValue: String): IFluentSQL;
     function NotLikeRight(const AValue: String): IFluentSQL;
+    /// <summary>
+    ///   SLOT DE VALOR. Cada elemento do array vira um bind proprio, e a lista
+    ///   sai como (:p1, :p2, ...). Nada do que o chamador passa alcanca o texto
+    ///   do SQL.
+    /// </summary>
     function InValues(const AValue: TArray<Double>): IFluentSQL; overload;
     function InValues(const AValue: TArray<String>): IFluentSQL; overload;
+    /// <summary>
+    ///   ESCAPE HATCH - SLOT DE EXPRESSAO. AValue e SQL, nao valor: entra
+    ///   VERBATIM entre parenteses, sem bind e sem escape. Existe para a
+    ///   subconsulta - IN (SELECT ...) - que o slot de valor nao exprime.
+    ///
+    ///   O contrato e o mesmo de Cast(x, 'VARCHAR2') e de IfThen('SALARIO*1.1'):
+    ///     InValues(['a','b'])         ... vira bind; a garantia e do framework
+    ///     InValues('SELECT ID FROM B') ... voce escolheu a palavra; a garantia e sua
+    ///
+    ///   ISSO E UMA PORTA DE INJECAO POR CONSTRUCAO. Nao alimente esta
+    ///   sobrecarga com entrada de usuario; o que se quer nesse caso e a
+    ///   sobrecarga de array, que parametriza.
+    /// </summary>
     function InValues(const AValue: String): IFluentSQL; overload;
     function NotIn(const AValue: TArray<Double>): IFluentSQL; overload;
     function NotIn(const AValue: TArray<String>): IFluentSQL; overload;
+    /// <summary>
+    ///   ESCAPE HATCH - SLOT DE EXPRESSAO. Mesmo contrato de InValues(String):
+    ///   AValue entra verbatim entre parenteses, sem bind. Porta de injecao por
+    ///   construcao; nao alimente com entrada de usuario.
+    /// </summary>
     function NotIn(const AValue: String): IFluentSQL; overload;
-    function Exists(const AValue: String): IFluentSQL; overload;
-    function NotExists(const AValue: String): IFluentSQL; overload;
+    /// <summary>
+    ///   ESCAPE HATCH - SLOT DE EXPRESSAO. ASubQuery e uma SUBCONSULTA, nao um
+    ///   valor: entra VERBATIM entre parenteses, produzindo
+    ///   "WHERE (exists (SELECT ...))", que e a forma portavel nos sete motores
+    ///   relacionais.
+    ///
+    ///   E a saida que a guarda de DELETE multi-relacao aponta: quando duas
+    ///   relacoes seriam precisas, restrinja a UNICA relacao alvo pelo WHERE
+    ///   correlacionando com a outra por subconsulta.
+    ///
+    ///     Delete.From('A','X').Where('')
+    ///           .Exists('SELECT 1 FROM B AS Y WHERE Y.AID = X.ID')
+    ///
+    ///   ISSO E UMA PORTA DE INJECAO POR CONSTRUCAO - o argumento e String e vai
+    ///   direto para o SQL, deliberadamente, como em Cast(x, 'VARCHAR2') e em
+    ///   IfThen('SALARIO * 1.1'): voce escolheu a palavra, a portabilidade e a
+    ///   seguranca sao suas. Nao alimente com entrada de usuario nao validada;
+    ///   os VALORES que a subconsulta compara devem vir de binds do consumidor,
+    ///   nao de concatenacao.
+    /// </summary>
+    function Exists(const ASubQuery: String): IFluentSQL; overload;
+    /// <summary>
+    ///   ESCAPE HATCH - SLOT DE EXPRESSAO. Mesmo contrato de Exists: ASubQuery
+    ///   entra verbatim entre parenteses, produzindo "WHERE (not exists (...))".
+    ///   Porta de injecao por construcao; nao alimente com entrada de usuario.
+    /// </summary>
+    function NotExists(const ASubQuery: String): IFluentSQL; overload;
     // Functions methods
     function Count: IFluentSQL;
     function Lower: IFluentSQL;
