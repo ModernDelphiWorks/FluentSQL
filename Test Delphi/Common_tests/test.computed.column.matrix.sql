@@ -248,8 +248,13 @@
 
   :pN e ? NAO sao SQL: sao a convencao de bind do framework, e quem os traduz e
   a camada de acesso. Submeter ":p1" cru mede a convencao de bind, nao a
-  gramatica do gerador - o T-SQL devolveria "Msg 102 Incorrect syntax near ':'"
-  em 33 dos 103 enunciados e afogaria o sinal.
+  gramatica do gerador - o T-SQL devolve "Msg 102 Incorrect syntax near ':'"
+  para QUALQUER sentenca que carregue o marcador, e esse ruido afogaria o sinal.
+
+  (De proposito sem contagem aqui: quantas sentencas carregam marcador e funcao
+  do corpus, e corpus muda a cada merge. O argumento nao muda - ele vale para
+  uma sentenca ou para trezentas. Numero que depende do corpus apodrece; a razao
+  de ser da substituicao, nao. Quem quiser a contagem tem a matriz de II.7.)
 
   As DUAS regex, literais, de corpus.py:
 
@@ -410,10 +415,11 @@
 
     * between / not between (239-240) sao CODIGO MORTO, e nao "caminho sem
       cobertura". Nao existe produtor: um grep por fcBetween/fcNotBetween em
-      todo o Source devolve exatamente DUAS ocorrencias - a declaracao no enum
-      (Interfaces.pas:844) e os dois ramos do case acima. Nenhum metodo fluente
-      alcanca esses valores, entao nenhum teste PODERIA exercita-los e nenhum
-      SQL com 'between' pode sair da biblioteca hoje.
+      todo o Source devolve TRES LINHAS, e NENHUMA DELAS E PRODUTOR - a
+      declaracao no enum (Interfaces.pas:844) e os dois ramos do case acima
+      (Operators.pas:239 e :240), que so traduzem o valor em texto. Nenhum
+      metodo fluente atribui esses valores, entao nenhum teste PODERIA
+      exercita-los e nenhum SQL com 'between' pode sair da biblioteca hoje.
       Compare com fcExists logo acima, que TEM produtor - e a comparacao que
       separa as duas situacoes.
       Isto e um achado desta varredura, mas de OUTRA familia: e da mesma
