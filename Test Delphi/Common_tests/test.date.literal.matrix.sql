@@ -158,10 +158,33 @@
       SELECT ID FROM T19_S WHERE D BETWEEN DATE '2026-08-01' AND DATE '2026-08-31';
                                                                  -> 1 e 2
 
-  Nas QUATRO posicoes de DML submetidas acima - WHERE (em coluna DATE e em
-  coluna TIMESTAMP), INSERT ... VALUES, UPDATE ... SET e BETWEEN - o literal
-  ANSI e aceito e o cru e recusado. A correcao na funcao e segura para as duas
-  superficies.
+  O QUE A TRANSCRICAO ACIMA AFIRMA, AO PE DA LETRA - e ela e menor do que a
+  vontade de generalizar:
+
+    * o PAR cru/ANSI so foi submetido em DUAS posicoes: ###W1/###W2 (WHERE em
+      coluna DATE) e ###W3/###W4 (WHERE em coluna TIMESTAMP). Nessas duas, e so
+      nessas, esta medido que o ANSI e ACEITO e que o cru e RECUSADO.
+    * ###I1, ###U1 e ###B1 tem UMA linha cada, e essa linha e a forma ANSI. O
+      literal CRU NUNCA FOI SUBMETIDO em INSERT ... VALUES, em UPDATE ... SET
+      nem em BETWEEN. O que essas tres linhas afirmam e a ACEITACAO DO ANSI -
+      nada sobre recusa do cru.
+
+  Somando o DEFAULT de coluna da secao I, o cru foi submetido e recusado em
+  TRES posicoes (DEFAULT, WHERE/DATE, WHERE/TIMESTAMP) e o ANSI foi aceito nas
+  seis. E o bastante para o que a correcao precisa: em toda posicao submetida o
+  texto novo e aceito, e em toda posicao onde o texto velho foi submetido ele
+  morre.
+
+  E PROVAVEL que o cru tambem seja recusado nas outras tres - ORA-01861 e erro
+  de CONVERSAO, nao de posicao, e a revisao da T19 mediu WHERE "D" =
+  '2024-04-14' devolvendo ORA-01861. Mas isto fica escrito como PROVAVEL, nao
+  como medido. Uma versao anterior deste paragrafo dizia "o cru e recusado" nas
+  quatro posicoes de DML: era generalizacao a partir de duas, e generalizar
+  assim ja produziu erro nesta mesma secao (o "SEIS posicoes" que virou
+  "QUATRO" e agora e "duas medidas de quatro"). Encolher sai mais barato que
+  medir, e e mais honesto.
+
+  A correcao na funcao e segura para as duas superficies.
 
   ------------------------------------------------------------------------------
   I.3  A SEXTA POSICAO ALCANCAVEL - ALTER TABLE ... ADD
@@ -180,6 +203,17 @@
   NAO MEDIDO POR ESTA ENTREGA - a medicao e da REVISAO da T19: o texto do HEAD
   altera a tabela e devolve o valor certo, e o texto da base devolve ORA-01861
   na mesma posicao.
+
+  DUAS RESSALVAS DE PROVENIENCIA, e elas importam porque a secao IX deste mesmo
+  arquivo cobra exatamente esta distincao:
+
+    * o enunciado ALTER TABLE ... ADD ... DEFAULT DATE '...' que foi submetido
+      ao motor foi RECONSTRUIDO A MAO, por leitura de Oracle.pas:138 mais
+      GetColumnDefinition - NAO foi copiado da saida do gerador, como sao os
+      doze da secao IX. O que esta medido e que a FORMA e aceita; que o gerador
+      produza exatamente este texto e leitura de codigo, nao transcricao.
+    * nao ha celula de teste travando esta posicao. Se alguem mudar
+      AlterTableAddColumn, nada na suite cai por causa disso.
 
   (ALTER TABLE ... MODIFY realmente nao emite DEFAULT no serializador do
   Oracle; nessa parte a declaracao original procede.)
@@ -326,14 +360,21 @@
              --       SQLSTATE = 22018 conversion error from string "13/12/2026"
              --     CREATE TABLE AMB3 (... DEFAULT '13/12/2026'); + INSERT
              --       SQLSTATE = 22018 conversion error from string "13/12/2026"
-             -- Ou seja: nao ha fallback DD/MM e nao ha ambiguidade. Ha RECUSA,
-             -- e ela e DIFERIDA.
+             -- Ou seja: nao ha fallback DD/MM e nao ha ambiguidade - ha
+             -- RECUSA. O MOMENTO da recusa muda com o caminho, e as duas
+             -- linhas acima nao dizem a mesma coisa:
+             --   * pelo CAST a recusa e IMEDIATA - o proprio SELECT morre;
+             --   * pelo DEFAULT de coluna a recusa e DIFERIDA - o CREATE TABLE
+             --     passa e o 22018 so aparece no INSERT.
+             -- E o caminho do DEFAULT que interessa aqui, porque e o que o
+             -- framework emite.
              --
-             -- CATALOGADO COMO TAREFA PROPRIA, nao consertado aqui: no
-             -- Firebird o CREATE TABLE com DEFAULT de data invalido PASSA e o
-             -- erro so aparece no primeiro INSERT. O schema nasce com um
-             -- default que estoura no primeiro uso - pior que recusa imediata.
-             -- Medir isso direito nao e desta entrega.
+             -- NAO CONSERTADO AQUI, e catalogado pelo ORQUESTRADOR desta fila
+             -- como tarefa propria (sem identificador atribuido ate aqui - nao
+             -- invento numero): no Firebird o CREATE TABLE com DEFAULT de data
+             -- invalido PASSA e o erro so aparece no primeiro INSERT. O schema
+             -- nasce com um default que estoura no primeiro uso - pior que
+             -- recusa imediata. Medir isso direito nao e desta entrega.
     ### E    d TIMESTAMP DEFAULT '2026-08-10 12:34:56'   -> 2026-08-10 12:34:56.0000
     ### F    d TIMESTAMP DEFAULT TIMESTAMP '2026-08-10 12:34:56'
                                                          -> 2026-08-10 12:34:56.0000

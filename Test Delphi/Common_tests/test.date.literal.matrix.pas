@@ -238,14 +238,18 @@ begin
     //
     // NAO MEDIDO POR ESTA ENTREGA, e a atribuicao importa: a REVISAO da T19
     // mediu que '13/12/2026' e RECUSADO pelo Firebird com SQLSTATE 22018
-    // (conversion error from string), e que a recusa e DIFERIDA - o CREATE
-    // TABLE com o DEFAULT invalido PASSA e o erro so aparece no INSERT. Uma
-    // versao anterior deste comentario afirmava o contrario ("o motor tambem
-    // aceita '13/12/2026', caindo para DD/MM") por INFERENCIA: o CREATE nao
-    // reclamou e o valor nunca foi lido. Nao havia medicao por tras da frase.
+    // (conversion error from string). O MOMENTO da recusa depende do caminho:
+    // por CAST ela e IMEDIATA, e pelo DEFAULT de coluna - que e o que o
+    // framework emite - ela e DIFERIDA: o CREATE TABLE PASSA e o erro so
+    // aparece no INSERT. Uma versao anterior deste comentario afirmava o
+    // contrario ("o motor tambem aceita '13/12/2026', caindo para DD/MM") por
+    // INFERENCIA: o CREATE nao reclamou e o valor nunca foi lido. Nao havia
+    // medicao por tras da frase.
     //
     // A falha DIFERIDA de literal de data no Firebird esta catalogada como
-    // tarefa propria. Medir isso direito nao e desta entrega.
+    // tarefa propria PELO ORQUESTRADOR desta fila - sem identificador
+    // atribuido ate aqui, e nao invento numero. Medir isso direito nao e
+    // desta entrega.
     // ====================================================================
     Inc(LCelulas);
     Assert.AreEqual(
