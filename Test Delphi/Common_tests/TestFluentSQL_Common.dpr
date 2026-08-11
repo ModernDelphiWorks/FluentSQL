@@ -28,6 +28,7 @@ uses
   test.date.literal.matrix in 'test.date.literal.matrix.pas',
   test.delete.alias.matrix in 'test.delete.alias.matrix.pas',
   test.delete.multirelacao in 'test.delete.multirelacao.pas',
+  test.exists.subquery.matrix in 'test.exists.subquery.matrix.pas',
   test.ddl.identity in 'test.ddl.identity.pas',
   test.ddl.numeric in 'test.ddl.numeric.pas',
   test.ddl.procedures in 'test.ddl.procedures.pas',

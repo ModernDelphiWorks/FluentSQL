@@ -166,7 +166,29 @@ begin
   Result := '';
   if VarIsNull(FValue) then
     Exit;
-  
+
+  // dftText e o slot de EXPRESSAO, nao de valor: o argumento JA E SQL - uma
+  // subconsulta - e sai verbatim entre parenteses. Nunca vira bind, com ou sem
+  // colecao de parametros ligada.
+  //
+  // Esta guarda estava dentro do ramo fcIn/fcNotIn e por isso valia so para
+  // eles. fcExists/fcNotExists caiam no "else" e o TEXTO DA SUBCONSULTA virava
+  // VALOR DE BIND: "WHERE (exists :p1)" com p1 = 'SELECT 1 FROM ...'. Isso nao
+  // e SQL valido em motor nenhum dos sete, e o que chegaria ao motor seria a
+  // subconsulta como STRING, nao como consulta.
+  //
+  // Hospedar a regra no TIPO, e nao no operador, e o que mantem os dois
+  // caminhos (com e sem parametros) dizendo a mesma coisa: o caminho inline
+  // ja tratava dftText assim, uniformemente, no case de baixo.
+  //
+  // Os UNICOS produtores de dftText sao IsIn/IsNotIn/IsExists/IsNotExists
+  // (String), entao subir a guarda nao alcanca nenhum outro operador.
+  if FDataType = dftText then
+  begin
+    Result := '(' + VarToStr(FValue) + ')';
+    Exit;
+  end;
+
   if Assigned(FParams) then
   begin
     case FCompare of
@@ -179,9 +201,7 @@ begin
       fcLikeRight, fcNotLikeRight:
         Result := FParams.Add(VarToStr(FValue) + '%', dftString);
       fcIn, fcNotIn:
-        if FDataType = dftText then
-          Result := '(' + VarToStr(FValue) + ')'
-        else if FDataType = dftArray then
+        if FDataType = dftArray then
           Result := _ParamListFromArray
         else
           Result := FParams.Add(FValue, FDataType);
@@ -214,7 +234,7 @@ begin
     dftGuid:     Result := TUtils.GuidStrToSQLFormat(FDatabase, StringToGUID(FValue));
     dftArray:    Result := _ArrayValueToString;
     dftBoolean:  result := BoolToStr(FValue);
-    dftText:     Result := '(' + FValue + ')';
+    // dftText nao chega aqui: sai na guarda de expressao no topo do metodo.
   end;
 end;
 
