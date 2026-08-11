@@ -38,6 +38,24 @@ type
     function Quote(const AName: string): string; virtual;
     function GetLiteralValue(const AValue: string; const ALogicalType: TDDLLogicalType = dltVarChar): string; virtual;
     function GetComputedDefinition(const ACol: IFluentDDLColumn): string; virtual;
+    /// <summary>
+    ///   A coluna computada deste dialeto carrega o tipo declarado antes da
+    ///   clausula de computacao?
+    ///
+    ///   O default e True porque e o que CINCO dos seis dialetos que emitem
+    ///   coluna computada aceitam - medido em motor, nao deduzido:
+    ///     PostgreSQL 16 EXIGE o tipo ("TOTAL" INTEGER GENERATED ALWAYS AS ...);
+    ///     MySQL 8.4, Oracle 23 e Firebird 5.0 ACEITAM o tipo;
+    ///     SQLite nem chega aqui - levanta ENotSupportedException.
+    ///   So o T-SQL RECUSA: "[TOTAL] INT AS (QTD * PRECO)" devolve
+    ///   Msg 156 "Incorrect syntax near the keyword 'AS'" em SQL Server 2022
+    ///   sob SET PARSEONLY ON. A forma que ele aceita e "[TOTAL] AS (...)".
+    ///
+    ///   O gancho existe para que a correcao do T-SQL seja LOCAL: quem nao
+    ///   sobrescreve continua emitindo byte a byte o que emitia. A alternativa
+    ///   recusada era tirar o tipo para todos, que quebraria o PostgreSQL.
+    /// </summary>
+    function ComputedColumnCarriesType: Boolean; virtual;
     function GetIdentityDefinition(const ACol: IFluentDDLColumn): string; virtual;
     function GetColumnDefinition(const ACol: IFluentDDLColumn): string;
     function GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
@@ -184,15 +202,31 @@ begin
   Result := '';
 end;
 
+function TFluentDDLSerializeAbstract.ComputedColumnCarriesType: Boolean;
+begin
+  Result := True;
+end;
+
 function TFluentDDLSerializeAbstract.GetIdentityDefinition(const ACol: IFluentDDLColumn): string;
 begin
   Result := '';
 end;
 
 function TFluentDDLSerializeAbstract.GetColumnDefinition(const ACol: IFluentDDLColumn): string;
+var
+  LComputed: string;
 begin
-  Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + GetComputedDefinition(ACol) +
-    GetIdentityDefinition(ACol) + MapConstraints(ACol);
+  LComputed := GetComputedDefinition(ACol);
+  // Coluna computada num dialeto que NAO admite tipo: o nome cola direto na
+  // clausula de computacao. So este ramo muda de texto, e so para quem
+  // sobrescreve ComputedColumnCarriesType - coluna comum (LComputed vazio)
+  // nunca entra aqui.
+  if (LComputed <> '') and (not ComputedColumnCarriesType) then
+    Result := Quote(ACol.Name) + LComputed +
+      GetIdentityDefinition(ACol) + MapConstraints(ACol)
+  else
+    Result := Quote(ACol.Name) + ' ' + MapLogicalType(ACol) + LComputed +
+      GetIdentityDefinition(ACol) + MapConstraints(ACol);
 end;
 
 function TFluentDDLSerializeAbstract.GetColumnDefinitionList(const ADef: IFluentDDLTableDef): string;
