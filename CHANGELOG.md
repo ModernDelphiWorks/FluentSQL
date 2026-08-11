@@ -48,6 +48,21 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **Fronteira declarada:** com mais de uma relação no `DELETE` (`From` chamado duas vezes), o `dbnMSSQL` cai de propósito na forma da base e emite `DELETE FROM A AS X, B AS Y` — igual a antes. Qual das relações seria o alvo do `DELETE` é decisão de convenção, não conserto silencioso, e essa forma **não foi executada em motor nenhum** nesta correção.
 
+- **BREAKING CHANGE (API) — `IFluentSQLSerialize` ganhou o método `function DeleteClause(const ADelete: IFluentSQLDelete): String;`.** Acrescentar método a interface publicada quebra quem a implementa do zero. É quebra de **compilação**, distinta e independente do BREAKING de **SQL emitido** da entrada acima: aquela atinge quem compara texto gerado para `dbnMSSQL`, esta atinge quem escreve serializador de dialeto próprio — inclusive quem não usa `DELETE` com apelido em lugar nenhum.
+
+  **Impacto real: baixo, e provavelmente não é você.** No repositório o único implementador direto é `TFluentSQLSerialize` (`FluentSQL.Serialize.pas:28`), e os **nove** serializadores de driver **descendem** dela — herdam o novo método de graça, e o mesmo vale para qualquer subclasse externa. Só quebra quem implementa `IFluentSQLSerialize` inteira do zero e a injeta por `TFluentSQLRegister.RegisterSerialize` (`FluentSQL.Register.pas:278`).
+
+  **Medido, não deduzido.** Uma classe de terceiro declarando exatamente os quatro membros anteriores (`AsString`, `Merge`, `QuotedName`, `RelationAliasKeyword`) compila limpo contra `9d0407c` e, contra esta branch, para em:
+
+  ```
+  terceiro.dpr(9) Error: E2291 Missing implementation of interface method
+                          IFluentSQLSerialize.DeleteClause
+  ```
+
+  **O que fazer:** passar a descender de `TFluentSQLSerialize` — que já traz a forma padrão — ou declarar o método. O corpo honesto para quem não tem regra própria é `Result := ADelete.Serialize;`, que é literalmente o que a base faz e reproduz o comportamento anterior byte a byte. **Não há ressalva de runtime aqui**, ao contrário do `Cast`: a implementação da base é concreta, não abstrata, então quem herda e não sobrescreve não corre risco de `EAbstractError`.
+
+  Está aqui e não em *Added* pela régua que esta mesma lista já aplicou três vezes — `IFluentSQLSelectQualifiers` com `RequestsZeroRows`, `IFluentSQLFunctions` com `Cast`, e `IFluentSQLCriteriaCase` com os dois membros do slot de valor: *"acrescentar método a interface publicada não pode ser rodapé"*. A régua não muda de interface para interface.
+
 - **BREAKING CHANGE (SQL emitido) — Oracle: o apelido de TABELA perdeu a palavra `AS`.** O Oracle **não aceita** `AS` antes de apelido de tabela, view ou subconsulta, e o núcleo emitia `AS` para todo apelido sem consultar dialeto nenhum — a linha era `Result := TUtils.Concat([Result, 'AS', FAlias])`, em `FluentSQL.Name.pas:114` **na árvore anterior à correção** (commit `eb48337`); no HEAD atual essa linha não existe mais, e o ponto equivalente é `FluentSQL.Name.pas:161`, já lendo `FAliasKeyword`. Todo `From(tabela, apelido)` e as **quatro** sobrecargas de join com apelido (`InnerJoin`/`LeftJoin`/`RightJoin`/`FullJoin`) produziam SQL que o Oracle recusa. **Quem compara o SQL gerado com string fixa para `dbnOracle` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
 
   | Construção | Antes (Oracle) | Depois (Oracle) | Motor real |

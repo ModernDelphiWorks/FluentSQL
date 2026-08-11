@@ -119,9 +119,13 @@ const
   ///
   ///   O Interbase esta em fdFromComAS por HERANCA, nao por medicao: nao existe
   ///   imagem publica de InterBase e ele nao foi executado em motor nenhum nesta
-  ///   tarefa. TFluentSQLSerializeInterbase descende da base e nao sobrescreve
-  ///   nem DeleteClause nem RelationAliasKeyword, entao o que ele emite e o
-  ///   texto da base - e e isso, e so isso, que a celula abaixo afirma.
+  ///   tarefa. TFluentSQLSerializerInterbase
+  ///   (Source\Drivers\FluentSQL.SerializeInterbase.pas:29, registrada em
+  ///   FluentSQL.Register.pas:178) descende de TFluentSQLSerialize e nao
+  ///   sobrescreve nem DeleteClause nem RelationAliasKeyword - seu unico
+  ///   override e AsString, cujo corpo delega ao inherited. Entao o que ela
+  ///   emite e o texto da base - e e isso, e so isso, que a celula abaixo
+  ///   afirma.
   /// </summary>
   cFORMA: array[TFluentSQLDriver] of TFormaDelete = (
     {dbnMSSQL}      fdAlvoApelido,

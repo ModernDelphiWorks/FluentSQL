@@ -70,9 +70,17 @@
     INTERBASE NAO FOI MEDIDO. Nao existe imagem Docker publica de InterBase, e a
     convencao da casa e declarar nao medido em vez de deduzir. O que se sabe do
     InterBase no FluentSQL e estrutural, nao empirico:
-    TFluentSQLSerializeInterbase descende de TFluentSQLSerialize e nao
-    sobrescreve DeleteClause nem RelationAliasKeyword, entao emite o texto da
-    base - "DELETE FROM A AS AP" - exatamente como emitia antes da T18.
+    TFluentSQLSerializerInterbase (Source\Drivers\FluentSQL.SerializeInterbase.pas:29,
+    registrada em FluentSQL.Register.pas:178) descende de TFluentSQLSerialize e
+    nao sobrescreve DeleteClause nem RelationAliasKeyword - seu unico override e
+    AsString, cujo corpo delega ao inherited. Entao emite o texto da base -
+    "DELETE FROM A AS AP" - exatamente como emitia antes da T18.
+
+    ATENCAO A QUEM FOR CONFERIR: a classe tem "Serializer" com R, nao
+    "Serialize". As versoes anteriores deste arquivo e de
+    test.delete.alias.matrix.pas escreviam TFluentSQLSerializeInterbase, que NAO
+    existe - quem fizesse grep nao encontrava nada, e esta e a unica evidencia
+    estrutural que sustenta o que se afirma sobre InterBase aqui.
 
   ------------------------------------------------------------------------------
   COMO REPETIR - os sete docker run usados nesta medicao
@@ -283,11 +291,80 @@ DELETE AP FROM A AP WHERE AP.ID = 999;
     ERROR at line 1:
     ORA-00942: table or view "SYSTEM"."AP" does not exist
 
-  LEITURA: o erro e o mais instrutivo da matriz. A Oracle nao devolve erro de
-  SINTAXE aqui - ela le "DELETE AP" como "apague da tabela AP" e so entao
-  descobre que AP nao existe. Se por acaso existisse uma tabela chamada AP, esta
-  linha apagaria as linhas ERRADAS, em silencio. E a razao concreta de a forma do
-  T-SQL nao poder ser adotada como padrao para todos.
+  LEITURA: a Oracle NAO devolve erro de sintaxe aqui - ela le "DELETE AP" como
+  "apague da tabela AP" e so entao descobre que AP nao existe. Ou seja: o
+  ORA-00942 nao e a Oracle recusando a forma, e a Oracle ACEITANDO a forma e
+  reclamando de outra coisa. O caso 04b abaixo mostra o que acontece quando a
+  tabela existe, e e MUITO pior.
+*/
+
+-- === 04b DELETE AP FROM A AP  QUANDO EXISTE uma tabela chamada AP ===
+--     (a mesma sentenca do 04, com a tabela AP criada de verdade)
+DROP TABLE A PURGE;
+DROP TABLE AP PURGE;
+CREATE TABLE A  (A_ID NUMBER, NOME VARCHAR2(30));
+CREATE TABLE AP (ID   NUMBER, NOME VARCHAR2(30));
+INSERT INTO A  VALUES (1,'A-um');
+INSERT INTO A  VALUES (1,'A-dois');
+INSERT INTO AP VALUES (1,'AP-um');
+INSERT INTO AP VALUES (1,'AP-dois');
+COMMIT;
+SELECT 'A' AS TABELA, COUNT(*) AS N FROM A UNION ALL SELECT 'AP', COUNT(*) FROM AP;
+DELETE AP FROM A AP WHERE AP.ID = 1;
+SELECT 'A' AS TABELA, COUNT(*) AS N FROM A UNION ALL SELECT 'AP', COUNT(*) FROM AP;
+/*
+  SAIDA BRUTA:
+
+    === ANTES ===
+    TA	    N
+    -- ----------
+    A	    2
+    AP	    2
+
+    2 rows selected.
+
+    === DELETE AP FROM A AP WHERE AP.ID = 1 ===
+
+    2 rows deleted.
+
+    === DEPOIS ===
+    TA	    N
+    -- ----------
+    A	    2
+    AP	    0
+
+    2 rows selected.
+
+  LEITURA - E ESTA E A CELULA MAIS IMPORTANTE DO ARQUIVO INTEIRO.
+
+  Nao ha erro. Nao ha aviso. A Oracle responde "2 rows deleted." e a contagem
+  DEPOIS mostra o estrago: a tabela A, que o usuario queria apagar, ficou
+  INTACTA com suas 2 linhas, e a tabela AP - que so por acaso se chama como o
+  apelido - foi ESVAZIADA. Nao e "apagar as linhas erradas": e apagar a TABELA
+  ERRADA por completo, em silencio, com o motor reportando sucesso.
+
+  Ou seja: se a T18 tivesse adotado a forma do T-SQL como padrao para todos os
+  dialetos - que era uma das alternativas em cima da mesa -, toda consulta
+  Delete.From(tabela, apelido) contra Oracle viraria uma bomba armada: funciona
+  ate o dia em que existir no schema uma tabela homonima do apelido, e nesse dia
+  destroi a tabela errada sem uma linha de log. Apelidos curtos ("C", "P", "T")
+  tornam a colisao provavel, nao teorica.
+
+  E POR ISSO que a forma tem de ser do DIALETO, e nao um denominador comum
+  escolhido por ser "o que mais motores aceitam".
+
+  RESSALVA HONESTA sobre o cenario do caso 04b: para chegar ao "2 rows deleted"
+  as duas tabelas precisam ter colunas de nomes diferentes. Com A e AP ambas
+  tendo uma coluna ID, a MESMA sentenca devolve
+
+    DELETE AP FROM A AP WHERE AP.ID = 1
+                              *
+    ERROR at line 1:
+    ORA-00918: ID: column ambiguously specified - appears in AP and A
+
+  e nada e apagado (medido, com as contagens antes e depois iguais). Ou seja: o
+  desastre silencioso depende do schema. Isso NAO o torna menos grave - torna-o
+  intermitente, que e pior para diagnosticar.
 */
 
 -- === 05 DELETE FROM A  (sem apelido - controle) ===
