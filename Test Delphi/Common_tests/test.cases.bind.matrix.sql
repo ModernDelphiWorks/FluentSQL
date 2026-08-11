@@ -340,7 +340,177 @@
     Interbase                     nao medido
 
   ==============================================================================
-  VEREDITO - POR QUE A ASSINATURA DE IfThen/ElseIf NAO MUDOU NESTA BRANCH
+  ATUALIZACAO T13 - A ASSINATURA MUDOU. LEIA ESTA SECAO ANTES DO VEREDITO ABAIXO
+  ==============================================================================
+
+  O VEREDITO que fecha este arquivo ("por isso a assinatura NAO foi alterada
+  nesta branch") descrevia a situacao na branch da T14. ELE ESTA SUPERADO. Fica
+  aqui porque a medicao que ele resume continua valendo e e a razao de o desenho
+  ter ficado como ficou - mas a conclusao dele nao e mais a conclusao.
+
+  O QUE MUDOU ENTRE UMA COISA E OUTRA: a T17 (PR #157). Ela tirou
+  IFluentSQLFunctions.Cast do padrao A e o pos a despachar por dialeto, com a
+  largura resolvida por driver e a intersecao portavel em fonte unica. Isso
+  entrega, pronta, a peca que faltava - a opcao (i) da lista do veredito.
+
+  A DECISAO DO DONO foi a (i): emitir CAST(:pN AS <tipo do dialeto>) nos SETE, e
+  nao so nos dois que exigem. A razao de uniformizar e que esta e uma sobrecarga
+  NOVA - nao ha SQL emitido hoje por ela, logo nao ha oraculo a quebrar - e a
+  alternativa seria manter uma tabela de "quem precisa de tipo" que envelhece com
+  a versao do motor.
+
+  O QUE A T13 EMITE, MEDIDO NO BUILD (nao inferido da gramatica): o texto exato
+  sai em test.cases.value.pas, celula por celula. Resumo:
+
+    Firebird ..... CASE ... THEN CAST(:p1 AS VARCHAR(4000)) ...
+    SQL Server ... CASE ... THEN CAST(:p1 AS NVARCHAR(4000)) ...
+    MySQL ........ CASE ... THEN CAST(? AS CHAR) ...        (:pN -> ? no driver)
+    Oracle ....... CASE ... THEN CAST(:p1 AS VARCHAR2(4000)) ...
+    PostgreSQL ... CASE ... THEN CAST(:p1 AS VARCHAR) ...
+    SQLite ....... CASE ... THEN CAST(:p1 AS TEXT) ...
+    DB2 .......... CASE ... THEN CAST(:p1 AS VARCHAR) ...   (sem largura)
+    InterBase .... levanta EFluentSQLFunctionNotSupported (matriz nao medida)
+    MongoDB ...... levanta EFluentSQLFunctionNotSupported (fora da intersecao)
+
+  ==============================================================================
+  CASO F - A FORMA QUE A T13 EMITE, MEDIDA NOS SETE  (2026-08-11)
+  ==============================================================================
+
+  Esta secao NAO cita a T17: e medicao PROPRIA, feita na branch da T13, com as
+  strings EXATAS que a implementacao emite - as mesmas que test.cases.value.pas
+  trava celula por celula. Docker engine 29.6.2. Imagens iguais as do cabecalho
+  deste arquivo; as versoes foram PERGUNTADAS ao motor em cada sessao, nao
+  presumidas da tag.
+
+  O que se perguntou em cada motor:
+
+    controle    CASE 1 WHEN 1 THEN <marcador nu> ELSE <marcador nu> END
+    dftString   CASE 1 WHEN 1 THEN CAST(p AS <grafia>) ELSE CAST(p AS <grafia>) END
+    dftInteger  idem, ramo ELSE tomado, valores 10 e 20
+    dftFloat    idem, ramo ELSE tomado, valores 1.5 e 2.5
+
+  --- Firebird 5.0.4 --------------------------------------------------------
+  SELECT rdb$get_context('SYSTEM','ENGINE_VERSION') FROM RDB$DATABASE  ->  5.0.4
+  Metodo: EXECUTE STATEMENT dentro de EXECUTE BLOCK - o texto interno e preparado
+  ANTES de os valores serem conhecidos, como o prepare de um cliente.
+
+    controle
+      EXECUTE STATEMENT
+        ('SELECT (CASE 1 WHEN 1 THEN :a ELSE :b END) FROM RDB$DATABASE')
+        (a := 'yes', b := 'no') INTO r;
+          Statement failed, SQLSTATE = HY004
+          Dynamic SQL Error
+          -SQL error code = -804
+          -Data type unknown
+          -At block line: 3, col: 3                 RECUSA (bloqueio reproduzido)
+
+    dftString   CAST(:a AS VARCHAR(4000)) nos dois ramos
+          R
+          ========================================
+          yes                                                        ACEITA
+
+    dftInteger  CAST(:a AS INTEGER) nos dois ramos
+                     R
+          ============
+                    20                                               ACEITA
+
+    dftFloat    CAST(:a AS DOUBLE PRECISION) nos dois ramos
+                                R
+          =======================
+                2.500000000000000            ACEITA   <== ANTES SO INFERIDO
+
+  --- DB2 v12.1.5.0 ---------------------------------------------------------
+  SELECT service_level FROM TABLE(sysproc.env_get_inst_info())  ->  DB2 v12.1.5.0
+  Metodo: db2 CLP com "?" - o CLP prepara e so entao pede valor. SQL0313N ("voce
+  nao me deu valores") prova que o PREPARE PASSOU; SQL0418N prova que nao passou.
+
+    controle    THEN ? ELSE ?
+          SQL0418N  The statement was not processed because the statement
+          contains an ... keyword, or a null value.  SQLSTATE=42610
+                                                    RECUSA (bloqueio reproduzido)
+
+    dftString   CAST(? AS VARCHAR)     SQL0313N ... SQLSTATE=07004  PREPARE PASSOU
+    dftInteger  CAST(? AS INTEGER)     SQL0313N ... SQLSTATE=07004  PREPARE PASSOU
+    dftFloat    CAST(? AS DOUBLE)      SQL0313N ... SQLSTATE=07004  PREPARE PASSOU
+                                                          <== ANTES SO INFERIDO
+
+  --- PostgreSQL 16.14 ------------------------------------------------------
+  SELECT version() -> PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu
+  Metodo: PREPARE ... AS <sql com $1,$2>, depois EXECUTE.
+    dftString   CAST($1 AS VARCHAR)              -> yes            ACEITA
+    dftInteger  CAST($1 AS INTEGER)              -> 20             ACEITA
+    dftFloat    CAST($1 AS DOUBLE PRECISION)     -> 2.5            ACEITA
+
+  --- MySQL 8.4.11 ----------------------------------------------------------
+  SELECT VERSION() -> 8.4.11
+  Metodo: PREPARE m FROM '<sql com ?>', depois EXECUTE m USING @a,@b.
+    dftString   CAST(? AS CHAR)                  -> yes            ACEITA
+    dftInteger  CAST(? AS SIGNED)                -> 20             ACEITA
+    dftFloat    CAST(? AS DOUBLE)                -> 2.5            ACEITA
+
+  --- SQLite 3.53.4 ---------------------------------------------------------
+  SELECT sqlite_version() -> 3.53.4
+  Metodo: .parameter set :p1 <v>, e entao a query.
+    dftString   CAST(:p1 AS TEXT)                -> yes            ACEITA
+    dftInteger  CAST(:p1 AS INTEGER)             -> 20             ACEITA
+    dftFloat    CAST(:p1 AS REAL)                -> 2.5            ACEITA
+
+  --- SQL Server 2022 (RTM-CU26) 16.0.4265 ----------------------------------
+  Metodo: sp_executesql - o cliente DECLARA o tipo do bind.
+    dftString   CAST(@p1 AS NVARCHAR(4000))      -> yes            ACEITA
+    dftInteger  CAST(@p1 AS INT)                 -> 20             ACEITA
+    dftFloat    CAST(@p1 AS FLOAT)               -> 2.5            ACEITA
+
+  --- Oracle AI Database 26ai Free Release 23.26.2.0.0 ----------------------
+  SELECT banner_full FROM v$version -> Oracle AI Database 26ai Free Release
+  23.26.2.0.0 (a tag da imagem diz "23-slim"; o motor diz 26ai - use o que o
+  motor diz)
+  Metodo: VARIABLE + EXEC - o cliente DECLARA o tipo do bind.
+    dftString   CAST(:s1 AS VARCHAR2(4000))      -> yes            ACEITA
+    dftInteger  CAST(:n1 AS INTEGER)             -> 20             ACEITA
+    dftFloat    CAST(:f1 AS BINARY_DOUBLE)       -> 2.5E+000       ACEITA
+
+  --- InterBase -------------------------------------------------------------
+    NAO MEDIDO, e nao ha o que procurar: nao existe imagem publica do motor
+    (produto pago da Embarcadero). A grafia do CAST do InterBase NAO foi inferida
+    do Firebird, de proposito - mesma decisao da T17.
+
+    O que EXISTE sobre o InterBase nesta entrega e de outra natureza e nao
+    depende de motor: o driver LEVANTA EFluentSQLFunctionNotSupported neste slot,
+    e essa recusa e observavel medindo o ESTADO DA COLECAO Params, nao a resposta
+    de um banco. Tem celula propria em test.cases.value.pas, e foi ela que
+    revelou o parametro orfao da porta 5. NADA neste arquivo afirma como o motor
+    InterBase se comportaria.
+
+  RESUMO DO CASO F
+
+    motor                        controle nu   String    Integer   Float
+    -------------------------  ------------  --------  --------  --------
+    PostgreSQL 16.14               ACEITA     ACEITA    ACEITA    ACEITA
+    MySQL 8.4.11                   ACEITA     ACEITA    ACEITA    ACEITA
+    SQLite 3.53.4                  ACEITA     ACEITA    ACEITA    ACEITA
+    SQL Server 2022 CU26           ACEITA     ACEITA    ACEITA    ACEITA
+    Oracle 26ai 23.26.2.0.0        ACEITA     ACEITA    ACEITA    ACEITA
+    Firebird 5.0.4                 RECUSA     ACEITA    ACEITA    ACEITA
+    DB2 v12.1.5.0                  RECUSA     PREPARE   PREPARE   PREPARE
+    InterBase                      nao medido em coluna nenhuma
+
+  A COLUNA DO CONTROLE E O PONTO. E a unica com RECUSA, e o CAST a converte em
+  ACEITA nos dois motores que recusavam. Nas outras cinco o CAST nao era
+  necessario e TAMBEM NAO ATRAPALHOU - que era a outra metade da aposta da
+  decisao "emitir CAST nos sete", e ate aqui essa metade nao tinha sido medida.
+
+  O QUE CONTINUA SEM MEDICAO, PARA NAO SER LIDO COMO MEDIDO
+
+    * InterBase, em qualquer forma (ver acima).
+    * o comportamento com valor que NAO CABE no tipo declarado - por exemplo
+      IfThen('BANANA', dftInteger). Nada na biblioteca valida AValue contra
+      ADataType. A divergencia entre motores nesse caso ja esta documentada na
+      matriz da T17 (no SQLite e no MySQL o CAST devolve 0 CALADO), e esta
+      declarada no CHANGELOG - mas o CASO F mediu o uso CORRETO, e so ele.
+
+  ==============================================================================
+  VEREDITO (HISTORICO, DA BRANCH DA T14) - POR QUE A ASSINATURA NAO MUDOU LA
   ==============================================================================
 
   A forma que a T13 propunha emitir - CASE WHEN <cond> THEN :p1 ELSE :p2 END -

@@ -36,6 +36,17 @@ type
     ///   se cada driver escrevesse a propria, a mensagem derivaria e a politica
     ///   viraria uma colecao de opinioes. Chamada como PRIMEIRA linha de todo
     ///   override de Cast(TFluentSQLDataFieldType), inclusive o do core.
+    ///
+    ///   CONTINUA protected, e isso e RESULTADO DE MEDICAO, nao omissao. O slot de
+    ///   VALOR do CASE (IFluentSQLCriteriaCase.IfThen/ElseIf) mora em outra unit e
+    ///   precisa recusar ANTES de gravar o parametro; houve uma versao da T13 que
+    ///   alargou esta visibilidade para chamar de la. Nao e preciso: o slot faz um
+    ///   PRE-VOO chamando o proprio Cast com uma expressao descartavel, e como
+    ///   esta assercao e a PRIMEIRA linha de TFluentSQLFunctions.Cast, o pre-voo
+    ///   ja a provoca. Medido: com o pre-voo no lugar, mover a chamada explicita
+    ///   para depois do Params.Add nao deixava NENHUM teste vermelho - era linha
+    ///   morta. A politica fica onde a T17 a pos, com a visibilidade que a T17
+    ///   lhe deu.
     /// </summary>
     class procedure _AssertCastTypeIsPortable(const ADataType: TFluentSQLDataFieldType);
     /// <summary>
