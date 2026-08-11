@@ -226,12 +226,26 @@ begin
   begin
     // ============================================================ ATENCAO
     // Esta celula fixa o formato US mm/dd/yyyy que o framework emite para
-    // Firebird/Interbase desde sempre. Medido em Firebird 5.0.4: o motor ACEITA
+    // Firebird/Interbase desde sempre. O QUE ESTA ENTREGA MEDIU no Firebird
+    // 5.0.4, e so isto:
     //   D DATE DEFAULT '04/14/2026'  -> cria, e o INSERT devolve 2026-04-14
-    // entao NAO ha defeito a consertar aqui, e mudar isto seria BREAKING sem
-    // causa medida. Fica registrado que o mesmo motor tambem aceita
-    // '13/12/2026' (fallback DD/MM quando o mes seria invalido) - ambiguidade
-    // real, achado separado, fora do escopo da T19.
+    //   D DATE DEFAULT '12/13/2026'  -> cria, e o INSERT devolve 2026-12-13
+    //
+    // NAO mexer no ramo dbnFirebird/dbnInterbase e decisao de ESCOPO: a T19
+    // nasceu do defeito do Oracle e nao foi encarregada de decidir o formato
+    // de outro dialeto. NAO leia esta celula como "nao ha nada a rever no
+    // Firebird" - ela nao mediu terreno suficiente para dizer isso.
+    //
+    // NAO MEDIDO POR ESTA ENTREGA, e a atribuicao importa: a REVISAO da T19
+    // mediu que '13/12/2026' e RECUSADO pelo Firebird com SQLSTATE 22018
+    // (conversion error from string), e que a recusa e DIFERIDA - o CREATE
+    // TABLE com o DEFAULT invalido PASSA e o erro so aparece no INSERT. Uma
+    // versao anterior deste comentario afirmava o contrario ("o motor tambem
+    // aceita '13/12/2026', caindo para DD/MM") por INFERENCIA: o CREATE nao
+    // reclamou e o valor nunca foi lido. Nao havia medicao por tras da frase.
+    //
+    // A falha DIFERIDA de literal de data no Firebird esta catalogada como
+    // tarefa propria. Medir isso direito nao e desta entrega.
     // ====================================================================
     Inc(LCelulas);
     Assert.AreEqual(

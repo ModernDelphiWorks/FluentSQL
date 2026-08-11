@@ -382,7 +382,7 @@ begin
   //   DEFAULT TIMESTAMP '2026-08-10 12:34:56'  -> cria, e o INSERT devolve
   //                                               2026-08-10 12:34:56
   // Vale tambem em coluna DATE (o Oracle guarda hora no DATE) e nas posicoes
-  // de WHERE, INSERT VALUES, UPDATE SET e BETWEEN - as seis submissoes estao
+  // de WHERE, INSERT VALUES, UPDATE SET e BETWEEN - as submissoes estao
   // transcritas em Test Delphi\Common_tests\test.date.literal.matrix.sql.
   if ADriverName = dbnOracle then
     Result := 'TIMESTAMP ' + Result;

@@ -125,8 +125,16 @@
 
   TUtils.DateToSQLFormat e chamada de duas superficies. A T19 corrige a funcao,
   entao o texto novo tambem sai no caminho inline de FluentSQL.Operators.pas
-  (alcancavel so por instanciacao direta de TFluentSQLOperators sem params).
-  As posicoes foram submetidas para que a correcao nao troque um erro por outro:
+  (dftDate/dftDateTime em Operators.pas:212-213). Esse caminho e de alcance
+  ESTREITO, e vale dizer a razao com precisao: TFluentSQLOperators so tem
+  construtor de DOIS argumentos e o unico chamador de dentro do framework
+  sempre passa os params, entao para cair no ramo inline e preciso passar nil
+  explicitamente ou usar TFluentSQLOperator direto. (Uma versao anterior desta
+  secao dizia "instanciacao direta de TFluentSQLOperators SEM params", o que
+  sugere um construtor de um argumento que nao existe.)
+
+  As posicoes de DML foram submetidas para que a correcao nao troque um erro
+  por outro:
 
     ###SETUP
       CREATE TABLE T19_S (ID NUMBER, D DATE, TS TIMESTAMP);
@@ -150,8 +158,31 @@
       SELECT ID FROM T19_S WHERE D BETWEEN DATE '2026-08-01' AND DATE '2026-08-31';
                                                                  -> 1 e 2
 
-  Nas SEIS posicoes o literal ANSI e aceito e o cru e recusado. A correcao na
-  funcao e segura para as duas superficies.
+  Nas QUATRO posicoes de DML submetidas acima - WHERE (em coluna DATE e em
+  coluna TIMESTAMP), INSERT ... VALUES, UPDATE ... SET e BETWEEN - o literal
+  ANSI e aceito e o cru e recusado. A correcao na funcao e segura para as duas
+  superficies.
+
+  ------------------------------------------------------------------------------
+  I.3  A SEXTA POSICAO ALCANCAVEL - ALTER TABLE ... ADD
+
+  A declaracao original desta entrega listava CINCO posicoes: o DEFAULT de
+  coluna em CREATE TABLE mais as quatro de DML de I.2. Faltava uma, e a
+  omissao foi apontada pela REVISAO da T19:
+
+    Source\Drivers\FluentSQL.DDL.Serialize.Oracle.pas:134  AlterTableAddColumn
+      -> :138 chama GetColumnDefinition, que passa por MapConstraints
+      -> FluentSQL.DDL.SerializeAbstract.pas:125, o mesmo ' DEFAULT ' + ...
+
+  Logo ALTER TABLE "T" ADD "D" DATE DEFAULT DATE '...' TAMBEM e emitido, e a
+  correcao melhora essa posicao tambem. Sao SEIS, nao cinco.
+
+  NAO MEDIDO POR ESTA ENTREGA - a medicao e da REVISAO da T19: o texto do HEAD
+  altera a tabela e devolve o valor certo, e o texto da base devolve ORA-01861
+  na mesma posicao.
+
+  (ALTER TABLE ... MODIFY realmente nao emite DEFAULT no serializador do
+  Oracle; nessa parte a declaracao original procede.)
 
   ------------------------------------------------------------------------------
   II  SQL SERVER 2022 - RECUSA a forma ANSI
@@ -256,7 +287,7 @@
 
   ------------------------------------------------------------------------------
   VI  FIREBIRD 5.0.4 - aceita as duas, E aceita o formato US que o framework
-      ja emitia
+      ja emitia (com uma linha de transcricao INCOMPLETA, declarada em ###D3)
 
     docker run -d --name t19-fb -e FIREBIRD_ROOT_PASSWORD=t19pass \
       -e FIREBIRD_DATABASE=t19.fdb firebirdsql/firebird:5.0.4
@@ -271,15 +302,38 @@
     ### B    d DATE DEFAULT DATE '2026-08-10'            -> 2026-08-10
     ### D    d DATE DEFAULT '04/14/2026'                 -> 2026-04-14
              <-- E EXATAMENTE O QUE O FRAMEWORK EMITE PARA FIREBIRD/INTERBASE.
-                 O motor ACEITA. Nao ha defeito aqui, e por isso a T19 NAO
-                 mexeu no ramo dbnFirebird/dbnInterbase.
+                 O motor cria E devolve o valor certo. A T19 NAO mexeu no ramo
+                 dbnFirebird/dbnInterbase por DECISAO DE ESCOPO - esta tarefa
+                 nasceu do defeito do Oracle e nao foi encarregada de decidir o
+                 formato de outro dialeto. NAO leia esta linha como "o formato
+                 do Firebird esta acima de qualquer suspeita": ver ###D3.
     ### D2   d DATE DEFAULT '12/13/2026'                 -> 2026-12-13
     ### D3   d DATE DEFAULT '13/12/2026'                 criou (sem erro)
-             -- ACHADO SEPARADO, FORA DO ESCOPO: o mesmo motor aceita '13/12/2026'
-             -- caindo para DD/MM quando o mes seria invalido. O formato US do
-             -- framework e AMBIGUO no Firebird: '04/14' e mes 04, mas '13/12'
-             -- vira dia 13. Nao consertado aqui - mudar o formato do Firebird
-             -- seria BREAKING sem defeito medido, e e decisao do dono.
+             -- TRANSCRICAO INCOMPLETA, E DECLARADA COMO TAL. O CREATE TABLE
+             -- passou, mas NENHUM valor foi lido: nao houve INSERT nem SELECT
+             -- nesta linha, ao contrario de ###D e ###D2, que registram "->
+             -- valor". Logo ESTA ENTREGA NAO AFIRMA NADA sobre o Firebird
+             -- aceitar '13/12/2026'.
+             --
+             -- Uma versao anterior deste arquivo concluia, daqui, que "o motor
+             -- aceita, caindo para DD/MM quando o mes seria invalido" e que o
+             -- formato US seria AMBIGUO. Isso era INFERENCIA a partir de "o
+             -- CREATE nao reclamou", nao medicao. A frase foi removida.
+             --
+             -- NAO MEDIDO POR ESTA ENTREGA - a medicao abaixo e da REVISAO da
+             -- T19, nao minha:
+             --     SELECT CAST('13/12/2026' AS DATE) FROM rdb$database;
+             --       SQLSTATE = 22018 conversion error from string "13/12/2026"
+             --     CREATE TABLE AMB3 (... DEFAULT '13/12/2026'); + INSERT
+             --       SQLSTATE = 22018 conversion error from string "13/12/2026"
+             -- Ou seja: nao ha fallback DD/MM e nao ha ambiguidade. Ha RECUSA,
+             -- e ela e DIFERIDA.
+             --
+             -- CATALOGADO COMO TAREFA PROPRIA, nao consertado aqui: no
+             -- Firebird o CREATE TABLE com DEFAULT de data invalido PASSA e o
+             -- erro so aparece no primeiro INSERT. O schema nasce com um
+             -- default que estoura no primeiro uso - pior que recusa imediata.
+             -- Medir isso direito nao e desta entrega.
     ### E    d TIMESTAMP DEFAULT '2026-08-10 12:34:56'   -> 2026-08-10 12:34:56.0000
     ### F    d TIMESTAMP DEFAULT TIMESTAMP '2026-08-10 12:34:56'
                                                          -> 2026-08-10 12:34:56.0000
