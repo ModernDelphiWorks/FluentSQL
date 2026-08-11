@@ -45,6 +45,14 @@ begin
     // CheckCommandLine acima ja gravou o destino em Options.XMLOutputFile (o
     // default do DUnitX e string vazia) e quem chamou manda: sobrescrever aqui
     // sem guarda faz o arquivo nascer em outro lugar e o coletor achar o nada.
+    // ATENCAO a quem coleta por glob '*-dunitx-results.xml': nao e so
+    // --xmlfile/--xml que redireciona. O DUnitX registra uma opcao SEM NOME e
+    // OCULTA que grava no mesmo Options.XMLOutputFile
+    // (DUnitX.OptionsDefinition.pas:124-129), entao um argumento POSICIONAL
+    // solto - 'runner.exe lixo.txt' - manda o resultado para 'lixo.txt' e
+    // nenhum XML derivado nasce. Os testes rodam, o processo sai com 0 e o
+    // glob nao acha nada. Nao ha guarda contra isso de proposito: a semantica
+    // ratificada e que a linha de comando manda. Fica declarado.
     if TDUnitX.Options.XMLOutputFile = '' then
       TDUnitX.Options.XMLOutputFile := ChangeFileExt(ParamStr(0), '') + '-dunitx-results.xml'
     else
@@ -61,10 +69,19 @@ begin
 
     results := runner.Execute;
     // Piso de honestidade: runner que nao encontrou caso nenhum nao sai com
-    // sucesso. Sem isto um projeto que compila mas perde o registro dos fixtures
-    // some da soma da suite sem uma linha de aviso - e a soma continua 'batendo'
-    // com uma suite menor. Nao ha lista de fixtures esperados aqui de proposito:
-    // lista escrita a mao apodrece no primeiro teste que alguem acrescenta.
+    // sucesso. O que ESTE piso cobre e o caso em que os fixtures EXISTEM e a
+    // selecao nao casa com teste nenhum - qualquer filtro vazio (--run,
+    // --include, --exclude, --runlist; todos desaguam no mesmo
+    // TDUnitXFilterBuilder.BuildFilter). Ai o DUnitX nao levanta nada: devolve
+    // Tests Found: 0 com AllPassed = True, e sem o piso o projeto sai com 0,
+    // some da soma da suite sem uma linha de aviso e a soma continua 'batendo'
+    // com uma suite menor.
+    // NAO e este piso que cobre 'nenhum fixture registrado': nesse caso o
+    // DUnitX levanta ENoTestsRegistered (DUnitX.TestRunner.pas:599) e quem
+    // transforma aquilo em codigo != 0 e a guarda do except, mais abaixo.
+    // Nao ha lista de fixtures esperados aqui de proposito: lista escrita a mao
+    // apodrece no primeiro teste que alguem acrescenta. O piso derivado nao
+    // apodrece - e a lacuna fica declarada: queda PARCIAL (205 -> 3) passa.
     if results.TestCount = 0 then
     begin
       System.Writeln('FATAL: nenhum caso de teste foi encontrado neste projeto.');
