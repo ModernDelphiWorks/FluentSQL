@@ -160,7 +160,10 @@ begin
 
     {$IFNDEF CI}
     //We don't want this happening when running under CI.
-    TDUnitX.Options.ExitBehavior := TDUnitXExitBehavior.Pause;
+    // Nao se force ExitBehavior aqui: a atribuicao vinha DEPOIS do
+    // CheckCommandLine e por isso o projeto ignorava o que a linha de comando
+    // pediu e travava em Readln em qualquer execucao nao-interativa. Quem quer o
+    // pause pede --exitbehavior:Pause, como nos outros 10 projetos da suite.
     if TDUnitX.Options.ExitBehavior = TDUnitXExitBehavior.Pause then
     begin
       System.Write('Done.. press <Enter> key to quit.');
