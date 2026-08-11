@@ -24,6 +24,7 @@ uses
   test.cache in 'test.cache.pas',
   test.cases.value in 'test.cases.value.pas',
   test.cast.matrix in 'test.cast.matrix.pas',
+  test.delete.alias.matrix in 'test.delete.alias.matrix.pas',
   test.ddl.identity in 'test.ddl.identity.pas',
   test.ddl.numeric in 'test.ddl.numeric.pas',
   test.ddl.procedures in 'test.ddl.procedures.pas',

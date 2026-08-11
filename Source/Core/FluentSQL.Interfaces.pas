@@ -793,6 +793,31 @@ type
     ///   la faria o DB2 herdar calado a forma da Oracle.
     /// </summary>
     function RelationAliasKeyword: String;
+    /// <summary>
+    ///   Clausula DELETE inteira, como ESTE dialeto a escreve.
+    ///
+    ///   Existe porque no DELETE o apelido nao muda so a PALAVRA que o antecede
+    ///   - no T-SQL ele muda a FORMA da clausula, e RelationAliasKeyword (que
+    ///   resolve FROM e JOIN) nao alcanca isso. Medido em SQL Server 2022
+    ///   16.0.4265.3:
+    ///
+    ///     DELETE FROM A AS AP    -> Msg 156, Incorrect syntax near 'AS'
+    ///     DELETE FROM A AP       -> Msg 102, Incorrect syntax near 'AP'
+    ///     DELETE AP FROM A AS AP -> executa
+    ///
+    ///   Transcricao literal, com docker run e versao perguntada a cada motor,
+    ///   em Test Delphi\Common_tests\test.delete.alias.matrix.sql.
+    ///
+    ///   A base devolve ADelete.Serialize, que e o "DELETE FROM <nome>" de
+    ///   sempre; so FluentSQL.SerializeMSSQL.pas sobrescreve. Sem apelido, os
+    ///   sete emitem exatamente o texto que ja emitiam.
+    ///
+    ///   Mora aqui, e nao no qualificador, pelo mesmo motivo de
+    ///   RelationAliasKeyword: TFluentSQLSelectDB2 instancia o qualificador da
+    ///   ORACLE (FluentSQL.SelectDB2.pas:46), entao regra hospedada la faria o
+    ///   DB2 herdar calado a forma de outro dialeto.
+    /// </summary>
+    function DeleteClause(const ADelete: IFluentSQLDelete): String;
   end;
 
   TFluentSQLOperatorCompare = (fcEqual, fcNotEqual,

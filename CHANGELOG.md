@@ -17,6 +17,37 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (SQL emitido) — SQL Server: `Delete.From(tabela, apelido)` mudou de FORMA.** O T-SQL **não aceita** apelido preso ao `DELETE FROM`; o alvo do `DELETE` tem de ser o **apelido**, e é o `FROM` que carrega a tabela apelidada. O FluentSQL emitia para `dbnMSSQL` um texto que o motor **recusa** — defeito pré-existente, não introduzido pela correção do apelido no Oracle. **Quem compara o SQL gerado com string fixa para `dbnMSSQL` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
+
+  | Construção | Antes (MSSQL) | Depois (MSSQL) | Motor real |
+  |---|---|---|---|
+  | `Delete.From('A','AP').Where(...)` | `DELETE FROM A AS AP WHERE ...` | `DELETE AP FROM A AS AP WHERE ...` | antes: **`Msg 156, Incorrect syntax near the keyword 'AS'`** |
+  | `Delete.From('A').Where(...)` | `DELETE FROM A WHERE ...` | **inalterado** | aceito nos dois |
+  | `Delete.From('A','X').From('B','Y')` | `DELETE FROM A AS X, B AS Y ...` | **inalterado** | não medido — ver fronteira abaixo |
+  | `From('A','AP')` em `SELECT` | `SELECT * FROM A AS AP` | **inalterado** | aceito nos dois |
+  | `Column('NOME').Alias('N')` | `SELECT NOME AS N` | **inalterado** | aceito nos dois |
+
+  **Tirar o `AS`, que foi o que resolveu o Oracle, NÃO resolve o T-SQL** — e é esse par de medições que separa esta correção da anterior: `DELETE FROM A AS AP` devolve `Msg 156` e `DELETE FROM A AP` devolve `Msg 102`. As duas formas que o núcleo sabia produzir são recusadas; só `DELETE AP FROM A AS AP` executa.
+
+  **Os outros seis dialetos relacionais não mudaram uma vírgula**, e isso é resultado de medição, não de analogia. A matriz completa, com transcrição literal, `docker run` e versão perguntada a cada motor, está em `Test Delphi\Common_tests\test.delete.alias.matrix.sql`:
+
+  | Dialeto | `DELETE FROM t AS ap` | `DELETE FROM t ap` | `DELETE ap FROM t AS ap` |
+  |---|---|---|---|
+  | SQL Server 2022 (16.0.4265.3) | `Msg 156` | `Msg 102` | **executa** |
+  | Oracle 23.26.2.0.0 | `ORA-03048` | **executa** | `ORA-03048` |
+  | PostgreSQL 16.14 | **executa** | **executa** | `syntax error at or near "AP"` |
+  | MySQL 8.4.11 | **executa** | **executa** | **executa** |
+  | Firebird 5.0.4 | **executa** | **executa** | `SQL error code = -104` |
+  | SQLite 3.53.4 | **executa** | `syntax error` | `syntax error` |
+  | DB2 12.1.5.0 | **executa** | **executa** | `SQL0104N` |
+  | InterBase | **não medido** — não existe imagem pública | não medido | não medido |
+
+  **A interseção é vazia**: não há forma que os sete aceitem. A do T-SQL é aceita por 2 de 7; a que o FluentSQL já emitia, por 5 de 7; a do Oracle, por 4 de 7. SQL Server e SQLite se excluem em qualquer combinação — um recusa a ausência do `AS`, o outro recusa o `AS`. Por isso a forma ficou no **serializador do dialeto** (`IFluentSQLSerialize.DeleteClause`, virtual na base, sobrescrita só em `FluentSQL.SerializeMSSQL.pas`) e não virou regra única no núcleo. **Recusar apelido em `DELETE`** com exceção nomeada também foi considerado e descartado: 5 dos 7 aceitam a forma atual, e retirar a funcionalidade deles para uniformizar seria perda maior que a correção.
+
+  A regra **não** foi para o qualificador, pela mesma razão da correção do Oracle: `TFluentSQLSelectDB2` instancia o qualificador **do Oracle** (`FluentSQL.SelectDB2.pas:46`) — hospedar a regra ali faria o **DB2** herdar calado a forma do T-SQL. Medido: o DB2 recusa essa forma (`SQL0104N`) e continua em `DELETE FROM t AS ap`.
+
+  **Fronteira declarada:** com mais de uma relação no `DELETE` (`From` chamado duas vezes), o `dbnMSSQL` cai de propósito na forma da base e emite `DELETE FROM A AS X, B AS Y` — igual a antes. Qual das relações seria o alvo do `DELETE` é decisão de convenção, não conserto silencioso, e essa forma **não foi executada em motor nenhum** nesta correção.
+
 - **BREAKING CHANGE (SQL emitido) — Oracle: o apelido de TABELA perdeu a palavra `AS`.** O Oracle **não aceita** `AS` antes de apelido de tabela, view ou subconsulta, e o núcleo emitia `AS` para todo apelido sem consultar dialeto nenhum — a linha era `Result := TUtils.Concat([Result, 'AS', FAlias])`, em `FluentSQL.Name.pas:114` **na árvore anterior à correção** (commit `eb48337`); no HEAD atual essa linha não existe mais, e o ponto equivalente é `FluentSQL.Name.pas:161`, já lendo `FAliasKeyword`. Todo `From(tabela, apelido)` e as **quatro** sobrecargas de join com apelido (`InnerJoin`/`LeftJoin`/`RightJoin`/`FullJoin`) produziam SQL que o Oracle recusa. **Quem compara o SQL gerado com string fixa para `dbnOracle` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
 
   | Construção | Antes (Oracle) | Depois (Oracle) | Motor real |

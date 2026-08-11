@@ -76,6 +76,7 @@ type
     function AsString(const AAST: IFluentSQLAST): String; override;
     function Merge(const ADef: IFluentSQLMergeDef): string; override;
     function QuotedName(const AName: string): string; override;
+    function DeleteClause(const ADelete: IFluentSQLDelete): String; override;
   end;
 
 implementation
@@ -251,6 +252,71 @@ begin
     Result := AName
   else
     Result := '[' + AName + ']';
+end;
+
+/// <summary>
+///   No T-SQL o alvo do DELETE e o APELIDO, e a tabela apelidada vai para um
+///   FROM proprio:
+///
+///     DELETE AP FROM A AS AP WHERE ...
+///
+///   Isto NAO e escolha de estilo. As duas formas que o FluentSQL sabia emitir
+///   sao RECUSADAS pelo motor - medido em SQL Server 2022 (RTM-CU26)
+///   16.0.4265.3, transcricao literal em
+///   Test Delphi\Common_tests\test.delete.alias.matrix.sql:
+///
+///     DELETE FROM A AS AP WHERE AP.ID = 999
+///       -> Msg 156, Level 15: Incorrect syntax near the keyword 'AS'.
+///     DELETE FROM A AP WHERE AP.ID = 999
+///       -> Msg 102, Level 15: Incorrect syntax near 'AP'.
+///     DELETE AP FROM A AS AP WHERE AP.ID = 999
+///       -> (0 rows affected)
+///
+///   Ou seja: tirar o AS, que foi o que resolveu a Oracle na T12, NAO resolve o
+///   T-SQL. Por isso a regra do DELETE nao cabia em RelationAliasKeyword.
+///
+///   AS DUAS GUARDAS SAO LOAD-BEARING e as duas foram falsificadas por mutacao
+///   dirigida - nenhuma esta aqui por precaucao decorativa:
+///
+///   1. "IsEmpty ou Count <> 1". ComposeSqlCore chama DeleteClause em TODA
+///      serializacao, inclusive na de um SELECT, onde a secao Delete esta vazia
+///      e TableNames.Count e ZERO. Sem esta guarda, TableNames[0] indexa lista
+///      vazia e a serializacao inteira do dbnMSSQL levanta.
+///      Count > 1 tambem e alcancavel - basta chamar From duas vezes - e cai de
+///      proposito no inherited: qual das relacoes seria o alvo do DELETE e
+///      decisao de convencao que esta tarefa nao tem. Medido, o texto que sai
+///      nesse caso e "DELETE FROM A AS X, B AS Y WHERE (X.ID = :p1)", identico
+///      ao de antes da T18.
+///
+///   2. "Alias = ''". "DELETE FROM T WHERE ..." sem apelido sempre foi valido no
+///      T-SQL (caso 06 do .sql) e nao pode mudar. Sem esta guarda a montagem
+///      abaixo produz "DELETE  FROM T", com alvo vazio e espaco duplo -
+///      regressao de texto num caminho que hoje funciona. Travado por
+///      test.delete.alias.matrix.TTestDeleteAliasMatrix.
+///      TestNaoMudouODeleteSemApelidoEmDialetoNenhum.
+///
+///   A montagem e por concatenacao direta - como o Merge logo acima - e NAO por
+///   TUtils.Concat. Isso nao e estilo: TUtils.Concat descarta membro vazio, e sob
+///   ele a guarda 2 vira DECORATIVA. Medido: com TUtils.Concat, apagar a guarda 2
+///   nao muda uma letra do texto emitido e deixa os 146 testes verdes. Guarda que
+///   nao vermelha sob mutacao propria nao esta provada.
+///
+///   NAO se altera o AliasKeyword do no: o mesmo IFluentSQLName pode ser lido de
+///   novo, e mexer nele contaminaria o FROM do SELECT. Este metodo so LE o Alias
+///   e o Serialize do proprio no, e monta texto proprio.
+/// </summary>
+function TFluentSQLSerializerMSSQL.DeleteClause(const ADelete: IFluentSQLDelete): String;
+var
+  LRelacao: IFluentSQLName;
+begin
+  if ADelete.IsEmpty or (ADelete.TableNames.Count <> 1) then
+    Exit(inherited DeleteClause(ADelete));
+
+  LRelacao := ADelete.TableNames[0];
+  if LRelacao.Alias = '' then
+    Exit(inherited DeleteClause(ADelete));
+
+  Result := 'DELETE ' + LRelacao.Alias + ' FROM ' + LRelacao.Serialize;
 end;
 
 end.
