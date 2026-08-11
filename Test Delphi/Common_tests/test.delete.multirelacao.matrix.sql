@@ -827,9 +827,46 @@ DELETE FRUM A WHERE ID = 999;
      FluentSQL emitia: MQL citando apenas a primeira colecao, com a segunda
      descartada em silencio.
 
-  5. ACHADO FORA DO ESCOPO, medido nesta sessao e registrado por honestidade:
+  5. A PORTA IRMA - DELETE COM JOIN - CONTINUA ABERTA, E ESTE ARQUIVO NAO A
+     FECHA. Nao e nota de rodape: e o item que quem ler este arquivo precisa
+     levar junto, porque a guarda desta tarefa NAO o cobre e a decisao la e
+     OUTRA.
+
      Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID') emite hoje
-     "DELETE FROM A INNER JOIN B ON B.ID = A.ID". E outra construcao, por outra
-     porta (TFluentSQL._CreateJoin, que nao tem _AssertSection), e NAO foi
-     tocada nem medida em motor nesta tarefa. Registrada para quem for decidir.
+     "DELETE FROM A INNER JOIN B ON B.ID = A.ID". Outra construcao, outra porta:
+     TFluentSQL._CreateJoin nao chama _AssertSection e nao passa por
+     ASTTableNames, entao a guarda de From nunca a ve. LeftJoin idem.
+     PRE-EXISTENTE: identico em main e no HEAD desta tarefa.
+
+     MEDIDO PELA REVISAO desta tarefa - NAO pela implementacao, e NAO por esta
+     suite. A distincao esta escrita porque importa: quem transcreve nao mediu.
+
+       SQL Server 2022   Msg 156
+       PostgreSQL 16     syntax error at or near "INNER"
+       MySQL 8.4         ERROR 1064
+       Firebird 5.0.4    SQL error code = -104
+       SQLite 3.53.4     Parse error near "INNER"
+       Oracle, DB2, InterBase   NAO MEDIDOS nesta rodada
+
+     E A NUANCE QUE MUDA A RESPOSTA - LEIA ANTES DE COPIAR A DECISAO DAQUI:
+
+       Delete.From('A','X').InnerJoin('B','Y').OnCond(...)   para dbnMSSQL
+       -> DELETE X FROM A AS X INNER JOIN B AS Y ON ...
+       -> ACEITO pelo SQL Server: "(4 rows affected)", medido pela revisao.
+
+     Ou seja: o irmao e TRADUZIVEL, nao recusavel. A razao e estrutural, e nao
+     de gosto. No caso desta tarefa faltavam as duas informacoes que a traducao
+     exige - qual relacao e o ALVO e COMO elas se relacionam. Na porta do JOIN
+     as duas EXISTEM: o alvo e a relacao do From, e a juncao e o OnCond. A
+     construcao SIGNIFICA algo, e por isso pode ser traduzida para a forma
+     nativa de cada dialeto. Recusa-la seria tirar funcionalidade que da para
+     entregar.
+
+     ACHADO PRE-EXISTENTE QUE VAI JUNTO, tambem da revisao:
+       Query(dbnMongoDB).Delete.From('A').InnerJoin('B')...
+       -> EArgumentOutOfRangeException: List index out of bounds (0).
+          TList<IFluentSQLName> is empty
+     Erro cru de TList, sem nome de metodo, em main e no HEAD. Mesmo que a
+     decisao relacional seja traduzir, o MongoDB precisa de recusa NOMEADA em
+     vez de estouro de indice.
 */

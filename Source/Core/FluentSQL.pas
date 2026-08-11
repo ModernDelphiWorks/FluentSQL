@@ -972,9 +972,27 @@ end;
 ///   A GUARDA ESTA AQUI, e nao no serializador, por tres razoes: falha na
 ///   chamada que errou e nao la adiante no AsString; vale para os dialetos
 ///   todos sem uma linha por driver; e nao acrescenta membro a
-///   IFluentSQLSerialize. E este e o unico ponto de entrada a guardar -
+///   IFluentSQLSerialize.
+///
+///   O QUE ELA FECHA, COM PRECISAO: a LISTA DE RELACOES DO FROM da secao
+///   DELETE. Este e o unico ponto de entrada que alimenta FAST.ASTTableNames -
 ///   IFluentSQL nao publica o AST, entao IFluentSQLDelete.TableNames.Add nao e
 ///   alcancavel por consumidor.
+///
+///   O QUE ELA NAO FECHA, e que ninguem deve ler que fecha: a secao DELETE NAO
+///   esta selada. _CreateJoin (nesta mesma unit, em
+///   "function TFluentSQL._CreateJoin(AjoinType: TJoinType; const ATableName:
+///   String): IFluentSQL") e um SEGUNDO ponto de entrada publico que poe outra
+///   relacao num DELETE: ele nao chama _AssertSection e nao passa por
+///   ASTTableNames, entao Delete.From('A').InnerJoin('B').OnCond(...) continua
+///   emitindo "DELETE FROM A INNER JOIN B ON ...".
+///
+///   E OUTRA construcao, por OUTRA porta, E COM OUTRA RESPOSTA - registrada
+///   como divida na Parte 8 de
+///   Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql. Ao contrario
+///   do caso desta guarda, a do JOIN e TRADUZIVEL e nao recusavel: medido pela
+///   revisao desta tarefa, "DELETE X FROM A AS X INNER JOIN B AS Y ON ..." e
+///   ACEITO pelo SQL Server. Quem for mexer la NAO deve copiar a decisao daqui.
 /// </summary>
 function TFluentSQL.From(const ATableName: String): IFluentSQL;
 begin

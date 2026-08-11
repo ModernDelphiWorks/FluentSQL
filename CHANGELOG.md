@@ -17,7 +17,11 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **BREAKING CHANGE (API) — `Delete.From(A).From(B)` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** `DELETE` com mais de uma relação **não existe** no FluentSQL a partir daqui. Antes, a segunda chamada de `From` numa seção `DELETE` acumulava a relação e o framework emitia uma lista separada por vírgula. **Os sete motores relacionais recusam esse texto por parse** — não é "a interseção é vazia", é a **união** que é vazia: não há um motor sequer em que ele executasse. Medição em motor real, transcrição literal com `docker run` e versão perguntada a cada motor em `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`:
+- **BREAKING CHANGE (API) — `Delete.From(A).From(B)` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** O que fechou foi a **lista de relações do `FROM`** de um `DELETE`: antes, a segunda chamada de `From` numa seção `DELETE` acumulava a relação e o framework emitia uma lista separada por vírgula.
+
+  ⚠️ **Isto NÃO quer dizer que `DELETE` multi-relação deixou de ser alcançável, e a seção NÃO está selada.** `Delete.From('A').InnerJoin('B').OnCond(…)` continua emitindo `DELETE FROM A INNER JOIN B ON …`, por outra porta — `TFluentSQL._CreateJoin`, que não passa por `ASTTableNames` nem chama `_AssertSection`. Essa porta **não foi medida em motor por esta tarefa** e está registrada como dívida em *Known issues*, com a medição da revisão. **Não escreva a forma com `JOIN` confiando nesta guarda**: ela não a cobre, e a resposta certa lá é **traduzir**, não recusar.
+
+  **Os sete motores relacionais recusam esse texto por parse** — não é "a interseção é vazia", é a **união** que é vazia: não há um motor sequer em que ele executasse. Medição em motor real, transcrição literal com `docker run` e versão perguntada a cada motor em `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`:
 
   | Dialeto | `DELETE FROM A AS X, B AS Y` | `DELETE FROM A, B` | `DELETE FROM A X, B Y` |
   |---|---|---|---|
@@ -587,6 +591,25 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - **Documentação — o guia `dml-merge.md` ensinava duas formas que nunca funcionaram.** O exemplo principal usava `.Update(['T.VALOR = S.VALOR', 'T.DATA = S.DATA'])`, tratando o array como lista de **fragmentos de SQL**; o array sempre foi lido como pares nome/valor, e essa chamada emite `UPDATE SET T.VALOR = S.VALOR = ...`, que o SQL Server recusa com `Msg 102, Incorrect syntax near '='`. A mesma página anunciava um overload `.Insert(['ID','VALOR'], ['S.ID','S.VALOR'])` de **dois arrays que não existe** em `IFluentSQLMergeWhenNotMatched` — copiar aquela linha dá `E2034 Too many actual parameters`. A página foi reescrita com a forma correta, com aviso explícito de que a anterior era inválida, e com a tabela de suporte por dialeto refletindo o que cada um faz hoje. O overload de dois arrays **não** foi criado: colunas e valores vão no mesmo array, alternados.
 
 ### Known issues
+
+- **`DELETE` com `JOIN` continua emitindo SQL que os motores recusam — a porta irmã, deixada aberta de propósito.** A guarda desta entrega fechou a **lista de relações do `FROM`** (`Delete.From(A).From(B)`). Ela **não** cobre o `JOIN`: `Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID')` emite `DELETE FROM A INNER JOIN B ON B.ID = A.ID`. É outra porta — `TFluentSQL._CreateJoin`, que não chama `_AssertSection` e não passa por `ASTTableNames` — e **pré-existente**, idêntica em `main` e neste HEAD. `LeftJoin` idem.
+
+  **Medido pela revisão desta tarefa**, em 5 dos 7 motores (não pela suíte, e não pela implementação):
+
+  | motor | `DELETE FROM A INNER JOIN B ON …` |
+  |---|---|
+  | SQL Server 2022 | `Msg 156` |
+  | PostgreSQL 16 | `syntax error at or near "INNER"` |
+  | MySQL 8.4 | `ERROR 1064` |
+  | Firebird 5.0.4 | `SQL error code = -104` |
+  | SQLite 3.53.4 | `Parse error near "INNER"` |
+  | Oracle, DB2, InterBase | **não medidos** nesta rodada |
+
+  ⚠️ **E a nuance que muda a resposta da tarefa futura: o irmão é TRADUZÍVEL, não recusável.** Com apelido, `Delete.From('A','X').InnerJoin('B','Y').OnCond(…)` emite para `dbnMSSQL` — por conta da forma de `DELETE` com apelido já corrigida — `DELETE X FROM A AS X INNER JOIN B AS Y ON …`, e **o SQL Server ACEITA**: `(4 rows affected)`, medido. Ou seja, ao contrário de `From(A).From(B)`, aqui **existe** designador de alvo (a relação do `From`) e **existe** condição de junção (o `OnCond`) — a construção **significa** algo. **Quem for atacar isto não deve copiar a decisão desta entrega:** lá a saída provável é emitir a forma válida de cada dialeto, não levantar.
+
+  **Achado pré-existente que vai junto:** `Query(dbnMongoDB).Delete.From('A').InnerJoin('B')…` levanta `EArgumentOutOfRangeException: List index out of bounds (0). TList<IFluentSQLName> is empty` — **erro cru de `TList`, sem nome de método**, em `main` e neste HEAD. Mesmo que a decisão relacional seja traduzir, o MongoDB precisa de recusa nomeada em vez de estouro de índice.
+
+  Transcrição e fronteiras na Parte 8 de `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`.
 
 - **Firebird — `Union` + paginação pagina apenas o primeiro ramo.** O FluentSQL emite `SELECT FIRST 3 SKIP 20 * FROM T UNION SELECT * FROM U`; no Firebird o `FIRST`/`SKIP` escrito num ramo recorta **aquele ramo**, não o resultado do `UNION` — medido, devolve 63 linhas onde os outros seis dialetos devolvem 3. É SQL válido com semântica divergente. Não corrigido: o conserto exige embrulhar o `UNION` numa subconsulta, mudando substancialmente a forma emitida por este driver. Detalhes em `test.pagination.firebird.sql`, parte 3.
 - **MSSQL — `WITH` (CTE) e `UNION` combinados com `OrderBy` do usuário geram SQL inválido, com ou sem paginação.** `FluentSQL.Serialize.pas` monta o `ORDER BY` **dentro** de `LBase` e só depois embrulha na CTE ou concatena o `UNION`, produzindo `WITH CTE AS (SELECT ... ORDER BY ...)` (`Msg 1033`) e `SELECT ... ORDER BY ... UNION SELECT ...` (`Msg 156`). É defeito de composição, independente de paginação, e não foi corrigido nesta entrega. Casos I e J de `test.pagination.mssql.sql`.

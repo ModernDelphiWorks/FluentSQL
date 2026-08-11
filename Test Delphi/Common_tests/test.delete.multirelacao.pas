@@ -46,9 +46,26 @@
   ONDE A GUARDA MORA: em TFluentSQL.From(const ATableName: String)
   (Source\Core\FluentSQL.pas), e nao num serializador. Ela falha na chamada que
   errou, vale para todos os dialetos sem uma linha por driver, e nao acrescenta
-  membro a IFluentSQLSerialize. E e o unico ponto a guardar: IFluentSQL nao
-  publica o AST, entao IFluentSQLDelete.TableNames.Add nao e alcancavel por
-  consumidor.
+  membro a IFluentSQLSerialize.
+
+  O QUE ESTE ARQUIVO COBRE, COM PRECISAO: a LISTA DE RELACOES DO FROM da secao
+  DELETE. From e o unico ponto de entrada que alimenta ASTTableNames -
+  IFluentSQL nao publica o AST, entao IFluentSQLDelete.TableNames.Add nao e
+  alcancavel por consumidor.
+
+  O QUE ELE NAO COBRE - LEIA ANTES DE CONCLUIR QUE A SECAO ESTA SELADA. Ela NAO
+  esta. TFluentSQL._CreateJoin e um SEGUNDO ponto de entrada publico que poe
+  outra relacao num DELETE: nao chama _AssertSection e nao passa por
+  ASTTableNames. Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID') continua
+  emitindo "DELETE FROM A INNER JOIN B ON B.ID = A.ID", e NAO ha teste aqui que
+  o trave - de proposito, porque a resposta la e OUTRA.
+
+  Medido pela REVISAO desta tarefa, e nao por esta suite: aquela forma e
+  recusada por MSSQL, PostgreSQL, MySQL, Firebird e SQLite; MAS a variante com
+  apelido, "DELETE X FROM A AS X INNER JOIN B AS Y ON ...", e ACEITA pelo SQL
+  Server. Ou seja: o irmao e TRADUZIVEL, nao recusavel. Quem for escrever o
+  teste dele NAO deve copiar as afirmacoes deste arquivo. A divida esta na
+  Parte 8 de test.delete.multirelacao.matrix.sql.
 
   ANTI-COLATERAL: os testes "TestNao..." afirmam o que NAO podia mudar - DELETE
   com UMA relacao (com e sem apelido) e SELECT com VARIAS relacoes, que e forma
