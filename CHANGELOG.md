@@ -84,7 +84,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   |---|---|---|
   | 1 | `DEFAULT` de coluna em `CREATE TABLE` | `FluentSQL.DDL.SerializeAbstract.pas:125` |
   | 2 | `DEFAULT` de coluna em `ALTER TABLE … ADD` | `FluentSQL.DDL.Serialize.Oracle.pas:134` → `:138` → `GetColumnDefinition` → o mesmo `:125` |
-  | 3–6 | `WHERE` (coluna `DATE` e coluna `TIMESTAMP`), `INSERT … VALUES`, `UPDATE … SET`, `BETWEEN` — pelo **caminho inline** de `FluentSQL.Operators.pas:212-213` | seção I.2 do arquivo-oráculo |
+  | 3–6 | `WHERE` (coluna `DATE` e coluna `TIMESTAMP`), `INSERT … VALUES`, `UPDATE … SET`, `BETWEEN` — pelo **caminho inline** de `FluentSQL.Operators.pas:232-233` | seção I.2 do arquivo-oráculo |
 
   **O literal ANSI foi submetido e aceito nas seis.** Já o literal **cru** foi submetido em **três**: `DEFAULT` de coluna, `WHERE` sobre coluna `DATE` e `WHERE` sobre coluna `TIMESTAMP` — e morre nas três (`ORA-01861`, `ORA-01861`, `ORA-01843`). Em `INSERT … VALUES`, `UPDATE … SET` e `BETWEEN` **só a forma ANSI foi submetida**; o que essas três linhas do oráculo afirmam é a **aceitação do ANSI**, e **nada** sobre a recusa do cru. É provável que o cru também seja recusado ali — `ORA-01861` é erro de **conversão**, não de posição —, mas isso fica escrito como **provável**, não como medido. *(Uma versão anterior desta entrada dizia "o cru é recusado em todas": generalização a partir de duas submissões.)*
 

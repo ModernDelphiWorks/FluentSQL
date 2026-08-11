@@ -207,14 +207,7 @@ type
     function NotIn(const AValue: TArray<Double>): IFluentSQL; overload;
     function NotIn(const AValue: TArray<String>): IFluentSQL; overload;
     function NotIn(const AValue: String): IFluentSQL; overload;
-    /// <summary>
-    ///   ESCAPE HATCH - slot de EXPRESSAO. Ver IFluentSQL.Exists: ASubQuery sai
-    ///   verbatim, sem bind. Porta de injecao por construcao.
-    /// </summary>
     function Exists(const ASubQuery: String): IFluentSQL; overload;
-    /// <summary>
-    ///   ESCAPE HATCH - slot de EXPRESSAO. Ver IFluentSQL.NotExists.
-    /// </summary>
     function NotExists(const ASubQuery: String): IFluentSQL; overload;
     // Functions methods
     function Count: IFluentSQL;
