@@ -17,6 +17,29 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (API) — `JOIN` dentro de um `DELETE` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** Atinge os **quatro** tipos: `Delete.From(…).InnerJoin(…)`, `.LeftJoin(…)`, `.RightJoin(…)` e `.FullJoin(…)`, com ou sem apelido, com ou sem `OnCond`. A guarda mora em `TFluentSQL._CreateJoin`, porta única por onde os quatro passam.
+
+  **A razão NÃO é "o texto emitido não executa".** Essa é verdadeira e é a menor das duas. A que decide é o **dano silencioso**, medido em motor real com contagem antes/depois — massa de 4 linhas em `A`, das quais 2 casam com `B`:
+
+  | Chamada | Forma nativa correspondente | Resultado medido |
+  |---|---|---|
+  | `From('A','X').LeftJoin('B','Y').OnCond('Y.AID = X.ID')`, **sem `Where`** | `DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID` | **`A`: 4 → 0**, `B`: 2 → 2 em **dois** dos sete motores — executam, **reportam sucesso** e apagam a tabela inteira |
+  | a mesma chamada, forma portável | `DELETE FROM A AS X WHERE EXISTS (SELECT 1 FROM B AS Y WHERE Y.AID = X.ID)` | `A`: 4 → 2, `B`: 2 → 2 nos **sete** |
+
+  Na junção **externa** a condição é **decorativa**: não filtra nada, porque a junção preserva toda linha da relação da esquerda. Quem escreveu aquilo achava estar filtrando, e perde a tabela sem uma linha de erro. É a **mesma classe** do achado do Oracle no PR #160 — apagar **mais** do que se pediu, sem erro; lá era a relação errada, aqui é a relação certa por inteiro.
+
+  **Por que a família inteira e não só o `LeftJoin`:** dentro do `DELETE` os membros não significam a mesma coisa — o `InnerJoin` **filtra** (a forma nativa apaga 2 das 4), o `LeftJoin` **não** (apaga 4 das 4). Liberar só o `InnerJoin` criaria uma distinção que a superfície fluente não insinua e que gramática nenhuma dos sete espelha: **5 dos 7 recusam os dois** por parse, **2 dos 7 aceitam os dois**.
+
+  **O que se perde, dito sem maquiagem:** para o `InnerJoin` **isolado** existe forma portável, medida e **aceita pelos sete** — a interseção **não** é vazia, e esta entrada não finge que seja. Entregá-la é tarefa própria, já catalogada, com o custo medido: o `WHERE` precisa migrar para **dentro** da subconsulta, porque pode citar a relação juntada (`Where('Y.Status').Equal(1)` é alcançável e emite `WHERE (Y.Status = ?)`).
+
+  **O `ON` pendurado morre junto, e por cima.** Sem `OnCond` o texto saía `… INNER JOIN B AS Y ON`, com `ON` e sem predicado — **não é produto cartesiano, é sentença truncada**, recusada pelos sete (o DB2 é o que nomeia melhor: espera `<boolean_predicate>`). A **causa** continua de pé e é de outra tarefa: `TFluentSQLJoins.Serialize` concatena `'ON'` incondicionalmente e `TUtils.Concat` descarta a condição vazia, o que produz o mesmo `ON` pendurado **também no `SELECT`**.
+
+  **Quem é atingido:** quem chamava `JOIN` num `DELETE` e **nunca executou** o resultado (5 dos 7 dialetos nunca analisaram o texto); e — este importa — quem usa `dbnMSSQL` ou `dbnMySQL` **com apelido**, onde o SQL **executava**. Se era `InnerJoin`, o comportamento era o esperado e a substituição abaixo o reproduz; se era `LeftJoin`, o que executava **apagava a tabela inteira**. **O que fazer:** `Delete.From('A','X').Where('').Exists('SELECT 1 FROM B AS Y WHERE Y.AID = X.ID')`, que sai verbatim e é aceita pelos sete. Se o que se queria era apagar de duas relações, são duas instruções.
+
+  Matriz completa, com digest de imagem, versão perguntada ao motor, transcrição literal e controle positivo e negativo em `Test Delphi\Common_tests\test.delete.join.matrix.sql`. **InterBase não foi medido** — não existe imagem pública.
+
+- **`EFluentSQLConstructNotSupported` ganhou uma sobrecarga de construtor `Create(AConstruct, AMedido, ASaida)`** — aditiva, o construtor de dois argumentos continua válido e nenhuma chamada existente muda. Ela existe por **veracidade**, não por estilo: a forma de dois argumentos afirma que a construção *"não tem forma válida em NENHUM dos dialetos"*, o que é verdade para o `DELETE` multi-relação (a **união** é vazia) e é **falso** para o `JOIN` em `DELETE`, onde **dois dos sete aceitam o texto** — e é justamente por aceitá-lo que a construção é perigosa. Usar a forma antiga ali embarcaria na mensagem uma generalização que a própria medição desmente.
+
 - **BREAKING CHANGE (SQL emitido) — `Exists`/`NotExists` deixaram de parametrizar a subconsulta e passaram a emiti-la verbatim.** `IFluentSQL.Exists(const ASubQuery: String)` tratava o argumento como **valor** e o mandava para a coleção de parâmetros. O texto da subconsulta virava **valor de bind**:
 
   | Dialeto | Antes | Depois |
@@ -124,7 +147,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - **BREAKING CHANGE (API) — `Delete.From(A).From(B)` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** O que fechou foi a **lista de relações do `FROM`** de um `DELETE`: antes, a segunda chamada de `From` numa seção `DELETE` acumulava a relação e o framework emitia uma lista separada por vírgula.
 
-  ⚠️ **Isto NÃO quer dizer que `DELETE` multi-relação deixou de ser alcançável, e a seção NÃO está selada.** `Delete.From('A').InnerJoin('B').OnCond(…)` continua emitindo `DELETE FROM A INNER JOIN B ON …`, por outra porta — `TFluentSQL._CreateJoin`, que não passa por `ASTTableNames` nem chama `_AssertSection`. Essa porta **não foi medida em motor por esta tarefa** e está registrada como dívida em *Known issues*, com a medição da revisão. **Não escreva a forma com `JOIN` confiando nesta guarda**: ela não a cobre, e a resposta certa lá é **traduzir**, não recusar.
+  ⚠️ **Esta guarda cobre a lista de relações do `FROM`, e só ela.** A porta irmã — `Delete.From('A').InnerJoin('B').OnCond(…)`, que passa por `TFluentSQL._CreateJoin` e não por `ASTTableNames` — ficou aberta de propósito quando esta entrada foi escrita, e **foi fechada depois**, por guarda própria: ver *"`JOIN` dentro de um `DELETE` deixou de emitir SQL"*, no topo desta mesma seção. **A previsão registrada aqui de que a resposta lá seria "traduzir" não se confirmou:** a medição em motor mostrou que a forma nativa do `LeftJoin` **apaga a tabela inteira em silêncio** em dois motores, e a porta foi **recusada**, não traduzida. O texto original desta ressalva ficou obsoleto e está corrigido.
 
   **Os sete motores relacionais recusam a lista separada por vírgula por parse** — não é "a interseção é vazia", é a **união** que é vazia: não há um motor sequer em que ele executasse. Medição em motor real, transcrição literal com `docker run` e versão perguntada a cada motor em `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`:
 
@@ -697,24 +720,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Known issues
 
-- **`DELETE` com `JOIN` continua emitindo SQL que os motores recusam — a porta irmã, deixada aberta de propósito.** A guarda desta entrega fechou a **lista de relações do `FROM`** (`Delete.From(A).From(B)`). Ela **não** cobre o `JOIN`: `Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID')` emite `DELETE FROM A INNER JOIN B ON B.ID = A.ID`. É outra porta — `TFluentSQL._CreateJoin`, que não chama `_AssertSection` e não passa por `ASTTableNames` — e **pré-existente**, idêntica em `main` e neste HEAD. `LeftJoin` idem.
+- ~~**`DELETE` com `JOIN` continua emitindo SQL que os motores recusam — a porta irmã, deixada aberta de propósito.**~~ **RESOLVIDO** — ver *"`JOIN` dentro de um `DELETE` deixou de emitir SQL"*, em *Changed*.
 
-  **Medido pela revisão desta tarefa**, em 5 dos 7 motores (não pela suíte, e não pela implementação):
+  **A previsão que esta dívida registrava estava ERRADA, e fica escrito porque a correção é do argumento e não só do estado.** O texto dizia *"o irmão é TRADUZÍVEL, não recusável"* e *"lá a saída provável é emitir a forma válida de cada dialeto, não levantar"*. A medição nos **sete** motores desmentiu isso por um caminho que a revisão de então não tinha percorrido: ela mediu só o `InnerJoin`. Com `LeftJoin` e **sem `Where`**, a forma nativa que os dois motores permissivos aceitam **apaga a tabela inteira** — `A`: 4 → 0 — e **reporta sucesso**, porque na junção externa a condição não filtra nada. `InnerJoin` filtra, `LeftJoin` não: **a família não tem uma semântica**, e traduzi-la escolheria pelo usuário entre dois resultados medidos como diferentes. A porta foi **recusada**.
 
-  | motor | `DELETE FROM A INNER JOIN B ON …` |
-  |---|---|
-  | SQL Server 2022 | `Msg 156` |
-  | PostgreSQL 16 | `syntax error at or near "INNER"` |
-  | MySQL 8.4 | `ERROR 1064` |
-  | Firebird 5.0.4 | `SQL error code = -104` |
-  | SQLite 3.53.4 | `Parse error near "INNER"` |
-  | Oracle, DB2, InterBase | **não medidos** nesta rodada |
+  Continua **verdadeiro** o que a dívida afirmava sobre o `InnerJoin` isolado: existe forma portável e ela é aceita pelos sete. Isso virou **tarefa própria**, e a interseção **não** é vazia.
 
-  ⚠️ **E a nuance que muda a resposta da tarefa futura: o irmão é TRADUZÍVEL, não recusável.** Com apelido, `Delete.From('A','X').InnerJoin('B','Y').OnCond(…)` emite para `dbnMSSQL` — por conta da forma de `DELETE` com apelido já corrigida — `DELETE X FROM A AS X INNER JOIN B AS Y ON …`, e **o SQL Server ACEITA**: `(4 rows affected)`, medido. Ou seja, ao contrário de `From(A).From(B)`, aqui **existe** designador de alvo (a relação do `From`) e **existe** condição de junção (o `OnCond`) — a construção **significa** algo. **Quem for atacar isto não deve copiar a decisão desta entrega:** lá a saída provável é emitir a forma válida de cada dialeto, não levantar.
-
-  **Achado pré-existente que vai junto:** `Query(dbnMongoDB).Delete.From('A').InnerJoin('B')…` levanta `EArgumentOutOfRangeException: List index out of bounds (0). TList<IFluentSQLName> is empty` — **erro cru de `TList`, sem nome de método**, em `main` e neste HEAD. Mesmo que a decisão relacional seja traduzir, o MongoDB precisa de recusa nomeada em vez de estouro de índice.
-
-  Transcrição e fronteiras na Parte 8 de `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`.
+  **Achado pré-existente que ia junto — atendido de lado, e é bom que se diga como:** `Query(dbnMongoDB).Delete.From('A').InnerJoin('B')…` levantava `EArgumentOutOfRangeException: List index out of bounds (0)`, erro cru de `TList` sem nome de método. A guarda nova é de **núcleo** e alcança o `dbnMongoDB` pelo mesmo caminho dos demais, então a recusa que ele passa a receber é **nomeada**. Isso é **efeito**, não promessa: o MongoDB está fora da interseção relacional e fora de toda contagem desta entrega.
 
 - **Firebird — `Union` + paginação pagina apenas o primeiro ramo.** O FluentSQL emite `SELECT FIRST 3 SKIP 20 * FROM T UNION SELECT * FROM U`; no Firebird o `FIRST`/`SKIP` escrito num ramo recorta **aquele ramo**, não o resultado do `UNION` — medido, devolve 63 linhas onde os outros seis dialetos devolvem 3. É SQL válido com semântica divergente. Não corrigido: o conserto exige embrulhar o `UNION` numa subconsulta, mudando substancialmente a forma emitida por este driver. Detalhes em `test.pagination.firebird.sql`, parte 3.
 - **MSSQL — `WITH` (CTE) e `UNION` combinados com `OrderBy` do usuário geram SQL inválido, com ou sem paginação.** `FluentSQL.Serialize.pas` monta o `ORDER BY` **dentro** de `LBase` e só depois embrulha na CTE ou concatena o `UNION`, produzindo `WITH CTE AS (SELECT ... ORDER BY ...)` (`Msg 1033`) e `SELECT ... ORDER BY ... UNION SELECT ...` (`Msg 156`). É defeito de composição, independente de paginação, e não foi corrigido nesta entrega. Casos I e J de `test.pagination.mssql.sql`.

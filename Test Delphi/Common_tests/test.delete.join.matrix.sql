@@ -3,13 +3,19 @@
   ORACULO DO DELETE COM JOIN - SETE DIALETOS  (T30)
 
   MEDICAO em motor real da porta que a T26 declarou ABERTA de proposito (Parte 8,
-  item 5 de test.delete.multirelacao.matrix.sql). A guarda da T26 mora em
-  TFluentSQL.From e conta ASTTableNames; TFluentSQL._CreateJoin nao passa por
-  ASTTableNames e nao chama _AssertSection, entao o JOIN continua alcancavel de
-  dentro do DELETE.
+  item 5 de test.delete.multirelacao.matrix.sql). A guarda da T26 morava em
+  TFluentSQL.From e contava ASTTableNames; TFluentSQL._CreateJoin nao passa por
+  ASTTableNames, entao o JOIN seguia alcancavel de dentro do DELETE.
 
-  ESTE ARQUIVO NAO IMPLEMENTA NADA. Ele MEDE, e a decisao de forma e do dono.
-  A razao de nao vir codigo junto esta na Parte 9.
+  ESTA PORTA AGORA ESTA FECHADA: TFluentSQL._CreateJoin recusa a secao DELETE
+  para os QUATRO tipos de juncao, com EFluentSQLConstructNotSupported. A razao
+  esta na Parte 9, e ela e o DANO SILENCIOSO medido no caso C07 - nao a
+  invalidade do texto emitido.
+
+  ⚠️ ESTE ARQUIVO E O ORACULO, NAO O TESTE. O que ele traz e transcricao de
+  motor real: digest de imagem, versao perguntada ao motor, controle positivo e
+  negativo, e contagem antes/depois. Quem trava o comportamento na suite e
+  test.delete.join.pas, nesta mesma pasta. Um arquivo mede, o outro afirma.
 
   ------------------------------------------------------------------------------
   O QUE O FLUENTSQL EMITE HOJE - lido do proprio builder, nao suposto
@@ -515,8 +521,40 @@
      emitido, e a forma so serve enquanto TODOS os joins forem internos.
 
   ==============================================================================
-  PARTE 9 - FRONTEIRA: o que este arquivo NAO afirma, e por que nao ha codigo
+  PARTE 9 - A DECISAO, E A FRONTEIRA DO QUE ESTE ARQUIVO NAO AFIRMA
   ==============================================================================
+
+  ⭐ A RAZAO DA RECUSA, EM UMA LINHA: A FORMA NATIVA DESTROI DADOS EM SILENCIO.
+
+  Nao e "o texto emitido nao executa" - essa e verdadeira e e a MENOR das duas.
+  A que decide esta no caso C07 da Parte 1 e da Parte 4:
+
+      DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID
+      SQL Server 2022   A: 4 -> 0     executou e reportou SUCESSO
+      MySQL 8.4.11      A: 4 -> 0     executou e reportou SUCESSO
+
+  Sem WHERE nenhum, e com o que parece ser um filtro escrito pelo usuario. Na
+  juncao EXTERNA a condicao e DECORATIVA: nao filtra nada, porque a juncao
+  preserva toda linha da relacao da esquerda. Quem escreveu aquilo achava estar
+  restringindo, e perde a tabela inteira sem uma linha de erro.
+
+  E A MESMA CLASSE DO ACHADO DO ORACLE NO PR #160 - apagar MAIS do que se pediu,
+  sem erro. La era a relacao errada; aqui e a relacao certa, por inteiro. Nao e
+  caso isolado: e classe conhecida. Nao se traduz construcao cuja forma nativa
+  destroi dados em silencio, e nao se deixa aberta - e por isso a porta FECHA.
+
+  A COLISAO DE SEMANTICAS E CONSEQUENCIA DISSO, NAO A CAUSA: o InnerJoin FILTRA
+  (a forma nativa apaga 2 das 4), o LeftJoin NAO (apaga 4 das 4). Por isso nao
+  existe traducao unica para a familia, e liberar so o InnerJoin criaria uma
+  distincao que a superficie fluente nao insinua e que gramatica nenhuma dos
+  sete espelha - 5 dos 7 recusam os dois por parse, 2 dos 7 aceitam os dois.
+
+  NOTA DE PROCEDENCIA: a primeira versao desta Parte 9 ordenava os argumentos ao
+  contrario - liderava pela colisao de semanticas e tratava o dano silencioso
+  como detalhe, e por isso concluia que a decisao ainda estava em aberto. Os
+  NUMEROS eram os mesmos e nenhuma transcricao mudou; o que estava errado era a
+  HIERARQUIA. Fica registrado porque quem le um oraculo precisa saber quando a
+  leitura dele foi corrigida.
 
   1. NAO afirma nada sobre InterBase por MEDICAO. Nao foi executado.
 
@@ -530,39 +568,44 @@
      EMITIDA e recusada pelos sete.
 
   4. NAO afirma nada sobre MongoDB em motor real. MongoDB esta fora da promessa
-     relacional. O unico fato registrado: Query(dbnMongoDB).Delete.From('A')
-     .InnerJoin('B') levanta hoje EArgumentOutOfRangeException cru de TList
-     ("List index out of bounds (0). TList<IFluentSQLName> is empty"), sem nome
-     de metodo. PRE-EXISTENTE em main e neste HEAD; nao e desta tarefa.
+     relacional e fora de toda contagem desta entrega. Registro do estado:
+     antes, Query(dbnMongoDB).Delete.From('A').InnerJoin('B') levantava
+     EArgumentOutOfRangeException cru de TList ("List index out of bounds (0).
+     TList<IFluentSQLName> is empty"), sem nome de metodo. A guarda desta tarefa
+     e de NUCLEO e o alcanca pelo mesmo caminho dos demais, entao ele passa a
+     receber EFluentSQLConstructNotSupported - verificado. Isso e EFEITO, nao
+     promessa: nao houve uma linha escrita para o MongoDB.
 
-  5. POR QUE ESTE ARQUIVO CHEGA SEM A CORRECAO JUNTO. Porque a medicao
-     CONTRARIOU a premissa de que a construcao tem UMA semantica traduzivel, e a
-     decisao de forma e do dono:
-
-       - InnerJoin FILTRA. LeftJoin NAO FILTRA - apaga tudo, medido, 4 de 4
-         linhas, nos dois unicos motores que o analisam. Uma traducao unica para
-         a familia JOIN esta descartada por MEDICAO, nao por gosto.
-       - Traduzir so o InnerJoin e recusar LeftJoin/RightJoin/FullJoin produz
-         uma API em que .InnerJoin funciona no DELETE e .LeftJoin levanta -
-         distincao que a superficie fluente nao insinua e que gramatica nenhuma
-         dos sete espelha (5 dos 7 recusam os dois; 2 dos 7 aceitam os dois).
-       - Recusar a familia inteira e defensavel, mas o argumento NAO pode ser o
-         da T26 ("a construcao nao significa nada"): aqui o InnerJoin significa,
-         e a forma portavel existe e esta medida.
-
-  6. ⚠️ ACHADO PRE-EXISTENTE QUE PESA NA DECISAO, E QUE NAO E DESTA TAREFA
-     CONSERTAR. A saida portavel que a T26 recomenda ao usuario - "restrinja a
-     unica relacao alvo pelo WHERE, inclusive com subconsulta, que e portavel
-     nos sete" - NAO E EMITIDA HOJE pelo builder. IFluentSQL.Exists(String)
-     PARAMETRIZA a subconsulta em vez de inseri-la:
+  5. A SAIDA APONTADA PELA MENSAGEM EXISTE, E ISSO FOI VERIFICADO - nao herdado.
+     Este arquivo foi escrito, na sua primeira versao, quando
+     IFluentSQL.Exists(String) ainda PARAMETRIZAVA a subconsulta e emitia
+     "WHERE (exists :p1)", com o texto virando valor de bind. Naquele estado,
+     recusar o JOIN teria mandado o usuario para uma porta que nao abria - e foi
+     por isso que a recusa esperou. O conserto do Exists entrou antes desta
+     entrega, e hoje:
 
        Delete.From('A','X').Where('').Exists('SELECT 1 FROM B AS Y WHERE Y.AID = X.ID')
-       dbnMSSQL      -> DELETE X FROM A AS X WHERE (exists :p1)
-       dbnPostgreSQL -> DELETE FROM A AS X WHERE (exists :p1)
-       dbnMySQL      -> DELETE FROM A AS X WHERE (exists ?)
+       dbnMSSQL      -> DELETE X FROM A AS X WHERE (exists (SELECT 1 FROM B AS Y WHERE Y.AID = X.ID))
+       dbnPostgreSQL -> DELETE FROM A AS X WHERE (exists (SELECT 1 FROM B AS Y WHERE Y.AID = X.ID))
+       dbnOracle     -> DELETE FROM A X WHERE (exists (SELECT 1 FROM B AS Y WHERE Y.AID = X.ID))
 
-     O texto da subconsulta vira VALOR de bind. Nenhum motor executa isso como
-     subconsulta. Quem decidir "recusar o JOIN e mandar usar o WHERE com
-     EXISTS" precisa saber que, hoje, esse caminho nao existe de fato.
-     PRE-EXISTENTE em 7c9ed45; catalogado, nao corrigido aqui.
+     A subconsulta sai VERBATIM. O caso C08 deste arquivo mediu essa forma nos
+     SETE motores. Ha teste dedicado a nao deixar a mensagem virar mentira:
+     test.delete.join.TTestDeleteJoin.
+     TestSaidaApontadaPelaMensagemRealmenteEmiteSubconsulta - falsificado por
+     mutacao dirigida que devolve o Exists a parametrizacao.
+
+  6. O QUE FICA DE FORA DE PROPOSITO, e nao por esquecimento:
+
+       - A forma EXISTS para o InnerJoin ISOLADO. Ela e boa, esta medida e e
+         aceita pelos sete - a INTERSECAO NAO E VAZIA, e este arquivo derruba
+         com numero a hipotese de que fosse. E tarefa propria, com o custo da
+         Parte 8 ja levantado.
+       - O 'ON' incondicional de TFluentSQLJoins.Serialize, que produz o mesmo
+         ON pendurado TAMBEM NO SELECT, onde esta guarda nao chega.
+       - O Exception.Create('Error Message') de
+         TFluentSQLJoins.SerializeJoinType.
+       - From(IFluentSQL), que descarta os parametros da subconsulta.
+
+     Os quatro estao catalogados e NENHUM foi tocado aqui.
 */

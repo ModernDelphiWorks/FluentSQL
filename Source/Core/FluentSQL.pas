@@ -712,10 +712,81 @@ begin
   Result := Self;
 end;
 
+/// <summary>
+///   Porta unica dos QUATRO tipos de juncao: InnerJoin, LeftJoin, RightJoin e
+///   FullJoin delegam todos aqui. Uma guarda, quatro construcoes fechadas.
+///
+///   ⭐ POR QUE O JOIN NAO ENTRA NO DELETE. A razao NAO e "o texto emitido nao
+///   executa" - essa e verdadeira e e a menor das duas. A que decide e o DANO
+///   SILENCIOSO, medido em motor real (transcricao com digest de imagem, versao
+///   perguntada ao motor e contagem antes/depois em
+///   Test Delphi\Common_tests\test.delete.join.matrix.sql):
+///
+///     Delete.From('A','X').LeftJoin('B','Y').OnCond('Y.AID = X.ID')   sem Where
+///     -> forma nativa "DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID"
+///     -> DOIS dos sete motores EXECUTAM, reportam sucesso e deixam
+///        A: 4 -> 0     B: 2 -> 2        apagaram a tabela inteira
+///
+///   Na juncao EXTERNA a condicao e DECORATIVA: nao filtra nada, porque a
+///   juncao preserva toda linha da relacao da esquerda. Quem escreveu aquilo
+///   achava estar filtrando. Mesma classe do achado do Oracle no PR #160 -
+///   apagar MAIS do que se pediu, sem erro; la era a relacao errada, aqui e a
+///   relacao certa por inteiro.
+///
+///   POR QUE A FAMILIA TODA, e nao so o LEFT: dentro do DELETE os membros nao
+///   significam a mesma coisa - o InnerJoin FILTRA (a forma nativa apaga 2 das
+///   4), o LeftJoin NAO (apaga 4 das 4). Liberar so o InnerJoin criaria uma
+///   distincao que a superficie fluente nao insinua e que gramatica nenhuma dos
+///   sete espelha: 5 dos 7 recusam os dois por parse, 2 dos 7 aceitam os dois.
+///
+///   O QUE SE PERDE, dito sem maquiagem: para o InnerJoin ISOLADO existe forma
+///   portavel, medida e aceita pelos SETE - "DELETE FROM A WHERE EXISTS (SELECT
+///   1 FROM B WHERE ...)". A INTERSECAO NAO E VAZIA, e este comentario nao
+///   finge que seja. Entregar so ela e tarefa propria, ja catalogada, com o
+///   custo medido: o WHERE precisa migrar para DENTRO da subconsulta, porque
+///   pode citar a relacao juntada ("WHERE (Y.Status = ?)" e alcancavel), e isso
+///   nao e mudanca local - e ComposeSqlCore deixando de emitir Where.Serialize
+///   na posicao de sempre para UMA secao.
+///
+///   O "ON" PENDURADO tambem morre aqui, e por cima. Sem OnCond o texto saia
+///   "... INNER JOIN B AS Y ON", com ON e sem predicado - nao e produto
+///   cartesiano, e sentenca TRUNCADA, e os sete a recusam (o DB2 e o que nomeia
+///   melhor: espera "<boolean_predicate>"). A CAUSA continua de pe e e de OUTRA
+///   tarefa: TFluentSQLJoins.Serialize (FluentSQL.Joins.pas) concatena 'ON'
+///   incondicionalmente e TUtils.Concat descarta a condicao vazia, o que produz
+///   o mesmo ON pendurado TAMBEM NO SELECT, que esta guarda nao toca.
+///
+///   POR QUE AQUI E NAO NUM SERIALIZADOR: falha na chamada que errou e nao la
+///   adiante no AsString; vale para os dialetos todos sem uma linha por driver;
+///   e nao acrescenta membro a IFluentSQLSerialize.
+///
+///   POR QUE NAO _AssertSection: aquele levanta Exception cru com "Not
+///   supported in this section". Quem recebe esta recusa precisa do TIPO
+///   proprio, para distinguir de outros erros do builder, e da mensagem que
+///   aponta a saida - recusar sem saida seria pior que o defeito.
+///
+///   A guarda le a secao ATIVA, nao uma marca pegajosa: trocar para SELECT na
+///   mesma instancia libera o JOIN de novo (travado por
+///   test.delete.join.TTestDeleteJoin.TestSelectDepoisDeDeleteLiberaOJoin).
+/// </summary>
 function TFluentSQL._CreateJoin(AjoinType: TJoinType; const ATableName: String): IFluentSQL;
 var
   LJoin: IFluentSQLJoin;
 begin
+  if FActiveSection = secDelete then
+    raise EFluentSQLConstructNotSupported.Create(
+      'JOIN em DELETE',
+      'Medido em motor real: dos sete, cinco recusam o texto por parse e dois ' +
+      'o executam - e sao esses dois o problema. Com LeftJoin e sem WHERE, a ' +
+      'forma nativa apaga a tabela inteira (4 de 4 linhas) e reporta sucesso, ' +
+      'porque na juncao externa a condicao nao filtra nada. Perde-se a tabela ' +
+      'em silencio. O InnerJoin filtra e o LeftJoin nao, entao nao ha traducao ' +
+      'unica para a familia, e liberar so o InnerJoin seria uma distincao que ' +
+      'a API nao insinua.',
+      'Restrinja a relacao alvo pelo WHERE com subconsulta - ' +
+      'Where(...).Exists(''SELECT 1 FROM B WHERE ...''), que sai verbatim e e ' +
+      'aceita pelos sete. Se o que se queria era apagar de duas relacoes, sao ' +
+      'duas instrucoes.');
   FActiveSection := secJoin;
   LJoin := FAST.Joins.Add;
   LJoin.JoinType := AjoinType;
