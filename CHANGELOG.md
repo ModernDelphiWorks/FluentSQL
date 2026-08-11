@@ -115,9 +115,9 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | 11 | `IFluentSQLCriteriaExpression.OrOpe(array)` | `FluentSQL.Expression.pas:344` |
   | 12 | `IFluentSQLCriteriaExpression.Ope(array)` | `FluentSQL.Expression.pas:358` |
   | 13 | `IFluentSQLCriteriaExpression.Fun(array)` | `FluentSQL.Expression.pas:318` |
-  | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:516` |
-  | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:277` |
-  | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:464` |
+  | 14 | `IFluentSQLCriteriaCase.When(array)` | `FluentSQL.Cases.pas:662` |
+  | 15 | `IFluentSQLCriteriaCase.AndOpe(array)` | `FluentSQL.Cases.pas:285` |
+  | 16 | `IFluentSQLCriteriaCase.OrOpe(array)` | `FluentSQL.Cases.pas:599` |
   | 17 | `IFluentSQLMerge.On(array)` | `FluentSQL.Merge.pas:376` |
 
   Quatro amostras do que os 11 omitidos emitem de fato, medidas com o payload `x'; DROP TABLE U; --`:
@@ -223,7 +223,9 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   Detalhe conferido e **não** corrigido às cegas: o `Assert` do `Desc` afirmava sobre `FAST.ASTColumns` e indexava `FAST.OrderBy.Columns`. As duas **são o mesmo objeto** enquanto a seção é `secOrderBy` — quem as liga é `_DefineSectionOrderBy` (`FluentSQL.pas:794`), e `_SetSection` não tem caminho que desfaça a ligação. A afirmação não estava medindo coleção errada na prática; era só o nome errado para ler, e passou a citar a coleção que de fato indexa. Há teste dedicado a essa porta (`TestDescComColunaNoSelectMasNenhumaNoOrderByLevanta`), porque a equivalência vale enquanto `_DefineSectionOrderBy` a mantiver.
 
-  **Não existe `Asc` para receber a guarda equivalente.** `IFluentSQL` declara só `function Desc: IFluentSQL;` (`FluentSQL.Interfaces.pas:315`); `dirAscending` é o default de `TOrderByDirection`. Varridas as duas famílias no `Source/` inteiro: na árvore anterior (`283512c`) `Assert(` devolvia 2 ocorrências — `FluentSQL.Cases.pas:340` e `FluentSQL.pas:838`, as duas acima — e a indexação por `Count-1]` devolvia 2, **exatamente nos mesmos dois métodos** (`FluentSQL.Cases.pas:342` e `FluentSQL.pas:839`; no HEAD desta branch, `FluentSQL.Cases.pas:379` e `FluentSQL.pas:865`). No HEAD desta branch `Assert(` devolve **zero** no `Source/`. Todo o resto de `Count - 1` na biblioteca é limite de `for`. A família está fechada.
+  **Não existe `Asc` para receber a guarda equivalente.** `IFluentSQL` declara só `function Desc: IFluentSQL;` (`FluentSQL.Interfaces.pas:366`); `dirAscending` é o default de `TOrderByDirection`. Varridas as duas famílias no `Source/` inteiro: na árvore anterior (`283512c`) `Assert(` devolvia 2 ocorrências — `FluentSQL.Cases.pas:340` e `FluentSQL.pas:838`, as duas acima — e a indexação por `Count-1]` devolvia 2, **exatamente nos mesmos dois métodos** (`FluentSQL.Cases.pas:342` e `FluentSQL.pas:839`; no HEAD atual, `FluentSQL.Cases.pas:658` e `FluentSQL.pas:865`). No HEAD atual `Assert(` devolve **zero** no `Source/`. Todo o resto de `Count - 1` na biblioteca é limite de `for`. A família está fechada.
+
+  *(As duas citações desta entrada que apontam para `FluentSQL.Interfaces.pas` e `FluentSQL.Cases.pas` foram **reabertas e corrigidas** na entrega do slot de valor do `CASE`: eram `:315` e `:379`, deslocadas pelo diff daquela entrega. As linhas rotuladas "na árvore anterior (`283512c`)" continuam corretas contra aquela árvore e não mudaram. As históricas descrevem `283512c`; as do HEAD descrevem o HEAD.)*
 
   **A fronteira publicada dos 17 `array of const` não mudou — recontada, não presumida.** O critério mecânico continua sendo "passa por `TUtils.SqlArrayOfConstToParameterizedSql`", e a contagem por chamada segue em 14 sítios / 17 pontos de entrada (os 4 de `IFluentSQLCriteriaExpression` compartilham `FluentSQL.Expression.pas:224`). Esta entrega **não acrescentou nem removeu sobrecarga `array of const`**, e **não criou slot de valor**: `IfThen`/`ElseIf` continuam com as duas sobrecargas de sempre (`String` e `Int64`), ambas em posição de expressão. Os quatro slots de valor (`SqlArrayOfConstToParameterizedValue`) também seguem quatro. *(Isto valia quando escrito. A entrega do slot de valor do `CASE`, mais abaixo em **Added**, criou dois slots de valor novos e por isso **refez esta contagem**; leia a recontagem lá.)*
 
@@ -237,8 +239,6 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **Nenhum SQL emitido muda por causa desta entrada.** As sobrecargas antigas de `IfThen`/`ElseIf` (`String` e `Int64`) têm diff vazio no corpo e continuam interpolando verbatim — há teste de controle para isso (`TestSobrecargaDeStringContinuaVerbatim`, `TestSobrecargaDeInt64ContinuaVerbatim`). O que a entrega faz é **dar alternativa**, não trocar comportamento debaixo de quem já usa.
 
-- **`TFluentSQLFunctionAbstract._AssertCastTypeIsPortable` passou de `protected` para `public`** (`FluentSQL.FunctionsAbstract.pas:48`). Alargamento de visibilidade, não quebra ninguém. É o preço de a política de interseção do `CAST` continuar com **fonte única**: o slot de valor do `CASE` mora em outra unit e precisa recusar o tipo **antes** de gravar o parâmetro na coleção — escrever `ADataType in cFluentSQLCastPortableTypes` lá é que seria a segunda opinião.
-
 - **BREAKING CHANGE (API) — `IFluentSQLFunctions` ganhou o método `function Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType; const ALength: Integer = 0): String;`.** Acrescentar método a interface publicada quebra quem a implementa do zero. O que a sobrecarga *faz* está em *Added*, junto com a matriz medida que a justifica; o que está aqui é a quebra de compilação.
 
   **Impacto real: baixo, e provavelmente não é você.** No repositório o único implementador é `TFluentSQLFunctionAbstract` (`FluentSQL.FunctionsAbstract.pas`), e os **nove** drivers descendem dela — quem herda não faz nada. Só quebra quem implementa `IFluentSQLFunctions` inteira do zero e a injeta por `TFluentSQLRegister.RegisterFunctions`: esse código deixa de compilar até declarar o método (`E2291 Missing implementation of interface method`).
@@ -251,7 +251,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **O `CASE` ganhou SLOT DE VALOR: `IfThen(AValue: Variant; ADataType: TFluentSQLDataFieldType)` e `ElseIf(...)` iguais.** Até aqui `IfThen`/`ElseIf` tinham duas sobrecargas — `String` e `Int64` — e **as duas são slot de expressão**: o argumento vira termo SQL **verbatim**. A de `Int64` não é exceção; ela chama `IntToStr` e cai na de `String` (`FluentSQL.Cases.pas:472` para `IfThen`, `:309` para `ElseIf`). Quem escrevia ali um valor vindo do usuário estava **concatenando SQL** — a mesma classe de defeito que o `MERGE` e o `SetValue`/`Values` fecharam acima nesta mesma lista. Não havia, em sobrecarga nenhuma, como **ligar** um valor num ramo do `CASE`.
+- **O `CASE` ganhou SLOT DE VALOR: `IfThen(AValue: Variant; ADataType: TFluentSQLDataFieldType)` e `ElseIf(...)` iguais.** Até aqui `IfThen`/`ElseIf` tinham duas sobrecargas — `String` e `Int64` — e **as duas são slot de expressão**: o argumento vira termo SQL **verbatim**. A de `Int64` não é exceção; ela chama `IntToStr` e cai na de `String` (`FluentSQL.Cases.pas:607` para `IfThen`, `:320` para `ElseIf`). Quem escrevia ali um valor vindo do usuário estava **concatenando SQL** — a mesma classe de defeito que o `MERGE` e o `SetValue`/`Values` fecharam acima nesta mesma lista. Não havia, em sobrecarga nenhuma, como **ligar** um valor num ramo do `CASE`.
 
   | Chamada | SQL (Firebird) | Parâmetros |
   |---|---|---|
@@ -260,7 +260,22 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | **`.IfThen('SEGREDO', dftString)`** — nova | `... THEN CAST(:p1 AS VARCHAR(4000)) ...` | 1, valor `SEGREDO` |
   | **`.ElseIf(Int64(42), dftInteger)`** — nova | `... ELSE CAST(:p2 AS INTEGER) ...` | 1, valor `42` |
 
-  **O `CAST` não é enfeite, e é a razão de esta tarefa ter ficado bloqueada.** Parâmetro **nu** em posição de `THEN`/`ELSE` é recusado **no `PREPARE`** por dois dos sete, medido em motor real (`Test Delphi\Common_tests\test.cases.bind.matrix.sql`): Firebird 5.0.4 responde `-804` / `HY004 Data type unknown`, e DB2 v12.1.5.0 responde `SQL0418N` / `42610 untyped parameter marker`. E não é culpa do `CASE`: isolado, `SELECT :a FROM RDB$DATABASE` dá o **mesmo** `-804`. É o marcador **sem tipo**. O que desbloqueou foi a sobrecarga por dialeto do `Cast` (entrada abaixo): com os dois ramos em `CAST`, os dois motores passam do `PREPARE` — Firebird devolve `yes`, DB2 chega a `SQL0313N` ("você não me deu valores"), que é a prova de que o `PREPARE` passou. As transcrições estão em `test.cast.matrix.sql`, seção *A forma que desbloqueia a T13*, feitas com **as strings exatas** que o driver emite.
+  **O `CAST` não é enfeite, e é a razão de esta tarefa ter ficado bloqueada.** Parâmetro **nu** em posição de `THEN`/`ELSE` é recusado **no `PREPARE`** por dois dos sete: Firebird 5.0.4 responde `-804` / `HY004 Data type unknown`, e DB2 v12.1.5.0 responde `SQL0418N` / `42610 untyped parameter marker`. E não é culpa do `CASE`: isolado, `SELECT :a FROM RDB$DATABASE` dá o **mesmo** `-804`. É o marcador **sem tipo**.
+
+  **A forma que esta entrega emite foi medida nos sete, com as strings exatas, e a medição é desta branch — não é citação da T17.** Docker engine 29.6.2; versões perguntadas ao motor, não presumidas da tag. Transcrição literal em `Test Delphi\Common_tests\test.cases.bind.matrix.sql`, **caso F**:
+
+  | Motor | controle (marcador nu) | `dftString` | `dftInteger` | `dftFloat` |
+  |---|---|---|---|---|
+  | Firebird 5.0.4 | **`-804` / `HY004`** | `yes` | `20` | `2.500000000000000` |
+  | DB2 v12.1.5.0 | **`SQL0418N` / `42610`** | `SQL0313N` → prepare passou | idem | idem |
+  | PostgreSQL 16.14 | aceita | `yes` | `20` | `2.5` |
+  | MySQL 8.4.11 | aceita | `yes` | `20` | `2.5` |
+  | SQLite 3.53.4 | aceita | `yes` | `20` | `2.5` |
+  | SQL Server 2022 CU26 | aceita | `yes` | `20` | `2.5` |
+  | Oracle 26ai 23.26.2.0.0 | aceita | `yes` | `20` | `2.5E+000` |
+  | InterBase | **não medido — não há imagem pública** | | | |
+
+  A **coluna do controle é o ponto**: é a única com recusa, e o `CAST` a converte em aceitação nos dois motores que recusavam. Nas outras cinco o `CAST` não era necessário e **também não atrapalhou** — que era a outra metade da aposta de "emitir `CAST` nos sete", e até aqui essa metade nunca tinha sido executada. O **`dftFloat` dentro do `CASE` também nunca tinha sido executado em motor nenhum**; agora foi, nos sete que têm imagem.
 
   **O `CAST` sai nos sete, e não só nos dois que exigem.** Sendo esta uma sobrecarga **nova**, não há SQL emitido hoje por ela e portanto **não há oráculo a quebrar** — uniformizar custa zero. A alternativa, uma tabela de "quem precisa de tipo", envelheceria com a versão do motor. É o **oposto** do que valeu para o apelido de tabela do Oracle, onde emitir a forma nova nos sete teria trocado o texto de seis dialetos que já funcionavam; lá havia oráculo, aqui não há.
 
@@ -278,20 +293,69 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **`ADataType` aceita só `dftString`, `dftInteger` e `dftFloat`** — o **mesmo** conjunto do `Cast` portável, pela **mesma** porta (`TFluentSQLFunctionAbstract._AssertCastTypeIsPortable`), e não por uma segunda lista. Os outros 7 membros do enum levantam `EFluentSQLFunctionNotSupported`, uniformemente. Consequência herdada dessa porta única, e **declarada**: em **MongoDB** e **InterBase** o `Cast` portável levanta, logo este slot levanta neles — erro nomeado, não MQL indefensável nem grafia inventada.
 
-  **`Null` e `Unassigned` são recusados** com `EArgumentException` nomeando a chamada. Não é limitação técnica: `CASE WHEN c THEN NULL END` é SQL legítimo e o parâmetro carrega `Variant`. É que **dar semântica de `NULL` a este slot é decisão de convenção, e ela não foi tomada aqui** — e a assimetria manda recusar: aceitar depois é **aditivo**, recusar depois seria **BREAKING**. É a mesma régua já escrita em `TUtils._AssertValueSlotCarriesData`. **`nil` não chega a ser questão de runtime: não compila** — `'Variant'` e `'Pointer'` são incompatíveis e o `dcc32` recusa com `E2010` (medido). A decisão "`nil` levanta, não vira `NULL`" está cumprida pelo **sistema de tipos** nesta sobrecarga.
+  **⚠️ O `CAST` é portável na SINTAXE, não na SEMÂNTICA — e nada aqui valida `AValue` contra `ADataType`.** No uso correto (o valor é do tipo que você declarou) o `CAST` é inofensivo, e no SQLite chega a ser identidade. Mas se os dois discordarem, **os sete divergem, e a pior metade diverge em silêncio**: `IfThen('BANANA', dftInteger)` vira **`0` calado** no SQLite e no MySQL (regras de afinidade e de conversão, não erro), e **erro de motor** nos outros. É a mesma divergência que a matriz da T17 já documenta para `Cast(x, dftDate)` no SQLite, agora alcançável por este slot. **Declare-se o que é:** o framework garante que o valor vai **ligado** e que a grafia do `CAST` é a do dialeto; ele **não** garante que o valor cabe no tipo. Guarda de valor-contra-tipo é decisão de desenho e **não** foi tomada aqui.
 
-  **A ordem das guardas é parte do contrato:** estrutural (`_AssertHaveWhen`) → nulidade → tipo → **só então** `Params.Add`. Chamada recusada **não deixa `:pN` órfão** na coleção, e há teste para cada uma das três portas.
+  **`Null` e `Unassigned` são recusados** com `EArgumentException` nomeando a chamada. Não é limitação técnica: `CASE WHEN c THEN NULL END` é SQL legítimo e o parâmetro carrega `Variant`. É que **dar semântica de `NULL` a este slot é decisão de convenção, e ela não foi tomada aqui** — e a assimetria manda recusar: aceitar depois é **aditivo**, recusar depois seria **BREAKING**. É a mesma régua já escrita em `TUtils._AssertValueSlotCarriesData`. **`nil` não chega a ser questão de runtime: não compila.** O erro do `dcc32` 36.0, **medido**, é `E2250 There is no overloaded version of 'IfThen' that can be called with these arguments` — e **não** `E2010`: `IfThen` é sobrecarregado, então a resolução de sobrecarga responde **antes** da compatibilidade de tipos. (O `E2010 Incompatible types: 'Variant' and 'Pointer'` sai da atribuição direta `V := nil`, que é outro experimento e não esta chamada.) A decisão "`nil` levanta, não vira `NULL`" está cumprida pelo **sistema de tipos** nesta sobrecarga.
 
-  **RECONTAGEM DA FRONTEIRA DOS `array of const`, feita e não presumida.** Duas perguntas separadas, porque esta entrega responde diferente a cada uma:
+  **O INVARIANTE, e ele custou uma rodada de review inteira:** *nenhum caminho de recusa pode deixar parâmetro para trás, e nenhum termo que carrega `:pN` pode ser substituído.* São **cinco** portas de recusa, e **quatro** delas chegaram a vazar numa versão anterior desta entrega:
 
-  1. **Os `array of const` em posição de expressão continuam 17.** Recontados pelo critério mecânico no HEAD desta entrega: `TUtils.SqlArrayOfConstToParameterizedSql` tem **14 sítios de chamada** no `Source/`, e como `FluentSQL.Expression.pas:224` serve **4** pontos de entrada, dá **17 pontos de entrada**. Esta entrega **não acrescentou nem removeu sobrecarga `array of const`** — as duas novas recebem `Variant`, não `array of const`. Os números 14/17 estão **inalterados**; o que mudou foram três **citações** da tabela acima, porque `FluentSQL.Cases.pas` cresceu (`When` 383→**516**, `AndOpe` 268→**277**, `OrOpe` 354→**464**).
+  | # | Causa da recusa | Guarda | Vazava? |
+  |---|---|---|---|
+  | 1 | sem `When` | `_AssertHaveWhen` | não |
+  | 2 | ramo já ocupado por um slot de valor | `_AssertValueSlotFree` | **sim, sem exceção nenhuma** |
+  | 3 | `Null` / `Unassigned` | `_AssertValueCarriesData` | não |
+  | 4 | tipo fora da interseção | a **sonda** | não |
+  | 5 | dialeto sem grafia de `CAST` | a **sonda** (mesma linha) | **sim** |
 
-  2. **Os slots de valor deixaram de ser quatro — e o critério que os contava deixou de servir.** A frase publicada era *"os quatro slots de valor (`SqlArrayOfConstToParameterizedValue`) também seguem quatro"*. Ela junta um **número** e um **critério**, e a entrega separa os dois:
+  A **causa 5** é a que quase passou: em `InterBase` — que é **relacional**, não é o caso do driver não relacional — o `Cast` levanta **de dentro da própria chamada**, ou seja **depois** de `Params.Add` já ter corrido. Medido: `Params.Count = 1`, com o dado do usuário na coleção e **nenhum SQL que o citasse**. O controle (causa 4, no PostgreSQL) dava `0` — o padrão existia em todas as células **menos** naquela.
 
-     - Pelo critério **literal** — "passa por `TUtils.SqlArrayOfConstToParameterizedValue`" —, continuam **2 sítios de chamada** (`FluentSQL.pas:402` e `:1454`), servindo `SetValue(nome, [...])` e `Values(nome, [...])`. `Merge.Update`/`Merge.Insert`, que a lista dos quatro nomeia, na verdade passam por `TUtils.SqlArrayOfConstToNameValuePairs` (`FluentSQL.Merge.pas:193` e `:211`), que delega ao mesmo `_StringVarRecAsParam`. O "quatro" era contagem de **pontos de entrada públicos**, não de chamadas ao helper — e por essa contagem continua **quatro**.
-     - Mas **o slot de valor do `CASE` não passa por nenhum dos dois helpers**: `IfThen`/`ElseIf` chamam `IFluentSQLParams.Add` direto (`FluentSQL.Cases.pas:454`), porque o valor não vem de um `array of const`. **Então o número novo é 6 pontos de entrada que ligam valor** — `Merge.Update`, `Merge.Insert`, `SetValue(nome, array)`, `Values(nome, array)`, **`IfThen(Variant, tipo)`** e **`ElseIf(Variant, tipo)`** —, e o critério mecânico antigo **não os separa mais**, porque agora há um terceiro caminho.
+  Fechada com uma **sonda**: `_ValueSlotTerm` chama o mesmo `Cast` com uma expressão descartável **antes** de gravar, e só grava se ele não recusar. A sonda fecha a causa 4 **junto** com a 5, porque `_AssertCastTypeIsPortable` é a **primeira linha** de `TFluentSQLFunctions.Cast` — provocar o `Cast` provoca as duas. **Isso é medição, não elegância:** uma versão anterior desta entrega chamava `_AssertCastTypeIsPortable` explicitamente ali (e alargava a visibilidade dele para `public` só por isso); com a sonda no lugar, mover essa chamada para **depois** do `Params.Add` **não deixava um único teste vermelho** — era linha morta. Ela saiu, e com ela a alteração de visibilidade: **a política da T17 fica onde a T17 a pôs, `protected`, e esta entrega não mexe em `FluentSQL.FunctionsAbstract.pas` a não ser em comentário.**
 
-     **Para quem for auditar, o critério novo é:** *o argumento é `array of const`?* Se **sim**, `SqlArrayOfConstToParameterizedSql` → literal (17), `SqlArrayOfConstToParameterizedValue`/`NameValuePairs` → parâmetro (4). Se **não**, e a assinatura traz um `TFluentSQLDataFieldType` ao lado do valor, é slot de valor por `IFluentSQLParams.Add` (2, os do `CASE`). A frase *"não há terceiro caminho"*, publicada acima, **passou a ter um** — e é este.
+  A sonda só é equivalente porque a recusa do `Cast` depende de *(dialeto, tipo)* e não da expressão — conferido lendo os nove drivers, **e travado por teste** que compara a recusa da sonda com a da chamada real, para o dia em que um driver divergir.
+
+  A **causa 2** nem envolve exceção no caminho que a motivou. Chamar `IfThen` duas vezes no mesmo ramo substituía o **texto** e abandonava o `:pN` da primeira chamada — medido, em Firebird:
+
+  | Sequência | SQL emitido | Coleção | |
+  |---|---|---|---|
+  | `.IfThen('A',dftString).IfThen('B',dftString)` | `THEN CAST(:p2 ...)` | `p1=A, p2=B` | `p1` **órfão** |
+  | `.IfThen('A',...).ElseIf('B',...).ElseIf('C',...)` | `THEN CAST(:p1) ELSE CAST(:p3)` | `p1,p2,p3` | `p2` **órfão** |
+  | `.IfThen('A',dftString).IfThen('''LITERAL''')` | `THEN 'LITERAL'` | `p1=A` | `p1` **órfão**, e o dado do usuário fica na coleção **fora** do SQL |
+
+  Quem liga parâmetro **por posição** — como todo driver Delphi liga — liga errado a partir do primeiro buraco. **Substituir um ramo que já carrega `:pN` passou a ser recusado, e a guarda vale também nas sobrecargas de `String` e `Int64`**, porque a substituição que vaza pode vir delas (é a terceira linha da tabela). **Isso não quebra código anterior a esta entrega:** para o slot estar ocupado alguém tem de ter chamado a sobrecarga de `Variant`, que nasceu aqui — programa que não a chama não alcança a recusa. `String` sobre `String` continua permitido e continua não vazando, e há controle para isso. **O que libera o slot é um `When` novo**, porque cada `WHEN` tem o seu próprio ramo `THEN`.
+
+  **Toda célula de recusa da suíte confere a coleção**, e não só a classe da exceção — na forma `Delta = 0` ("a chamada recusada não acrescenta parâmetro"), que é o que vale nas cinco causas. `Total = 0` seria **errado** na causa 2, onde a primeira chamada ligou um `:p1` que o SQL **cita**: exigir zero ali seria exigir que um parâmetro referenciado fosse apagado. Há ainda a asserção na forma mais pura, em célula própria: **todo parâmetro da coleção tem de ser citado pelo statement** — essa sozinha teria pego os quatro vazamentos.
+
+  **RECONTAGEM DA FRONTEIRA — o que esta entrega mediu, e o que ela deliberadamente NÃO publica.**
+
+  1. **Os `array of const` em posição de expressão continuam 17, e este é o comando que reproduz.** No HEAD desta entrega:
+
+     ```
+     grep -rn "TUtils\.SqlArrayOfConstToParameterizedSql(" Source/ --include=*.pas \
+       | grep -v "^Source/Core/FluentSQL.Utils.pas" | wc -l
+     ```
+
+     → **14** sítios de chamada. (Sem o segundo filtro o `grep` devolve **15**; o 15.º é a própria implementação, `FluentSQL.Utils.pas:287`, e não uma chamada — é a armadilha de contar a definição junto com os usos.) Como `FluentSQL.Expression.pas:224` serve **4** pontos de entrada (`AndOpe`, `OrOpe`, `Ope`, `Fun`), são **14 sítios / 17 pontos de entrada**.
+
+     Esta entrega **não acrescentou nem removeu sobrecarga `array of const`** — as duas novas recebem `Variant`. Os números 14/17 estão **inalterados**; o que mudou foram três **citações** da tabela acima, porque `FluentSQL.Cases.pas` cresceu (`When` 383→**662**, `AndOpe` 268→**285**, `OrOpe` 354→**599**).
+
+  2. **O que a T13 mudou na fronteira de quem LIGA valor: acrescentou 2 pontos de entrada** — `IfThen(Variant, TFluentSQLDataFieldType)` e `ElseIf(Variant, TFluentSQLDataFieldType)`, que chamam `IFluentSQLParams.Add` direto (`FluentSQL.Cases.pas:589`). **É só isso que esta entrada afirma sobre essa fronteira, e a omissão de um total é deliberada.**
+
+     **Não se publica aqui um total de "pontos de entrada que ligam valor", porque medir mostrou que todo total curto que se tentou escrever estava errado.** A varredura completa —
+
+     ```
+     grep -rn "Params\.Add(" Source/ --include=*.pas | grep -v "function .*Add(const AValue" | wc -l
+     ```
+
+     → **29** sítios — encontra binding direto em lugares que **nada têm a ver com `array of const` e já existiam em `main`**: as **8** sobrecargas *tipadas* de `SetValue` (`FluentSQL.pas:412, 440, 451, 462, 473, 484, 495, 506` — `String`, `Integer`, `Extended`, `Double`, `Currency`, `TDate`, `TDateTime`, `TGUID`); **8** em `FluentSQL.Operators.pas` (`:174, 176, 178, 180, 187, 189, 297, 317` — o lado direito de `Equal`/`Like`/`In` e afins); **13** dentro dos próprios helpers, em `FluentSQL.Utils.pas`; e **1** que é o `CASE` desta entrega.
+
+     **Duas afirmações que uma versão anterior desta entrada chegou a publicar e que a medição desmentiu:**
+
+     - o total **"6 pontos de entrada que ligam valor"** era **subcontagem** — ignorava as 8 tipadas de `SetValue` e os 8 dos operadores;
+     - **`IFluentSQLParams.Add` direto NÃO é "um terceiro caminho que a T13 criou".** Ele já era o caminho das sobrecargas tipadas e dos operadores em `main`. A T13 **acrescentou dois usos dele**; não inaugurou nada. Dar o caminho como novidade desta entrega seria creditá-la por algo que ela não fez.
+
+     E o critério que se tentou publicar — *"se a assinatura traz um `TFluentSQLDataFieldType` ao lado do valor"* — **também não classifica**: **nenhuma** das 8 sobrecargas tipadas de `SetValue` tem esse parâmetro, e todas ligam valor.
+
+     **A regra que sobrevive à medição, e a única publicada aqui:** dentro de `array of const`, `SqlArrayOfConstToParameterizedSql` → literal, `SqlArrayOfConstToParameterizedValue`/`NameValuePairs` → parâmetro. **Fora de `array of const` não há atalho — quem quiser o conjunto completo roda o `grep` de `Params.Add(` acima e lê os 29.**
 
 - **`IFluentSQLFunctions.Cast` ganhou sobrecarga por dialeto: `Cast(const AExpression: String; const ADataType: TFluentSQLDataFieldType; const ALength: Integer = 0)`.** `Cast` era a última função escalar no **padrão A** — o núcleo emitia `'CAST(' + AExpression + ' AS ' + ADataType + ')'` sem consultar o driver, e **nenhum** dos nove drivers a sobrescrevia. Uma grafia respondia pelos sete dialetos. É o mesmo defeito estrutural que já queimou `CEIL`/`LENGTH`, com um agravante: aqui a célula errada frequentemente **não levanta**.
 
