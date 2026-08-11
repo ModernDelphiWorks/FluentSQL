@@ -257,21 +257,37 @@ end;
 procedure TTestAliasMatrix.TestApelidoDeRelacaoNoDeleteFrom;
 var
   LDriver: TFluentSQLDriver;
+  LEsperado: String;
   LCelulas: Integer;
 begin
   // O DELETE cai no MESMO TFluentSQL.From (a assercao de secao aceita secSelect
-  // e secDelete), entao ele acompanha a regra sem codigo proprio. Medido na
-  // Oracle: "DELETE FROM A AS AP" devolve ORA-03048; sem o AS, executa.
+  // e secDelete), entao ele acompanha a regra da PALAVRA sem codigo proprio.
+  // Medido na Oracle: "DELETE FROM A AS AP" devolve ORA-03048; sem o AS,
+  // executa.
+  //
+  // A FORMA da clausula, porem, NAO e universal, e este teste deixou de afirmar
+  // que era. O T-SQL recusa as duas formas "DELETE FROM <relacao apelidada>":
+  //   DELETE FROM A AS AP -> Msg 156   DELETE FROM A AP -> Msg 102
+  // e exige "DELETE AP FROM A AS AP", com o apelido como alvo. Ate a T18 esta
+  // celula fixava para o dbnMSSQL exatamente o texto que o motor recusa - ela
+  // estava verde afirmando SQL invalido.
+  //
+  // Quem responde pela forma agora e test.delete.alias.matrix.pas, com a matriz
+  // dos sete medida em motor real. Aqui fica so o que e desta matriz: a
+  // PALAVRA do apelido, lida da mesma cPALAVRA_RELACAO das outras celulas.
   LCelulas := 0;
   for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
   begin
     if not _Medivel(LDriver) then
       Continue;
     Inc(LCelulas);
-    Assert.AreEqual('DELETE FROM ' + _ComApelido(LDriver, 'A', 'AP') +
-      ' WHERE (AP.ID = ' + _Bind(LDriver) + ')',
+    if LDriver = dbnMSSQL then
+      LEsperado := 'DELETE AP FROM ' + _ComApelido(LDriver, 'A', 'AP')
+    else
+      LEsperado := 'DELETE FROM ' + _ComApelido(LDriver, 'A', 'AP');
+    Assert.AreEqual(LEsperado + ' WHERE (AP.ID = ' + _Bind(LDriver) + ')',
       Query(LDriver).Delete.From('A', 'AP').Where('AP.ID').Equal(1).AsString, False,
-      cDIALETO[LDriver] + ': apelido de tabela no DELETE FROM.');
+      cDIALETO[LDriver] + ': apelido de tabela no DELETE.');
   end;
   Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
 end;

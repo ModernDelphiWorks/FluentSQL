@@ -33,6 +33,7 @@ type
     function Merge(const ADef: IFluentSQLMergeDef): string; virtual;
     function QuotedName(const AName: string): string; virtual;
     function RelationAliasKeyword: String; virtual;
+    function DeleteClause(const ADelete: IFluentSQLDelete): String; virtual;
   end;
 
 /// <summary>Suffix emitted only for fragments whose dialect matches the query serialization dialect (ADR-016).</summary>
@@ -87,8 +88,12 @@ begin
   if not Assigned(AAST) then
     Exit('');
 
+  // DeleteClause, e nao AAST.Delete.Serialize: no T-SQL o apelido muda a FORMA
+  // da clausula, nao so a palavra que antecede o apelido. Chamada VIRTUAL - e
+  // por isso que TFluentSQLSerializerMSSQL alcanca este ponto sem sobrescrever
+  // ComposeSqlCore.
   LBase := TUtils.Concat([AAST.Select.Serialize,
-                          AAST.Delete.Serialize,
+                          DeleteClause(AAST.Delete),
                           AAST.Insert.Serialize,
                           AAST.Update.Serialize,
                           AAST.Joins.Serialize,
@@ -161,6 +166,36 @@ end;
 function TFluentSQLSerialize.RelationAliasKeyword: String;
 begin
   Result := 'AS';
+end;
+
+/// <summary>
+///   Forma PADRAO da clausula DELETE: o que TFluentSQLDelete.Serialize monta,
+///   ou seja "DELETE FROM <relacao>" com o apelido - se houver - ja escrito por
+///   TFluentSQLName.Serialize na palavra do dialeto.
+///
+///   Vale para MySQL, Firebird, SQLite, Interbase, DB2, PostgreSQL e Oracle, e
+///   e byte-a-byte o texto que esses dialetos emitiam antes desta tarefa: quem
+///   nao sobrescreve nao muda uma virgula. Medido com apelido, em motor real
+///   (transcricao em Test Delphi\Common_tests\test.delete.alias.matrix.sql):
+///
+///     PostgreSQL 16.14  DELETE FROM A AS AP  -> executa
+///     MySQL 8.4.11      DELETE FROM A AS AP  -> executa
+///     Firebird 5.0.4    DELETE FROM A AS AP  -> executa
+///     SQLite 3.53.4     DELETE FROM A AS AP  -> executa
+///     DB2 12.1.5.0      DELETE FROM A AS AP  -> executa
+///     Oracle 23.26.2    DELETE FROM A AP     -> executa (a palavra ja e ''
+///                                               por RelationAliasKeyword)
+///
+///   O Interbase esta nesta base por HERANCA e nao por medicao: nao ha imagem
+///   publica de InterBase e ele nao foi executado.
+///
+///   Nao se adotou "emitir a forma do T-SQL em todos": ela e a UNICA que os
+///   outros seis recusam (medido - PostgreSQL, SQLite, Firebird e Oracle
+///   devolvem erro de sintaxe para "DELETE AP FROM A AS AP").
+/// </summary>
+function TFluentSQLSerialize.DeleteClause(const ADelete: IFluentSQLDelete): String;
+begin
+  Result := ADelete.Serialize;
 end;
 
 end.
