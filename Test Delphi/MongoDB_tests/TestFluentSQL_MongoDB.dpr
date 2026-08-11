@@ -85,7 +85,16 @@ begin
     // default do DUnitX e string vazia) e quem chamou manda: sobrescrever aqui
     // sem guarda faz o arquivo nascer em outro lugar e o coletor achar o nada.
     if TDUnitX.Options.XMLOutputFile = '' then
-      TDUnitX.Options.XMLOutputFile := ChangeFileExt(ParamStr(0), '') + '-dunitx-results.xml';
+      TDUnitX.Options.XMLOutputFile := ChangeFileExt(ParamStr(0), '') + '-dunitx-results.xml'
+    else
+      // Veio da linha de comando: absolutiza contra o diretorio corrente, que e
+      // o que 'custom.xml' quer dizer. Sem isto o DUnitX chama
+      // ForceDirectories(ExtractFilePath(nome)) com string vazia e levanta
+      // EInOutError, e a opcao passa a funcionar so com caminho completo - ou
+      // seja, falha justo na forma mais obvia de argumento. ExpandFileName e
+      // identidade para caminho ja absoluto e NAO valida a existencia do
+      // destino: alvo impossivel continua estourando alto, com ExitCode != 0.
+      TDUnitX.Options.XMLOutputFile := ExpandFileName(TDUnitX.Options.XMLOutputFile);
     nunitLogger := TDUnitXXMLNUnitFileLogger.Create(TDUnitX.Options.XMLOutputFile);
     runner.AddLogger(nunitLogger);
 
