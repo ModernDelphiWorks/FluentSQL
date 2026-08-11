@@ -308,7 +308,21 @@ type
     ///
     ///   AValue Null ou Unassigned e RECUSADO com EArgumentException: esta
     ///   entrega nao decide a convencao de NULL. Aceitar depois e aditivo.
-    ///   Passar nil nem compila - 'Variant' e 'Pointer' sao incompativeis (E2010).
+    ///   Passar nil nem compila: o dcc32 36.0 responde E2250 ("There is no
+    ///   overloaded version of 'IfThen' that can be called with these
+    ///   arguments"), MEDIDO - e nao E2010, porque IfThen e sobrecarregado e a
+    ///   resolucao de sobrecarga responde antes da checagem de compatibilidade.
+    ///
+    ///   CHAME UMA VEZ POR RAMO. Substituir o termo de um ramo que ja carrega um
+    ///   :pN e RECUSADO - inclusive pelas sobrecargas de String e Int64 -, porque
+    ///   a substituicao abandonaria o parametro na colecao. Um When novo abre um
+    ///   ramo THEN novo e libera o slot.
+    ///
+    ///   O CAST e portavel na SINTAXE, nao na SEMANTICA: nada valida AValue
+    ///   contra ADataType. IfThen('BANANA', dftInteger) vira 0 CALADO no SQLite e
+    ///   no MySQL, e erro de motor nos outros. O framework garante que o valor vai
+    ///   LIGADO e que a grafia do CAST e a do dialeto; que o valor CAIBA no tipo e
+    ///   responsabilidade do chamador.
     /// </summary>
     function IfThen(const AValue: Variant;
       const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase; overload;

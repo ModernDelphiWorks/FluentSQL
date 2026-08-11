@@ -29,7 +29,7 @@ const
 
 type
   TFluentSQLFunctionAbstract = class(TInterfacedObject, IFluentSQLFunctions)
-  public
+  protected
     /// <summary>
     ///   A PORTA UNICA da politica de intersecao estrita do Cast portavel. Fica
     ///   aqui, e nao copiada em cada driver, porque a recusa e a MESMA nos sete -
@@ -37,16 +37,18 @@ type
     ///   viraria uma colecao de opinioes. Chamada como PRIMEIRA linha de todo
     ///   override de Cast(TFluentSQLDataFieldType), inclusive o do core.
     ///
-    ///   PUBLICA desde a T13, e nao mais protected. O slot de VALOR do CASE
-    ///   (IFluentSQLCriteriaCase.IfThen/ElseIf com TFluentSQLDataFieldType) mora
-    ///   em outra unit e precisa recusar o tipo ANTES de gravar o parametro na
-    ///   colecao - se esperasse a recusa vir de dentro de Cast, o :pN ja teria
-    ///   sido criado e sobraria orfao na numeracao. Alargar a visibilidade e o
-    ///   preco de a politica continuar com fonte unica; escrever "ADataType in
-    ///   cFluentSQLCastPortableTypes" na outra unit e que seria a segunda opiniao.
+    ///   CONTINUA protected, e isso e RESULTADO DE MEDICAO, nao omissao. O slot de
+    ///   VALOR do CASE (IFluentSQLCriteriaCase.IfThen/ElseIf) mora em outra unit e
+    ///   precisa recusar ANTES de gravar o parametro; houve uma versao da T13 que
+    ///   alargou esta visibilidade para chamar de la. Nao e preciso: o slot faz um
+    ///   PRE-VOO chamando o proprio Cast com uma expressao descartavel, e como
+    ///   esta assercao e a PRIMEIRA linha de TFluentSQLFunctions.Cast, o pre-voo
+    ///   ja a provoca. Medido: com o pre-voo no lugar, mover a chamada explicita
+    ///   para depois do Params.Add nao deixava NENHUM teste vermelho - era linha
+    ///   morta. A politica fica onde a T17 a pos, com a visibilidade que a T17
+    ///   lhe deu.
     /// </summary>
     class procedure _AssertCastTypeIsPortable(const ADataType: TFluentSQLDataFieldType);
-  protected
     /// <summary>
     ///   Rede de seguranca do lado do driver: o tipo esta na intersecao portavel
     ///   mas ESTE driver nao tem grafia para ele. Hoje isso so acontece em
