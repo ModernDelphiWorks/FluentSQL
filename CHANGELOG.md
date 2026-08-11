@@ -53,6 +53,47 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **Nenhuma interface ganhou membro nesta mudança** — não há `E2291` para quem implementa `IFluentSQL` do zero. A única alteração de assinatura foi o **nome** do parâmetro (`AValue` → `ASubQuery`), que em Delphi/FPC não participa da compatibilidade. Uma eventual sobrecarga `Exists(IFluentSQL)` — porta *portável* construída pelo builder, ainda **não implementada** — seria um BREAKING de API separado.
 
+- **BREAKING CHANGE (SQL emitido) — Oracle: literal de data e de data-hora passou a sair como literal ANSI tipado.** `TUtils.DateToSQLFormat` e `TUtils.DateTimeToSQLFormat` emitiam para `dbnOracle` o literal **cru** entre aspas, e o Oracle **recusa** esse texto. Medido em **Oracle AI Database 26ai Free Release 23.26.2.0.0**, com o `NLS_DATE_FORMAT` **de fábrica** (`DD-MON-RR`) — o erro é no `CREATE TABLE`, não no `INSERT`. **Quem compara o SQL gerado com string fixa para `dbnOracle` precisa atualizar as expectativas**; quem executa o DDL passa a executar SQL que o motor aceita.
+
+  | Construção (`dbnOracle`) | Antes | Depois | Motor real |
+  |---|---|---|---|
+  | `.ColumnDate('D').DefaultValue('2024-04-14')` | `"D" DATE DEFAULT '2024-04-14'` | `"D" DATE DEFAULT DATE '2024-04-14'` | antes: **`ORA-01861: literal does not match format string`** |
+  | `.ColumnDateTime('D').DefaultValue('2024-04-14 12:34:56')` | `"D" TIMESTAMP DEFAULT '2024-04-14 12:34:56'` | `"D" TIMESTAMP DEFAULT TIMESTAMP '2024-04-14 12:34:56'` | antes: **`ORA-01843: An invalid month was specified`** |
+  | os outros oito dialetos | — | **inalterado** | ver matriz abaixo |
+
+  **O texto antigo não estava "quase certo": ele dependia de configuração de sessão que o framework não controla.** A mesma sentença que morre com `ORA-01861` passa a criar a tabela depois de `ALTER SESSION SET NLS_DATE_FORMAT='YYYY-MM-DD'` — medição transcrita na seção I do arquivo-oráculo. O literal ANSI tipado não depende de NLS nenhum.
+
+  **Emitir a forma ANSI para todos os dialetos, que seria a correção óbvia, QUEBRARIA três dos outros seis** — e é essa medição que obrigou a correção a ser um ramo de dialeto. **Não existe forma aceita pelos sete.** A matriz completa, com transcrição literal, `docker run`, digest de imagem, versão perguntada a cada motor e controle positivo/negativo, está em `Test Delphi\Common_tests\test.date.literal.matrix.sql`:
+
+  | Dialeto | `'2026-08-10'` cru | `DATE '2026-08-10'` |
+  |---|---|---|
+  | Oracle 23.26.2.0.0 | **recusa** — `ORA-01861` | aceita |
+  | SQL Server 2022 (16.0.4265.3) | aceita | **recusa** — `Msg 128, The name "DATE" is not permitted in this context` |
+  | MySQL 8.4.11 | aceita | **recusa** — `ERRO 1067, Invalid default value` (só entre parênteses, e aí vira expressão) |
+  | SQLite 3.53.4 | aceita | **recusa** — `parse error`, nem entre parênteses |
+  | PostgreSQL 16.14 | aceita | aceita |
+  | Firebird 5.0.4 | aceita | aceita |
+  | DB2 12.1.5.0 | aceita | aceita |
+  | InterBase | **não medido** — não existe imagem pública | não medido |
+
+  O literal cru é aceito por **6** e recusado por **1**; o ANSI tipado é aceito por **4** e recusado por **3**. A interseção é **vazia**. Por isso o ramo ficou restrito a `dbnOracle`, o único com defeito medido, e os outros seis continuam emitindo **byte a byte** o que emitiam — travado por **mutação dirigida** em `test.date.literal.matrix.pas` (estender o ramo a qualquer um dos cinco dialetos com serializador DDL derruba a célula correspondente).
+
+  **Alcance da mudança, declarado — são SEIS posições emitidas, não cinco.** A correção mora nas duas funções de `FluentSQL.Utils.pas`, então alcança tudo que passa por elas:
+
+  | # | posição | sítio |
+  |---|---|---|
+  | 1 | `DEFAULT` de coluna em `CREATE TABLE` | `FluentSQL.DDL.SerializeAbstract.pas:125` |
+  | 2 | `DEFAULT` de coluna em `ALTER TABLE … ADD` | `FluentSQL.DDL.Serialize.Oracle.pas:134` → `:138` → `GetColumnDefinition` → o mesmo `:125` |
+  | 3–6 | `WHERE` (coluna `DATE` e coluna `TIMESTAMP`), `INSERT … VALUES`, `UPDATE … SET`, `BETWEEN` — pelo **caminho inline** de `FluentSQL.Operators.pas:212-213` | seção I.2 do arquivo-oráculo |
+
+  **O literal ANSI foi submetido e aceito nas seis.** Já o literal **cru** foi submetido em **três**: `DEFAULT` de coluna, `WHERE` sobre coluna `DATE` e `WHERE` sobre coluna `TIMESTAMP` — e morre nas três (`ORA-01861`, `ORA-01861`, `ORA-01843`). Em `INSERT … VALUES`, `UPDATE … SET` e `BETWEEN` **só a forma ANSI foi submetida**; o que essas três linhas do oráculo afirmam é a **aceitação do ANSI**, e **nada** sobre a recusa do cru. É provável que o cru também seja recusado ali — `ORA-01861` é erro de **conversão**, não de posição —, mas isso fica escrito como **provável**, não como medido. *(Uma versão anterior desta entrada dizia "o cru é recusado em todas": generalização a partir de duas submissões.)*
+
+  **A posição 2 é omissão da declaração original desta entrega, apontada e medida pela revisão da T19** — o texto do HEAD altera a tabela e devolve o valor certo, e o texto da base devolve `ORA-01861` ali também; **a medição é da revisão, não desta entrega**. Duas ressalvas de proveniência: o enunciado submetido ali foi **reconstruído à mão** por leitura de `Oracle.pas:138` + `GetColumnDefinition`, **não copiado da saída do gerador** como são os doze da seção IX do oráculo — está medido que a *forma* é aceita, e é *leitura de código* que o gerador produza esse texto; e **não há célula de teste travando essa posição**. (`ALTER TABLE … MODIFY` realmente não emite `DEFAULT` no serializador do Oracle — nessa parte a declaração original procede.)
+
+  Sobre o **caminho inline**, com a redação corrigida: `TFluentSQLOperators` só tem construtor de **dois** argumentos, e o único chamador interno sempre passa os params — cair no ramo inline exige passar `nil` explicitamente ou usar `TFluentSQLOperator` direto. O alcance é estreito, como se dizia; a razão é essa, e não "um construtor sem parâmetros". **Nada foi decidido aqui sobre remover o modo inline**; a lógica do `case` de `Operators.pas` não foi tocada.
+
+  **Fronteira declarada:** `dbnInterbase` **não foi medido** (não existe imagem pública) e seu ramo **não foi tocado**. O ramo `dbnFirebird`/`dbnInterbase` não foi mexido por **decisão de escopo** — esta tarefa nasceu do defeito do Oracle e não foi encarregada de decidir o formato de outro dialeto. **Isso não é o mesmo que "não há nada a rever no Firebird"**: esta entrega mediu apenas que `'04/14/2026'` → `2026-04-14` e `'12/13/2026'` → `2026-12-13`. **A revisão da T19 mediu que `'13/12/2026'` é RECUSADO com `SQLSTATE 22018`.** O **momento** da recusa depende do caminho: por `CAST` ela é **imediata** (o próprio `SELECT` morre); pelo **`DEFAULT` de coluna** — que é o que o framework emite — ela é **diferida**, o `CREATE TABLE` passa e o `22018` só aparece no `INSERT`, de modo que o schema nasce com um default que estoura no primeiro uso. **A medição é da revisão, não desta entrega**, e a falha diferida está catalogada como tarefa própria **pelo orquestrador desta fila** (sem identificador atribuído até aqui). Uma versão anterior desta entrada afirmava o oposto — `'13/12/2026'` aceito por *fallback* DD/MM, "ambiguidade real" — **por inferência**, a partir de um `CREATE TABLE` que passou sem que o valor jamais fosse lido; a afirmação foi removida.
+
 - **BREAKING CHANGE (SQL emitido) — SQL Server: coluna computada deixou de carregar o tipo declarado.** O T-SQL **não aceita** tipo em coluna computada: a gramática de `<computed_column_definition>` é `column_name AS computed_column_expression`, sem `<data_type>` — o tipo é derivado da expressão. O FluentSQL emitia para `dbnMSSQL` um texto que o motor **recusa**, e o teste que fixava esse texto estava **verde**. **Quem compara o SQL gerado com string fixa para `dbnMSSQL` precisa atualizar as expectativas**; quem executa o DDL passa a executar SQL que o motor aceita.
 
   | Construção (`dbnMSSQL`) | Antes | Depois | Motor real |
