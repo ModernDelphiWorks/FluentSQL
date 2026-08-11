@@ -49,7 +49,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   ⚠️ **Isto NÃO quer dizer que `DELETE` multi-relação deixou de ser alcançável, e a seção NÃO está selada.** `Delete.From('A').InnerJoin('B').OnCond(…)` continua emitindo `DELETE FROM A INNER JOIN B ON …`, por outra porta — `TFluentSQL._CreateJoin`, que não passa por `ASTTableNames` nem chama `_AssertSection`. Essa porta **não foi medida em motor por esta tarefa** e está registrada como dívida em *Known issues*, com a medição da revisão. **Não escreva a forma com `JOIN` confiando nesta guarda**: ela não a cobre, e a resposta certa lá é **traduzir**, não recusar.
 
-  **Os sete motores relacionais recusam esse texto por parse** — não é "a interseção é vazia", é a **união** que é vazia: não há um motor sequer em que ele executasse. Medição em motor real, transcrição literal com `docker run` e versão perguntada a cada motor em `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`:
+  **Os sete motores relacionais recusam a lista separada por vírgula por parse** — não é "a interseção é vazia", é a **união** que é vazia: não há um motor sequer em que ele executasse. Medição em motor real, transcrição literal com `docker run` e versão perguntada a cada motor em `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`:
 
   | Dialeto | `DELETE FROM A AS X, B AS Y` | `DELETE FROM A, B` | `DELETE FROM A X, B Y` |
   |---|---|---|---|
