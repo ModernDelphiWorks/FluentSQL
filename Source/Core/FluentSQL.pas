@@ -941,9 +941,68 @@ begin
   Result := From('(' + AQuery.AsString + ')');
 end;
 
+/// <summary>
+///   No SELECT, From acumula relacoes e vira a lista separada por virgula do
+///   FROM - forma valida e antiga. No DELETE, a MESMA chamada acumulava do
+///   mesmo jeito e produzia "DELETE FROM A AS X, B AS Y", que NENHUM dos sete
+///   motores relacionais analisa. Medido, transcricao literal em
+///   Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql:
+///
+///     SQL Server 2022 16.0.4265.3  Msg 156 / Msg 102
+///     Oracle 23.26.2.0.0           ORA-03048
+///     PostgreSQL 16.14             syntax error at or near ","
+///     MySQL 8.4.11                 ERROR 1064
+///     Firebird 5.0.4               SQL error code = -104
+///     SQLite 3.53.4                near ",": syntax error
+///     DB2 12.1.5.0                 SQL0104N
+///
+///   Nao ha o que emitir no lugar, e NAO por falta de esforco: as formas
+///   multi-relacao nativas nao querem dizer a mesma coisa umas que as outras.
+///   "DELETE X FROM A X JOIN B Y" (T-SQL) e "DELETE FROM A USING B" (PostgreSQL
+///   e Oracle 23ai) apagam de UMA relacao filtrando pela outra; "DELETE X, Y
+///   FROM A X JOIN B Y" (MySQL) apaga das DUAS - e o T-SQL RECUSA essa segunda
+///   (Msg 102, medido). Traduzir uma chamada para formas de semantica diferente
+///   por dialeto seria trocar SQL que nao executa por SQL que executa APAGANDO
+///   COISAS DIFERENTES conforme o banco.
+///
+///   E a API nao tem como saber qual das duas foi pedida: nao ha designador de
+///   alvo, nao ha condicao de juncao propria da secao, nao ha marcador de
+///   relacao auxiliar. Duas chamadas de From num DELETE nao expressam nada.
+///
+///   A GUARDA ESTA AQUI, e nao no serializador, por tres razoes: falha na
+///   chamada que errou e nao la adiante no AsString; vale para os dialetos
+///   todos sem uma linha por driver; e nao acrescenta membro a
+///   IFluentSQLSerialize.
+///
+///   O QUE ELA FECHA, COM PRECISAO: a LISTA DE RELACOES DO FROM da secao
+///   DELETE. Este e o unico ponto de entrada que alimenta FAST.ASTTableNames -
+///   IFluentSQL nao publica o AST, entao IFluentSQLDelete.TableNames.Add nao e
+///   alcancavel por consumidor.
+///
+///   O QUE ELA NAO FECHA, e que ninguem deve ler que fecha: a secao DELETE NAO
+///   esta selada. _CreateJoin (nesta mesma unit, em
+///   "function TFluentSQL._CreateJoin(AjoinType: TJoinType; const ATableName:
+///   String): IFluentSQL") e um SEGUNDO ponto de entrada publico que poe outra
+///   relacao num DELETE: ele nao chama _AssertSection e nao passa por
+///   ASTTableNames, entao Delete.From('A').InnerJoin('B').OnCond(...) continua
+///   emitindo "DELETE FROM A INNER JOIN B ON ...".
+///
+///   E OUTRA construcao, por OUTRA porta, E COM OUTRA RESPOSTA - registrada
+///   como divida na Parte 8 de
+///   Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql. Ao contrario
+///   do caso desta guarda, a do JOIN e TRADUZIVEL e nao recusavel: medido pela
+///   revisao desta tarefa, "DELETE X FROM A AS X INNER JOIN B AS Y ON ..." e
+///   ACEITO pelo SQL Server. Quem for mexer la NAO deve copiar a decisao daqui.
+/// </summary>
 function TFluentSQL.From(const ATableName: String): IFluentSQL;
 begin
   _AssertSection([secSelect, secDelete]);
+  if (FActiveSection = secDelete) and (FAST.ASTTableNames.Count > 0) then
+    raise EFluentSQLConstructNotSupported.Create(
+      'DELETE com mais de uma relacao',
+      'Emita um DELETE por relacao, ou restrinja a unica relacao alvo pelo ' +
+      'WHERE - inclusive com subconsulta, que e portavel nos sete. Se o que ' +
+      'se queria era apagar de duas tabelas, sao duas instrucoes.');
   FAST.ASTName := FAST.ASTTableNames.Add;
   FAST.ASTName.AliasKeyword := _RelationAliasKeyword;
   FAST.ASTName.Name := ATableName;
