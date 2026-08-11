@@ -108,7 +108,12 @@ begin
     // gravem 'dunitx-results.xml' no mesmo diretorio se sobrescrevem e a medicao do
     // primeiro some sem uma linha de aviso. Derivar de ParamStr(0) mantem o nome
     // unico ate quando alguem copia este .dpr para criar o proximo projeto.
-    TDUnitX.Options.XMLOutputFile := ChangeFileExt(ParamStr(0), '') + '-dunitx-results.xml';
+    // So vale como DEFAULT. Se a linha de comando pediu --xmlfile/--xml, o
+    // CheckCommandLine acima ja gravou o destino em Options.XMLOutputFile (o
+    // default do DUnitX e string vazia) e quem chamou manda: sobrescrever aqui
+    // sem guarda faz o arquivo nascer em outro lugar e o coletor achar o nada.
+    if TDUnitX.Options.XMLOutputFile = '' then
+      TDUnitX.Options.XMLOutputFile := ChangeFileExt(ParamStr(0), '') + '-dunitx-results.xml';
     nunitLogger := TDUnitXXMLNUnitFileLogger.Create(TDUnitX.Options.XMLOutputFile);
     runner.AddLogger(nunitLogger);
     runner.FailsOnNoAsserts := False;
