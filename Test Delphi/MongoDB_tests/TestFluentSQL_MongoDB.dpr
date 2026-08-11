@@ -90,8 +90,18 @@ begin
     runner.AddLogger(nunitLogger);
 
     results := runner.Execute;
+    // Piso de honestidade: runner que nao encontrou caso nenhum nao sai com
+    // sucesso. Sem isto um projeto que compila mas perde o registro dos fixtures
+    // some da soma da suite sem uma linha de aviso - e a soma continua 'batendo'
+    // com uma suite menor. Nao ha lista de fixtures esperados aqui de proposito:
+    // lista escrita a mao apodrece no primeiro teste que alguem acrescenta.
+    if results.TestCount = 0 then
+    begin
+      System.Writeln('FATAL: nenhum caso de teste foi encontrado neste projeto.');
+      System.ExitCode := EXIT_ERRORS;
+    end;
     if not results.AllPassed then
-      System.ExitCode := 1;
+      System.ExitCode := EXIT_ERRORS;
 
     {$IFNDEF CI}
     if TDUnitX.Options.ExitBehavior = TDUnitXExitBehavior.Pause then
@@ -102,7 +112,16 @@ begin
     {$ENDIF}
   except
     on E: Exception do
+    begin
       System.Writeln(E.ClassName, ': ', E.Message);
+      // Excecao no bootstrap (alvo de XML invalido, opcao malformada) tem de sair
+      // com codigo != 0: sem isto o processo morre antes de rodar um unico caso e
+      // a automacao le a ausencia de resultado como sucesso. So EXIT_OK e
+      // sobrescrito, para nao apagar o EXIT_OPTIONS_ERROR que o proprio
+      // CheckCommandLine ja tenha posto.
+      if System.ExitCode = EXIT_OK then
+        System.ExitCode := EXIT_ERRORS;
+    end;
   end;
 {$ENDIF}
 end.
