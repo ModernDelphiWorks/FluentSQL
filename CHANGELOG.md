@@ -17,6 +17,50 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (API) — `Delete.From(A).From(B)` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** O que fechou foi a **lista de relações do `FROM`** de um `DELETE`: antes, a segunda chamada de `From` numa seção `DELETE` acumulava a relação e o framework emitia uma lista separada por vírgula.
+
+  ⚠️ **Isto NÃO quer dizer que `DELETE` multi-relação deixou de ser alcançável, e a seção NÃO está selada.** `Delete.From('A').InnerJoin('B').OnCond(…)` continua emitindo `DELETE FROM A INNER JOIN B ON …`, por outra porta — `TFluentSQL._CreateJoin`, que não passa por `ASTTableNames` nem chama `_AssertSection`. Essa porta **não foi medida em motor por esta tarefa** e está registrada como dívida em *Known issues*, com a medição da revisão. **Não escreva a forma com `JOIN` confiando nesta guarda**: ela não a cobre, e a resposta certa lá é **traduzir**, não recusar.
+
+  **Os sete motores relacionais recusam esse texto por parse** — não é "a interseção é vazia", é a **união** que é vazia: não há um motor sequer em que ele executasse. Medição em motor real, transcrição literal com `docker run` e versão perguntada a cada motor em `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`:
+
+  | Dialeto | `DELETE FROM A AS X, B AS Y` | `DELETE FROM A, B` | `DELETE FROM A X, B Y` |
+  |---|---|---|---|
+  | SQL Server 2022 (16.0.4265.3) | `Msg 156` | `Msg 102` | `Msg 102` |
+  | Oracle 23.26.2.0.0 | `ORA-03048` | `ORA-03048` | `ORA-03048` |
+  | PostgreSQL 16.14 | `syntax error at or near ","` | `syntax error` | `syntax error` |
+  | MySQL 8.4.11 | `ERROR 1064` | `ERROR 1064` | `ERROR 1064` |
+  | Firebird 5.0.4 | `SQL error code = -104` | `-104` | `-104` |
+  | SQLite 3.53.4 | `near ",": syntax error` | `syntax error` | `syntax error` |
+  | DB2 12.1.5.0 | `SQL0104N` | `SQL0104N` | `SQL0104N` |
+  | InterBase | **não medido** — não existe imagem pública | não medido | não medido |
+
+  **O defeito nunca foi do apelido**: sem apelido nenhum, `DELETE FROM A, B` já derruba o parse nos sete. A guarda, por isso, não olha `Alias`.
+
+  **Por que RECUSAR e não traduzir para a forma nativa de cada dialeto.** Porque as formas nativas **não significam a mesma coisa**. Medido com contagem antes/depois, `A` e `B` com 2 linhas cada:
+
+  | Dialeto | Forma nativa | Apagou de |
+  |---|---|---|
+  | T-SQL | `DELETE X FROM A AS X JOIN B AS Y ON ...` | **só de A** (A 2→1, B 2→2) |
+  | PostgreSQL | `DELETE FROM A AS X USING B AS Y WHERE ...` | **só de A** (A 2→1, B 2→2) |
+  | Oracle 23ai | `DELETE FROM A X USING B Y WHERE ...` | **só de A** (A 3→1, B 2→2) |
+  | MySQL | `DELETE X, Y FROM A AS X JOIN B AS Y ON ...` | **das DUAS** (A 2→1, B 2→1) |
+  | T-SQL | `DELETE X, Y FROM A AS X JOIN B AS Y ON ...` | **`Msg 102` — recusa** |
+  | Firebird, SQLite, DB2 | não têm forma multi-relação nenhuma | — |
+
+  São **duas construções diferentes**: "apagar de uma relação filtrando pela outra" e "apagar das duas". A segunda existe em **1 dos 7**, e o T-SQL a recusa explicitamente. Mapear uma única chamada do builder para elas trocaria "SQL que não executa em lugar nenhum" por "SQL que executa **apagando coisas diferentes conforme o banco**" — o primeiro defeito grita na primeira execução, o segundo é silencioso e destrutivo.
+
+  **E o que fecha o assunto: a chamada não diz qual das duas foi pedida.** `Delete.From('A','X').From('B','Y')` não tem designador de alvo, não tem condição de junção própria da seção e não tem marcador de relação auxiliar. Não distingue a semântica 1 da 2, nem "A é alvo e B é filtro" de "B é alvo e A é filtro". Construção cujo significado ninguém sabe declarar não pode ter tradução correta.
+
+  **Quem é atingido:** ninguém em produção — o SQL antigo não executava em motor nenhum. Atinge quem tem **teste** comparando esse texto com string fixa, e quem constrói a query dinamicamente e pode chamar `From` duas vezes por caminho de código. **O que fazer:** emitir um `DELETE` por relação, ou restringir a única relação alvo pelo `WHERE` — inclusive com subconsulta, que é portável nos sete.
+
+  **Onde a guarda mora:** `TFluentSQL.From(const ATableName: String): IFluentSQL` (`Source\Core\FluentSQL.pas`), não num serializador. Falha na chamada que errou, vale para todos os dialetos sem uma linha por driver, e — **isto importa para quem procura o segundo BREAKING** — **nenhuma interface publicada ganhou membro nesta mudança**: `IFluentSQLSerialize`, `IFluentSQLDelete` e `IFluentSQL` estão idênticas, e portanto **não há quebra de compilação `E2291` aqui**. O único tipo novo é a classe de exceção `EFluentSQLConstructNotSupported`, que é aditiva (ver *Added*).
+
+  **O que NÃO mudou**, e é medido por teste em todo dialeto registrado: `Delete.From('A')`, `Delete.From('A','AP')` e `Select.All.From('A').From('B')` (`SELECT * FROM A, B`, forma válida e antiga) saem byte a byte iguais.
+
+  **MongoDB:** também levanta, pela guarda ser de núcleo. Antes ele **descartava a segunda coleção em silêncio** (o MQL emitido citava apenas a primeira). Fora da interseção relacional e fora de qualquer contagem.
+
+  Isto **fecha a fronteira declarada e não medida** pela entrada do apelido em `DELETE`, logo abaixo — a linha `Delete.From('A','X').From('B','Y')` da tabela dela dizia "inalterado / não medido", e é essa fronteira que esta entrada mede e encerra.
+
 - **BREAKING CHANGE (SQL emitido) — SQL Server: `Delete.From(tabela, apelido)` mudou de FORMA.** O T-SQL **não aceita** apelido preso ao `DELETE FROM`; o alvo do `DELETE` tem de ser o **apelido**, e é o `FROM` que carrega a tabela apelidada. O FluentSQL emitia para `dbnMSSQL` um texto que o motor **recusa** — defeito pré-existente, não introduzido pela correção do apelido no Oracle. **Quem compara o SQL gerado com string fixa para `dbnMSSQL` precisa atualizar as expectativas**; quem executa a consulta passa a executar SQL que o motor aceita.
 
   | Construção | Antes (MSSQL) | Depois (MSSQL) | Motor real |
@@ -313,6 +357,8 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Classe de exceção `EFluentSQLConstructNotSupported` (`FluentSQL.Interfaces.pas`), com `constructor Create(const AConstruct, ASaida: String)`.** Irmã de `EFluentSQLFunctionNotSupported`, `EFluentSQLQualifierNotSupported` e `EFluentSQLStatementNotSupported`, e **distinta das três num ponto**: aquelas dizem "o **seu** dialeto não tem", esta diz "não tem **em lugar nenhum**". Por isso a mensagem **não nomeia dialeto** — nomear mandaria quem lê tentar outro banco, que é exatamente o caminho errado quando os sete recusam. Aditiva: acrescentar classe não quebra ninguém. Primeira usuária: a guarda de `DELETE` multi-relação (ver *Changed*).
+
 - **O `CASE` ganhou SLOT DE VALOR: `IfThen(AValue: Variant; ADataType: TFluentSQLDataFieldType)` e `ElseIf(...)` iguais.** Até aqui `IfThen`/`ElseIf` tinham duas sobrecargas — `String` e `Int64` — e **as duas são slot de expressão**: o argumento vira termo SQL **verbatim**. A de `Int64` não é exceção; ela chama `IntToStr` e cai na de `String` (`FluentSQL.Cases.pas:607` para `IfThen`, `:320` para `ElseIf`). Quem escrevia ali um valor vindo do usuário estava **concatenando SQL** — a mesma classe de defeito que o `MERGE` e o `SetValue`/`Values` fecharam acima nesta mesma lista. Não havia, em sobrecarga nenhuma, como **ligar** um valor num ramo do `CASE`.
 
   | Chamada | SQL (Firebird) | Parâmetros |
@@ -545,6 +591,25 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 - **Documentação — o guia `dml-merge.md` ensinava duas formas que nunca funcionaram.** O exemplo principal usava `.Update(['T.VALOR = S.VALOR', 'T.DATA = S.DATA'])`, tratando o array como lista de **fragmentos de SQL**; o array sempre foi lido como pares nome/valor, e essa chamada emite `UPDATE SET T.VALOR = S.VALOR = ...`, que o SQL Server recusa com `Msg 102, Incorrect syntax near '='`. A mesma página anunciava um overload `.Insert(['ID','VALOR'], ['S.ID','S.VALOR'])` de **dois arrays que não existe** em `IFluentSQLMergeWhenNotMatched` — copiar aquela linha dá `E2034 Too many actual parameters`. A página foi reescrita com a forma correta, com aviso explícito de que a anterior era inválida, e com a tabela de suporte por dialeto refletindo o que cada um faz hoje. O overload de dois arrays **não** foi criado: colunas e valores vão no mesmo array, alternados.
 
 ### Known issues
+
+- **`DELETE` com `JOIN` continua emitindo SQL que os motores recusam — a porta irmã, deixada aberta de propósito.** A guarda desta entrega fechou a **lista de relações do `FROM`** (`Delete.From(A).From(B)`). Ela **não** cobre o `JOIN`: `Delete.From('A').InnerJoin('B').OnCond('B.ID = A.ID')` emite `DELETE FROM A INNER JOIN B ON B.ID = A.ID`. É outra porta — `TFluentSQL._CreateJoin`, que não chama `_AssertSection` e não passa por `ASTTableNames` — e **pré-existente**, idêntica em `main` e neste HEAD. `LeftJoin` idem.
+
+  **Medido pela revisão desta tarefa**, em 5 dos 7 motores (não pela suíte, e não pela implementação):
+
+  | motor | `DELETE FROM A INNER JOIN B ON …` |
+  |---|---|
+  | SQL Server 2022 | `Msg 156` |
+  | PostgreSQL 16 | `syntax error at or near "INNER"` |
+  | MySQL 8.4 | `ERROR 1064` |
+  | Firebird 5.0.4 | `SQL error code = -104` |
+  | SQLite 3.53.4 | `Parse error near "INNER"` |
+  | Oracle, DB2, InterBase | **não medidos** nesta rodada |
+
+  ⚠️ **E a nuance que muda a resposta da tarefa futura: o irmão é TRADUZÍVEL, não recusável.** Com apelido, `Delete.From('A','X').InnerJoin('B','Y').OnCond(…)` emite para `dbnMSSQL` — por conta da forma de `DELETE` com apelido já corrigida — `DELETE X FROM A AS X INNER JOIN B AS Y ON …`, e **o SQL Server ACEITA**: `(4 rows affected)`, medido. Ou seja, ao contrário de `From(A).From(B)`, aqui **existe** designador de alvo (a relação do `From`) e **existe** condição de junção (o `OnCond`) — a construção **significa** algo. **Quem for atacar isto não deve copiar a decisão desta entrega:** lá a saída provável é emitir a forma válida de cada dialeto, não levantar.
+
+  **Achado pré-existente que vai junto:** `Query(dbnMongoDB).Delete.From('A').InnerJoin('B')…` levanta `EArgumentOutOfRangeException: List index out of bounds (0). TList<IFluentSQLName> is empty` — **erro cru de `TList`, sem nome de método**, em `main` e neste HEAD. Mesmo que a decisão relacional seja traduzir, o MongoDB precisa de recusa nomeada em vez de estouro de índice.
+
+  Transcrição e fronteiras na Parte 8 de `Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql`.
 
 - **Firebird — `Union` + paginação pagina apenas o primeiro ramo.** O FluentSQL emite `SELECT FIRST 3 SKIP 20 * FROM T UNION SELECT * FROM U`; no Firebird o `FIRST`/`SKIP` escrito num ramo recorta **aquele ramo**, não o resultado do `UNION` — medido, devolve 63 linhas onde os outros seis dialetos devolvem 3. É SQL válido com semântica divergente. Não corrigido: o conserto exige embrulhar o `UNION` numa subconsulta, mudando substancialmente a forma emitida por este driver. Detalhes em `test.pagination.firebird.sql`, parte 3.
 - **MSSQL — `WITH` (CTE) e `UNION` combinados com `OrderBy` do usuário geram SQL inválido, com ou sem paginação.** `FluentSQL.Serialize.pas` monta o `ORDER BY` **dentro** de `LBase` e só depois embrulha na CTE ou concatena o `UNION`, produzindo `WITH CTE AS (SELECT ... ORDER BY ...)` (`Msg 1033`) e `SELECT ... ORDER BY ... UNION SELECT ...` (`Msg 156`). É defeito de composição, independente de paginação, e não foi corrigido nesta entrega. Casos I e J de `test.pagination.mssql.sql`.

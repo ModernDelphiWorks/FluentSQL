@@ -84,6 +84,22 @@ type
     constructor Create(const AStatement, ADialect: String); reintroduce;
   end;
 
+  /// <summary>
+  ///   A construcao existe no BUILDER e nao existe em SQL: nao ha forma valida
+  ///   dela em dialeto NENHUM da intersecao relacional. Irma das tres acima e
+  ///   distinta delas justamente por isso - as outras dizem "o SEU dialeto nao
+  ///   tem", esta diz "nao tem em lugar nenhum", e por isso NAO carrega nome de
+  ///   dialeto na mensagem: trocar de banco nao resolve.
+  ///
+  ///   Caso concreto que a criou: DELETE com mais de uma relacao. Ver
+  ///   Test Delphi\Common_tests\test.delete.multirelacao.matrix.sql, onde os
+  ///   SETE motores recusam por parse o texto que o framework emitia.
+  /// </summary>
+  EFluentSQLConstructNotSupported = class(Exception)
+  public
+    constructor Create(const AConstruct, ASaida: String); reintroduce;
+  end;
+
   /// <summary>ESP-016: one opt-in fragment registered for a specific engine; not portable SQL.</summary>
   TDialectOnlyFragment = record
     Dialect: TFluentSQLDriver;
@@ -1910,6 +1926,21 @@ constructor EFluentSQLStatementNotSupported.Create(const AStatement, ADialect: S
 begin
   inherited CreateFmt('O comando "%s" nao tem serializador no dialeto %s. ' +
     'Use uma construcao equivalente suportada por esse motor.', [AStatement, ADialect]);
+end;
+
+{ EFluentSQLConstructNotSupported }
+
+/// <summary>
+///   A mensagem NAO nomeia dialeto de proposito. Quem le isto esta prestes a
+///   trocar de banco achando que o outro aceita - e nenhum aceita. Dizer "nao
+///   suportado neste dialeto" mandaria a pessoa exatamente para o lugar errado.
+/// </summary>
+constructor EFluentSQLConstructNotSupported.Create(const AConstruct, ASaida: String);
+begin
+  inherited CreateFmt('A construcao "%s" nao tem forma valida em NENHUM dos ' +
+    'dialetos relacionais suportados - a recusa e a mesma nos sete, nao e ' +
+    'limitacao do banco escolhido, e trocar de dialeto nao resolve. %s',
+    [AConstruct, ASaida]);
 end;
 
 end.
