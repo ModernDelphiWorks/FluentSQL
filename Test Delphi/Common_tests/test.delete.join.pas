@@ -4,7 +4,23 @@
 
   O que este arquivo trava: Delete.From(A).InnerJoin(B) - e LeftJoin, RightJoin
   e FullJoin - deixa de emitir SQL e passa a levantar
-  EFluentSQLConstructNotSupported, em todo dialeto.
+  EFluentSQLConstructNotSupported, em todo dialeto, EM QUALQUER ORDEM DA CADEIA
+  FLUENTE.
+
+  ⚠️ "EM QUALQUER ORDEM" E PARTE DA AFIRMACAO, e nao enfeite. A primeira versao
+  desta guarda lia a secao ATIVA (FActiveSection = secDelete), e por isso
+  QUALQUER chamada que trocasse a secao entre o From e o join a desarmava -
+  Where, OrderBy, GroupBy. Where('') nao emite uma letra e ja bastava:
+
+    Delete.From('A','X').Where('').LeftJoin('B','Y').OnCond('Y.AID = X.ID')
+    -> DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID
+
+  que e byte a byte a sentenca medida em A: 4 -> 0. O agravante: Where e
+  exatamente a chamada que a mensagem da guarda RECOMENDA como saida.
+
+  A primeira versao destes testes nao viu o furo porque punha o join sempre
+  IMEDIATAMENTE depois do From - uma ordem so. As celulas
+  Test*EntreOFromEOJoin* existem por causa disso, e percorrem os QUATRO tipos.
 
   ⭐ POR QUE RECUSAR, E A RAZAO NAO E "O TEXTO NAO EXECUTA". Essa e verdadeira e
   e a menor das duas. A que decide e esta:
@@ -146,9 +162,30 @@ type
     /// <summary>ANTI-COLATERAL: DELETE sem JOIN, sem apelido, texto exato.</summary>
     [Test]
     procedure TestNaoMudouODeleteSemJoinSemApelido;
+    /// <summary>ORDEM INTERCALADA: Where('') entre o From e o join nao desarma.</summary>
+    [Test]
+    procedure TestWhereVazioEntreOFromEOJoinNaoDesarmaAGuarda;
+    /// <summary>ORDEM INTERCALADA: Where com predicado, nos QUATRO tipos.</summary>
+    [Test]
+    procedure TestWhereComPredicadoEntreOFromEOJoinNaoDesarmaNosQuatroTipos;
+    /// <summary>ORDEM INTERCALADA: OrderBy entre o From e o join, nos QUATRO tipos.</summary>
+    [Test]
+    procedure TestOrderByEntreOFromEOJoinNaoDesarmaNosQuatroTipos;
+    /// <summary>ORDEM INTERCALADA: GroupBy entre o From e o join, nos QUATRO tipos.</summary>
+    [Test]
+    procedure TestGroupByEntreOFromEOJoinNaoDesarmaNosQuatroTipos;
+    /// <summary>ORDEM INTERCALADA: a saida recomendada nao vira, ela propria, o desvio.</summary>
+    [Test]
+    procedure TestASaidaRecomendadaNaoDesarmaAGuarda;
+    /// <summary>Delete SEM From: nao ha marca duravel, mas a secao ativa pega.</summary>
+    [Test]
+    procedure TestDeleteSemFromTambemRecusaOJoin;
     /// <summary>A guarda le o estado VIVO: Select depois de Delete libera o JOIN.</summary>
     [Test]
     procedure TestSelectDepoisDeDeleteLiberaOJoin;
+    /// <summary>Insert depois de Delete tambem limpa a marca duravel.</summary>
+    [Test]
+    procedure TestInsertDepoisDeDeleteLimpaAMarcaDuravel;
   end;
 
 implementation
@@ -437,6 +474,17 @@ begin
     'A mensagem tem de liderar pelo DANO: a forma nativa do LEFT apaga tudo.');
   Assert.Contains(LMsg, 'silencio', False,
     'A mensagem tem de dizer que o dano e SILENCIOSO - o motor reporta sucesso.');
+  // "LIDERA" e afirmacao de POSICAO, e a primeira versao deste teste nao a
+  // media: so pedia a substring, em qualquer lugar. Uma mensagem que jogasse o
+  // dano para o fim, rotulado "detalhe tecnico secundario", passava. Medido por
+  // mutacao. Agora se exige que o dano venha na PRIMEIRA METADE do texto.
+  Assert.IsTrue(Pos('apaga a tabela inteira', LMsg) > 0, 'substring ausente.');
+  Assert.IsTrue(Pos('apaga a tabela inteira', LMsg) < (Length(LMsg) div 2),
+    'O dano tem de LIDERAR: aparecer na primeira metade da mensagem, nao no fim.');
+  // E o NUMERO medido tem de estar travado. Sem ele a mensagem vira adjetivo, e
+  // adjetivo nao sobrevive a uma reescrita distraida.
+  Assert.Contains(LMsg, '4 de 4', False,
+    'A mensagem tem de carregar a contagem MEDIDA, nao so o adjetivo.');
 end;
 
 procedure TTestDeleteJoin.TestMensagemDizQueValeParaAFamiliaInteira;
@@ -481,8 +529,16 @@ begin
       LMsg := E.Message;
   end;
   Assert.IsTrue(LMsg <> '', 'A guarda nao levantou EFluentSQLConstructNotSupported.');
-  Assert.Contains(LMsg, 'Exists', False,
-    'A mensagem tem de apontar a saida portavel: Where(...).Exists(subconsulta).');
+  // A primeira versao pedia so a palavra "Exists" - e uma mensagem que dissesse
+  // "consulte a documentacao sobre Exists" passava, sem dar saida nenhuma.
+  // Medido por mutacao. A saida tem de vir ESCRITA, em forma copiavel: a
+  // chamada e um exemplo de subconsulta que o leitor possa adaptar.
+  Assert.Contains(LMsg, 'Where(...).Exists(', False,
+    'A mensagem tem de trazer a CHAMADA da saida, nao so a palavra Exists.');
+  Assert.Contains(LMsg, 'SELECT 1 FROM', False,
+    'A saida tem de vir com exemplo copiavel de subconsulta.');
+  Assert.DoesNotContain(LMsg, 'documentacao', False,
+    'Mandar consultar documentacao nao e dar saida.');
 end;
 
 procedure TTestDeleteJoin.TestMensagemNaoNomeiaDialeto;
@@ -640,6 +696,228 @@ begin
       cDIALETO[LDriver] + ': DELETE sem JOIN sem apelido nao podia mudar.');
   end;
   Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+/// <summary>
+///   Aplica o join do tipo pedido a uma IFluentSQL ja montada. Existe para que
+///   as celulas de ORDEM INTERCALADA percorram os QUATRO tipos sem quatro
+///   copias do mesmo corpo - foi testar UM arranjo que deixou o furo passar, e
+///   nao se conserta isso escrevendo menos combinacoes.
+/// </summary>
+function _AplicaJoin(const AQuery: IFluentSQL; const ATipo: Integer): IFluentSQL;
+begin
+  case ATipo of
+    0: Result := AQuery.InnerJoin('B', 'Y');
+    1: Result := AQuery.LeftJoin('B', 'Y');
+    2: Result := AQuery.RightJoin('B', 'Y');
+  else
+    Result := AQuery.FullJoin('B', 'Y');
+  end;
+end;
+
+function _NomeDoTipo(const ATipo: Integer): String;
+begin
+  case ATipo of
+    0: Result := 'InnerJoin';
+    1: Result := 'LeftJoin';
+    2: Result := 'RightJoin';
+  else
+    Result := 'FullJoin';
+  end;
+end;
+
+procedure TTestDeleteJoin.TestWhereVazioEntreOFromEOJoinNaoDesarmaAGuarda;
+var
+  LDriver: TFluentSQLDriver;
+  LCelulas: Integer;
+begin
+  // ⭐ ESTE E O CASO QUE A PRIMEIRA VERSAO DA GUARDA DEIXAVA PASSAR, e ele nao
+  // e exotico: Where('') nao emite UMA LETRA - nao ha nem WHERE na saida - mas
+  // troca a secao ativa para secWhere, e uma guarda que perguntasse "o cursor
+  // esta AGORA na secao DELETE?" nao disparava. O texto que saia era
+  //
+  //   DELETE X FROM A AS X LEFT JOIN B AS Y ON Y.AID = X.ID
+  //
+  // byte a byte o caso C07 do oraculo, medido A: 4 -> 0 no SQL Server e no
+  // MySQL. Ou seja: o dano silencioso que E A RAZAO DESTA TAREFA continuava
+  // alcancavel por uma cadeia de uma chamada a mais.
+  //
+  // A guarda passou a perguntar "este statement E um DELETE?", lendo a marca
+  // DURAVEL (a secao Delete do AST, que _DefineSectionDelete estabelece e
+  // ClearAll limpa) em vez do cursor.
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    Inc(LCelulas);
+    Assert.WillRaise(
+      procedure
+      begin
+        Query(LDriver).Delete.From('A', 'X').Where('').LeftJoin('B', 'Y')
+          .OnCond('Y.AID = X.ID').AsString;
+      end,
+      EFluentSQLConstructNotSupported,
+      cDIALETO[LDriver] + ': Where('''') entre o From e o join nao pode ' +
+      'desarmar a guarda.');
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestDeleteJoin.TestWhereComPredicadoEntreOFromEOJoinNaoDesarmaNosQuatroTipos;
+var
+  LDriver: TFluentSQLDriver;
+  LTipo, LCelulas: Integer;
+begin
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    for LTipo := 0 to 3 do
+    begin
+      Inc(LCelulas);
+      Assert.WillRaise(
+        procedure
+        begin
+          _AplicaJoin(
+            Query(LDriver).Delete.From('A', 'X').Where('X.Active').Equal(1),
+            LTipo).OnCond('Y.AID = X.ID').AsString;
+        end,
+        EFluentSQLConstructNotSupported,
+        cDIALETO[LDriver] + '/' + _NomeDoTipo(LTipo) +
+        ': WHERE antes do join nao pode desarmar a guarda.');
+    end;
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestDeleteJoin.TestOrderByEntreOFromEOJoinNaoDesarmaNosQuatroTipos;
+var
+  LDriver: TFluentSQLDriver;
+  LTipo, LCelulas: Integer;
+begin
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    for LTipo := 0 to 3 do
+    begin
+      Inc(LCelulas);
+      Assert.WillRaise(
+        procedure
+        begin
+          _AplicaJoin(
+            Query(LDriver).Delete.From('A', 'X').OrderBy('X.ID'),
+            LTipo).OnCond('Y.AID = X.ID').AsString;
+        end,
+        EFluentSQLConstructNotSupported,
+        cDIALETO[LDriver] + '/' + _NomeDoTipo(LTipo) +
+        ': ORDER BY antes do join nao pode desarmar a guarda.');
+    end;
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestDeleteJoin.TestGroupByEntreOFromEOJoinNaoDesarmaNosQuatroTipos;
+var
+  LDriver: TFluentSQLDriver;
+  LTipo, LCelulas: Integer;
+begin
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    for LTipo := 0 to 3 do
+    begin
+      Inc(LCelulas);
+      Assert.WillRaise(
+        procedure
+        begin
+          _AplicaJoin(
+            Query(LDriver).Delete.From('A', 'X').GroupBy('X.ID'),
+            LTipo).OnCond('Y.AID = X.ID').AsString;
+        end,
+        EFluentSQLConstructNotSupported,
+        cDIALETO[LDriver] + '/' + _NomeDoTipo(LTipo) +
+        ': GROUP BY antes do join nao pode desarmar a guarda.');
+    end;
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestDeleteJoin.TestASaidaRecomendadaNaoDesarmaAGuarda;
+var
+  LDriver: TFluentSQLDriver;
+  LCelulas: Integer;
+begin
+  // ⚠️ O AGRAVANTE DO FURO ORIGINAL, e por isso ele tem celula propria: a
+  // chamada que desarmava a guarda - Where(...) - e EXATAMENTE a que a
+  // mensagem da guarda recomenda como saida. A saida apontada e o desvio eram
+  // a MESMA porta. Quem seguisse a recomendacao ao pe da letra e acrescentasse
+  // um join depois voltava a ter o SQL destrutivo, sem nenhum aviso.
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    Inc(LCelulas);
+    Assert.WillRaise(
+      procedure
+      begin
+        Query(LDriver).Delete.From('A', 'X')
+          .Where('').Exists('SELECT 1 FROM B AS Y WHERE Y.AID = X.ID')
+          .InnerJoin('C', 'Z').OnCond('Z.AID = X.ID').AsString;
+      end,
+      EFluentSQLConstructNotSupported,
+      cDIALETO[LDriver] + ': a saida recomendada nao pode ser o desvio.');
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestDeleteJoin.TestDeleteSemFromTambemRecusaOJoin;
+var
+  LDriver: TFluentSQLDriver;
+  LCelulas: Integer;
+begin
+  // A marca DURAVEL e a secao Delete do AST, alimentada pelo From. Sem From
+  // ela esta VAZIA - entao aqui quem tem de pegar e a leitura da secao ativa,
+  // que continua no lugar. As duas condicoes existem porque nenhuma das duas
+  // cobre a outra: esta celula falsifica a mutacao que apaga a leitura da
+  // secao ativa e fica so com a marca duravel.
+  LCelulas := 0;
+  for LDriver := Low(TFluentSQLDriver) to High(TFluentSQLDriver) do
+  begin
+    if not _Medivel(LDriver) then
+      Continue;
+    Inc(LCelulas);
+    Assert.WillRaise(
+      procedure
+      begin
+        Query(LDriver).Delete.InnerJoin('B', 'Y').OnCond('Y.AID = A.ID').AsString;
+      end,
+      EFluentSQLConstructNotSupported,
+      cDIALETO[LDriver] + ': DELETE sem From tambem tem de recusar o join.');
+  end;
+  Assert.IsTrue(LCelulas > 0, 'Nenhum dialeto percorrido: a matriz nao mede nada.');
+end;
+
+procedure TTestDeleteJoin.TestInsertDepoisDeDeleteLimpaAMarcaDuravel;
+var
+  LSql: String;
+begin
+  // A marca duravel nao pode ser um sinalizador que so o Select desfaz.
+  // _DefineSectionInsert tambem chama ClearAll, entao um INSERT montado depois
+  // de um Delete na mesma instancia nao pode herdar a recusa. Esta celula e o
+  // par de TestSelectDepoisDeDeleteLiberaOJoin para a outra porta de limpeza.
+  LSql := Query(dbnPostgreSQL).Delete.From('A')
+            .Insert.Into('T').Values('C', '1').AsString;
+  Assert.Contains(LSql, 'INSERT INTO T', False,
+    'Trocar para a secao INSERT tem de limpar a marca deixada pelo Delete.');
+  Assert.DoesNotContain(LSql, 'DELETE', False,
+    'O INSERT nao pode carregar residuo da secao DELETE anterior.');
 end;
 
 procedure TTestDeleteJoin.TestSelectDepoisDeDeleteLiberaOJoin;

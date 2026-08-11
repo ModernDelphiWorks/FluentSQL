@@ -17,7 +17,9 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **BREAKING CHANGE (API) — `JOIN` dentro de um `DELETE` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** Atinge os **quatro** tipos: `Delete.From(…).InnerJoin(…)`, `.LeftJoin(…)`, `.RightJoin(…)` e `.FullJoin(…)`, com ou sem apelido, com ou sem `OnCond`. A guarda mora em `TFluentSQL._CreateJoin`, porta única por onde os quatro passam.
+- **BREAKING CHANGE (API) — `JOIN` dentro de um `DELETE` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** Atinge os **quatro** tipos: `Delete.From(…).InnerJoin(…)`, `.LeftJoin(…)`, `.RightJoin(…)` e `.FullJoin(…)`, com ou sem apelido, com ou sem `OnCond`, **e em qualquer ordem da cadeia fluente** — inclusive com `Where`, `OrderBy` ou `GroupBy` intercalados entre o `From` e o join.
+
+  A guarda mora em `TFluentSQL._CreateJoin` e pergunta *"este statement **é** um `DELETE`?"*, lendo a **marca durável** no AST (`FAST.Delete`, que `_DefineSectionDelete` estabelece e `ClearAll` limpa) — **não** o cursor de seção, que `Where('')` desloca sem emitir uma letra. **Trocar para `SELECT`, `INSERT` ou `UPDATE` na mesma instância limpa a marca e libera o join de novo**, e isso é intencional.
 
   **A razão NÃO é "o texto emitido não executa".** Essa é verdadeira e é a menor das duas. A que decide é o **dano silencioso**, medido em motor real com contagem antes/depois — massa de 4 linhas em `A`, das quais 2 casam com `B`:
 
