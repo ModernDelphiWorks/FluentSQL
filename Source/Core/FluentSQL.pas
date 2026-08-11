@@ -207,8 +207,15 @@ type
     function NotIn(const AValue: TArray<Double>): IFluentSQL; overload;
     function NotIn(const AValue: TArray<String>): IFluentSQL; overload;
     function NotIn(const AValue: String): IFluentSQL; overload;
-    function Exists(const AValue: String): IFluentSQL; overload;
-    function NotExists(const AValue: String): IFluentSQL; overload;
+    /// <summary>
+    ///   ESCAPE HATCH - slot de EXPRESSAO. Ver IFluentSQL.Exists: ASubQuery sai
+    ///   verbatim, sem bind. Porta de injecao por construcao.
+    /// </summary>
+    function Exists(const ASubQuery: String): IFluentSQL; overload;
+    /// <summary>
+    ///   ESCAPE HATCH - slot de EXPRESSAO. Ver IFluentSQL.NotExists.
+    /// </summary>
+    function NotExists(const ASubQuery: String): IFluentSQL; overload;
     // Functions methods
     function Count: IFluentSQL;
     function Lower: IFluentSQL;
@@ -912,10 +919,10 @@ begin
   Result := Self;
 end;
 
-function TFluentSQL.Exists(const AValue: String): IFluentSQL;
+function TFluentSQL.Exists(const ASubQuery: String): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
-  FActiveExpr.Ope(FOperator.IsExists(AValue));
+  FActiveExpr.Ope(FOperator.IsExists(ASubQuery));
   Result := Self;
 end;
 
@@ -1297,10 +1304,10 @@ begin
   Result := Self;
 end;
 
-function TFluentSQL.NotExists(const AValue: String): IFluentSQL;
+function TFluentSQL.NotExists(const ASubQuery: String): IFluentSQL;
 begin
   _AssertOperator([opeWhere, opeAND, opeOR]);
-  FActiveExpr.Ope(FOperator.IsNotExists(AValue));
+  FActiveExpr.Ope(FOperator.IsNotExists(ASubQuery));
   Result := Self;
 end;
 
