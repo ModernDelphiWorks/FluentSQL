@@ -269,12 +269,49 @@ type
     function AndOpe(const AExpression: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase; overload;
     function ElseIf(const AValue: String): IFluentSQLCriteriaCase; overload;
     function ElseIf(const AValue: int64): IFluentSQLCriteriaCase; overload;
+    /// <summary>
+    ///   Slot de VALOR do ramo ELSE (T13). Ver IfThen(Variant, ...) abaixo: as
+    ///   duas sobrecargas sao a mesma regra em ramos diferentes do mesmo CASE.
+    /// </summary>
+    function ElseIf(const AValue: Variant;
+      const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase; overload;
     function EndCase: IFluentSQL;
     function OrOpe(const AExpression: array of const): IFluentSQLCriteriaCase; overload;
     function OrOpe(const AExpression: String): IFluentSQLCriteriaCase; overload;
     function OrOpe(const AExpression: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase; overload;
     function IfThen(const AValue: String): IFluentSQLCriteriaCase; overload;
     function IfThen(const AValue: int64): IFluentSQLCriteriaCase; overload;
+    /// <summary>
+    ///   Slot de VALOR do ramo THEN (T13). As sobrecargas de String e de Int64
+    ///   acima sao slot de EXPRESSAO: o que se passa a elas vai VERBATIM para o
+    ///   texto do SQL (a de Int64 chama IntToStr e cai na de String). Quem
+    ///   escreve ali um valor vindo do usuario esta concatenando SQL.
+    ///
+    ///   Esta sobrecarga e o slot de VALOR: o dado vira parametro
+    ///   (IFluentSQLParams.Add, :pN) e o que entra no texto do SQL e
+    ///   CAST(:pN AS <tipo do dialeto>), pela mesma maquina de
+    ///   IFluentSQLFunctions.Cast(String, TFluentSQLDataFieldType, Integer).
+    ///
+    ///   O CAST nao e enfeite: medido em motor real (Test Delphi\Common_tests\
+    ///   test.cases.bind.matrix.sql), parametro NU em posicao de THEN/ELSE e
+    ///   recusado no PREPARE pelo Firebird 5.0.4 (-804, HY004 "Data type
+    ///   unknown") e pelo DB2 v12.1.5.0 (SQL0418N, 42610 "untyped parameter
+    ///   marker"). O CAST e o que da tipo ao marcador.
+    ///
+    ///   ADataType aceita SO cFluentSQLCastPortableTypes - dftString, dftInteger,
+    ///   dftFloat. Qualquer outro levanta EFluentSQLFunctionNotSupported, pela
+    ///   MESMA porta do Cast portavel (TFluentSQLFunctionAbstract.
+    ///   _AssertCastTypeIsPortable), e nao por uma segunda lista.
+    ///
+    ///   Consequencia herdada dessa mesma porta: em MongoDB e InterBase o Cast
+    ///   portavel LEVANTA (nao ha matriz medida), logo este slot levanta neles.
+    ///
+    ///   AValue Null ou Unassigned e RECUSADO com EArgumentException: esta
+    ///   entrega nao decide a convencao de NULL. Aceitar depois e aditivo.
+    ///   Passar nil nem compila - 'Variant' e 'Pointer' sao incompativeis (E2010).
+    /// </summary>
+    function IfThen(const AValue: Variant;
+      const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase; overload;
     function When(const ACondition: String): IFluentSQLCriteriaCase; overload;
     function When(const ACondition: array of const): IFluentSQLCriteriaCase; overload;
     function When(const ACondition: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase; overload;

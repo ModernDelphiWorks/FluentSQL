@@ -29,15 +29,24 @@ const
 
 type
   TFluentSQLFunctionAbstract = class(TInterfacedObject, IFluentSQLFunctions)
-  protected
+  public
     /// <summary>
     ///   A PORTA UNICA da politica de intersecao estrita do Cast portavel. Fica
     ///   aqui, e nao copiada em cada driver, porque a recusa e a MESMA nos sete -
     ///   se cada driver escrevesse a propria, a mensagem derivaria e a politica
     ///   viraria uma colecao de opinioes. Chamada como PRIMEIRA linha de todo
     ///   override de Cast(TFluentSQLDataFieldType), inclusive o do core.
+    ///
+    ///   PUBLICA desde a T13, e nao mais protected. O slot de VALOR do CASE
+    ///   (IFluentSQLCriteriaCase.IfThen/ElseIf com TFluentSQLDataFieldType) mora
+    ///   em outra unit e precisa recusar o tipo ANTES de gravar o parametro na
+    ///   colecao - se esperasse a recusa vir de dentro de Cast, o :pN ja teria
+    ///   sido criado e sobraria orfao na numeracao. Alargar a visibilidade e o
+    ///   preco de a politica continuar com fonte unica; escrever "ADataType in
+    ///   cFluentSQLCastPortableTypes" na outra unit e que seria a segunda opiniao.
     /// </summary>
     class procedure _AssertCastTypeIsPortable(const ADataType: TFluentSQLDataFieldType);
+  protected
     /// <summary>
     ///   Rede de seguranca do lado do driver: o tipo esta na intersecao portavel
     ///   mas ESTE driver nao tem grafia para ele. Hoje isso so acontece em

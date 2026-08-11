@@ -21,6 +21,7 @@ interface
 
 uses
   SysUtils,
+  Variants,
   Generics.Collections,
   FluentSQL.Interfaces,
   FluentSQL.Expression;
@@ -85,6 +86,9 @@ type
     FLastExpression: IFluentSQLCriteriaExpression;
     function _GetCase: IFluentSQLCase;
     procedure _AssertHaveWhen(const AMethod, AKeyword: String);
+    procedure _AssertValueCarriesData(const AMethod: String; const AValue: Variant);
+    function _ValueSlotTerm(const AValue: Variant;
+      const ADataType: TFluentSQLDataFieldType): String;
   public
     constructor Create(const AOwner: IFluentSQL; const AExpression: String);
     destructor Destroy; override;
@@ -93,12 +97,16 @@ type
     function AndOpe(const AExpression: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase; overload;
     function ElseIf(const AValue: String): IFluentSQLCriteriaCase; overload;
     function ElseIf(const AValue: Int64): IFluentSQLCriteriaCase; overload;
+    function ElseIf(const AValue: Variant;
+      const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase; overload;
     function EndCase: IFluentSQL;
     function OrOpe(const AExpression: array of const): IFluentSQLCriteriaCase; overload;
     function OrOpe(const AExpression: String): IFluentSQLCriteriaCase; overload;
     function OrOpe(const AExpression: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase; overload;
     function IfThen(const AValue: String): IFluentSQLCriteriaCase; overload;
     function IfThen(const AValue: Int64): IFluentSQLCriteriaCase; overload;
+    function IfThen(const AValue: Variant;
+      const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase; overload;
     function When(const ACondition: String): IFluentSQLCriteriaCase; overload;
     function When(const ACondition: array of const): IFluentSQLCriteriaCase; overload;
     function When(const ACondition: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase; overload;
@@ -108,7 +116,8 @@ type
 implementation
 
 uses
-  FluentSQL.Utils;
+  FluentSQL.Utils,
+  FluentSQL.FunctionsAbstract;
 
 { TFluentSQLCase }
 
@@ -300,6 +309,20 @@ begin
   Result := ElseIf(IntToStr(AValue));
 end;
 
+/// <summary>
+///   SLOT DE VALOR do ramo ELSE. Gemeo de IfThen(Variant, ...) - a doutrina toda
+///   esta no comentario de _ValueSlotTerm e na declaracao em
+///   FluentSQL.Interfaces.pas. A ordem aqui e a mesma e pela mesma razao: a
+///   guarda estrutural PRIMEIRO, porque _ValueSlotTerm grava parametro.
+/// </summary>
+function TFluentSQLCriteriaCase.ElseIf(const AValue: Variant;
+  const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase;
+begin
+  _AssertHaveWhen('ElseIf', 'ELSE');
+  _AssertValueCarriesData('ElseIf', AValue);
+  Result := ElseIf(_ValueSlotTerm(AValue, ADataType));
+end;
+
 function TFluentSQLCriteriaCase.EndCase: IFluentSQL;
 begin
   Result := FOwner;
@@ -345,6 +368,93 @@ begin
     [AMethod, AKeyword, AKeyword, AMethod]);
 end;
 
+/// <summary>
+///   O slot de valor do CASE nao decide a convencao de NULL, e por isso recusa
+///   os dois Variants que NAO carregam dado.
+///
+///   Null (varNull) e Unassigned (varEmpty) sao coisas diferentes de nil - e nil
+///   nem chega aqui: 'Variant' e 'Pointer' sao tipos incompativeis e o compilador
+///   recusa a chamada com E2010 antes de gerar codigo (medido). A decisao "nil
+///   levanta, nao vira NULL" e portanto cumprida pelo SISTEMA DE TIPOS nesta
+///   sobrecarga, e nao por guarda de runtime; nao existe guarda de nil aqui
+///   porque nao existe caminho de nil ate aqui.
+///
+///   Restam Null e Unassigned. Os dois sao RECUSADOS, e a escolha e deliberada e
+///   conservadora: emitir CAST(:pN AS <tipo>) com o parametro ligado em NULL e
+///   SQL valido e util - "CASE WHEN c THEN NULL END" existe - mas transformar
+///   Null em NULL do banco e decisao de CONVENCAO, e ela nao foi tomada aqui. A
+///   assimetria decide: aceitar depois e ADITIVO, recusar depois seria BREAKING.
+///   E a mesma regua ja escrita em TUtils._AssertValueSlotCarriesData, que recusa
+///   os dois pelo mesmo motivo no slot de valor de SetValue/Values.
+///
+///   Unassigned tem ainda um agravante proprio: nao ha dado nenhum a ligar, e
+///   o que o motor receberia dependeria de como o driver trata varEmpty.
+/// </summary>
+procedure TFluentSQLCriteriaCase._AssertValueCarriesData(const AMethod: String;
+  const AValue: Variant);
+const
+  cCONVENCAO = ' Dar semantica de NULL a este slot e decisao de convencao, e ' +
+               'ela nao foi tomada: se o ramo deve devolver NULL, use a ' +
+               'sobrecarga de String com o termo que o seu dialeto espera.';
+begin
+  if VarIsNull(AValue) then
+    raise EArgumentException.CreateFmt(
+      'IFluentSQLCriteriaCase.%s recebeu Variant Null em posicao de VALOR: ' +
+      'este slot liga um DADO como parametro e nao exprime NULL.' + cCONVENCAO,
+      [AMethod]);
+  if VarIsEmpty(AValue) then
+    raise EArgumentException.CreateFmt(
+      'IFluentSQLCriteriaCase.%s recebeu Variant Unassigned em posicao de ' +
+      'VALOR: nao ha dado a ligar ao parametro.' + cCONVENCAO,
+      [AMethod]);
+end;
+
+/// <summary>
+///   O motor do slot de valor, compartilhado por IfThen e ElseIf - os dois ramos
+///   do mesmo CASE nao podem divergir de forma, e uma funcao so garante isso.
+///
+///   O que sai daqui e CAST(:pN AS <tipo do dialeto>), NAO :pN nu, e nos SETE
+///   dialetos, nao so onde o motor exige. Duas razoes, nesta ordem:
+///
+///   1. PARAMETRO NU NAO PASSA DO PREPARE EM DOIS DOS SETE. Medido, transcricao
+///      literal em Test Delphi\Common_tests\test.cases.bind.matrix.sql:
+///        Firebird 5.0.4    -804 / HY004  "Data type unknown"
+///        DB2 v12.1.5.0     SQL0418N / 42610  "untyped parameter marker"
+///      E nao e do CASE: isolado, "SELECT :a FROM RDB$DATABASE" da o mesmo -804.
+///      E o marcador SEM TIPO. Com CAST os dois passam do prepare (caso E5 do
+///      mesmo arquivo).
+///
+///   2. EMITIR CAST SO ONDE O MOTOR EXIGE criaria uma tabela de "quem precisa de
+///      tipo" para manter, e ela seria fragil pelo mesmo motivo que a matriz de
+///      CAST da T17 e: a resposta muda por versao de motor. Como esta e uma
+///      sobrecarga NOVA, nao ha SQL emitido hoje por ela e portanto nao ha
+///      oraculo a quebrar - uniformizar aqui e de graca. (E o oposto do que
+///      valeu para o apelido de tabela do Oracle, onde emitir a forma nova nos
+///      sete teria trocado o texto de seis dialetos que ja funcionavam.)
+///
+///   A LARGURA do VARCHAR nao e decidida aqui: ALength fica no default 0 e cada
+///   driver resolve (Firebird/Oracle/MSSQL preenchem com
+///   cFluentSQLCastDefaultLength; DB2, MySQL e PostgreSQL emitem SEM largura, o
+///   que no DB2 foi medido como a escolha certa - impor 4000 criaria um teto que
+///   o motor nao tem). Nao ha sobrecarga com largura neste slot: acrescentar uma
+///   depois e aditivo.
+///
+///   A GUARDA DE TIPO vem ANTES do Params.Add, e ela e a MESMA da T17 -
+///   TFluentSQLFunctionAbstract._AssertCastTypeIsPortable, a porta unica. Sim, o
+///   Cast logo abaixo tambem a chama; a chamada explicita aqui existe so pela
+///   ORDEM: sem ela, um ADataType fora da intersecao seria recusado depois de o
+///   :pN ja estar gravado, e a numeracao dos parametros ficaria com um buraco.
+/// </summary>
+function TFluentSQLCriteriaCase._ValueSlotTerm(const AValue: Variant;
+  const ADataType: TFluentSQLDataFieldType): String;
+var
+  LPlaceholder: String;
+begin
+  TFluentSQLFunctionAbstract._AssertCastTypeIsPortable(ADataType);
+  LPlaceholder := FOwner.Params.Add(AValue, ADataType);
+  Result := FOwner.AsFun.Cast(LPlaceholder, ADataType);
+end;
+
 function TFluentSQLCriteriaCase.OrOpe(const AExpression: String): IFluentSQLCriteriaCase;
 begin
   FLastExpression.OrOpe(AExpression);
@@ -360,6 +470,29 @@ end;
 function TFluentSQLCriteriaCase.IfThen(const AValue: int64): IFluentSQLCriteriaCase;
 begin
   Result := IfThen(IntToStr(AValue));
+end;
+
+/// <summary>
+///   SLOT DE VALOR do ramo THEN. As sobrecargas de String e de Int64 logo acima
+///   sao slot de EXPRESSAO: o argumento vira termo SQL verbatim (a de Int64
+///   passa por IntToStr e cai na de String). Esta aqui e a unica em que o dado
+///   NAO entra no texto.
+///
+///   A ordem das tres linhas nao e estilo:
+///     1. _AssertHaveWhen ... guarda ESTRUTURAL, ja existente, e a mesma das
+///        outras sobrecargas. Vem antes de qualquer efeito colateral.
+///     2. _AssertValueCarriesData ... o Variant carrega dado?
+///     3. _ValueSlotTerm ... so entao GRAVA o parametro e monta o CAST.
+///   Inverter 1/2 com 3 deixaria :pN orfao na colecao quando a chamada e
+///   recusada - e a mesma regra que TUtils._AssertSingleValue ja aplica ao slot
+///   de valor de SetValue/Values.
+/// </summary>
+function TFluentSQLCriteriaCase.IfThen(const AValue: Variant;
+  const ADataType: TFluentSQLDataFieldType): IFluentSQLCriteriaCase;
+begin
+  _AssertHaveWhen('IfThen', 'THEN');
+  _AssertValueCarriesData('IfThen', AValue);
+  Result := IfThen(_ValueSlotTerm(AValue, ADataType));
 end;
 
 function TFluentSQLCriteriaCase.When(const ACondition: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase;
