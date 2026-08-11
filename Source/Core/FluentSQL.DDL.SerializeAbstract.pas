@@ -42,14 +42,30 @@ type
     ///   A coluna computada deste dialeto carrega o tipo declarado antes da
     ///   clausula de computacao?
     ///
-    ///   O default e True porque e o que CINCO dos seis dialetos que emitem
-    ///   coluna computada aceitam - medido em motor, nao deduzido:
-    ///     PostgreSQL 16 EXIGE o tipo ("TOTAL" INTEGER GENERATED ALWAYS AS ...);
-    ///     MySQL 8.4, Oracle 23 e Firebird 5.0 ACEITAM o tipo;
-    ///     SQLite nem chega aqui - levanta ENotSupportedException.
-    ///   So o T-SQL RECUSA: "[TOTAL] INT AS (QTD * PRECO)" devolve
-    ///   Msg 156 "Incorrect syntax near the keyword 'AS'" em SQL Server 2022
-    ///   sob SET PARSEONLY ON. A forma que ele aceita e "[TOTAL] AS (...)".
+    ///   Ha SEIS serializadores DDL. Deles, CINCO chegam a emitir coluna
+    ///   computada e um nao chega:
+    ///
+    ///     emitem, e TODOS OS QUATRO nao-MSSQL levam o tipo (medido em motor,
+    ///     nao lido em documentacao):
+    ///       PostgreSQL 16.14  EXIGE   "TOTAL" INTEGER GENERATED ALWAYS AS ... STORED
+    ///                                 (sem o tipo: ERROR 42601, syntax error
+    ///                                 at or near "ALWAYS")
+    ///       MySQL 8.4         aceita  `TOTAL` INT AS (...) VIRTUAL
+    ///       Oracle 23 Free    aceita  "TOTAL" NUMBER(10) GENERATED ALWAYS AS (...) VIRTUAL
+    ///       Firebird 5.0.4    aceita  "TOTAL" INTEGER COMPUTED BY (...)
+    ///
+    ///     emite, e RECUSA o tipo - o unico:
+    ///       MSSQL 2022        "[TOTAL] INT AS (QTD * PRECO)" devolve Msg 156
+    ///                         "Incorrect syntax near the keyword 'AS'" ja sob
+    ///                         SET PARSEONLY ON. A forma aceita e
+    ///                         "[TOTAL] AS (...)".
+    ///
+    ///     NAO emite, logo nunca alcanca este gancho:
+    ///       SQLite            levanta ENotSupportedException antes.
+    ///
+    ///   Ou seja: 4 a favor do tipo, 1 contra, 1 fora da conta. O default e
+    ///   True porque so o T-SQL discorda, e nao porque "cinco votaram" - o
+    ///   SQLite nao vota.
     ///
     ///   O gancho existe para que a correcao do T-SQL seja LOCAL: quem nao
     ///   sobrescreve continua emitindo byte a byte o que emitia. A alternativa

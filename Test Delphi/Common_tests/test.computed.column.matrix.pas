@@ -32,6 +32,23 @@
     Firebird 5.0.4    "TOTAL" INTEGER COMPUTED BY (...)               tipo aceito
     SQLite            nao chega a emitir: levanta ENotSupportedException
 
+  O QUE A COLUNA "tipo" ACIMA AFIRMA, E O QUE ELA NAO AFIRMA
+
+  Ela afirma UMA propriedade medida - se o dialeto admite o tipo antes da
+  clausula de computacao - e SO ela. Ela NAO afirma que o enunciado inteiro da
+  linha e aceito pelo motor.
+
+  A distincao nao e teorica: a linha do PostgreSQL fixa um enunciado que o
+  motor RECUSA. Como o framework hoje delimita o NOME e repassa a EXPRESSAO
+  crua, "AS (QTD * PRECO)" vira "qtd" na dobra de caixa do PG e o CREATE morre
+  com ERROR 42703. O detalhe, com as tres medicoes que separam as duas coisas,
+  esta no comentario da propria celula em
+  TestDemaisDialetosContinuamCarregandoOTipo. Defeito aberto, territorio da T22.
+
+  Este aviso existe porque a T27 foi a tarefa que cacou "celula verde que
+  certifica SQL invalido". Acrescentar uma sem marcacao, num arquivo que
+  denuncia o padrao, seria reproduzir o defeito auditado.
+
   Por isso a correcao mora num gancho de dialeto
   (TFluentDDLSerializeAbstract.ComputedColumnCarriesType, default True) e nao no
   caminho comum: quem nao sobrescreve continua emitindo byte a byte o que emitia.
@@ -162,11 +179,47 @@ begin
   if _EstaRegistrado(dbnPostgreSQL) then
   begin
     Inc(LCelulas);
+    // ============================================================ ATENCAO
+    // ESTA CELULA FIXA TEXTO QUE O MOTOR RECUSA. Ela e VERDE de proposito, e
+    // o que ela mede NAO e o enunciado inteiro - e so a presenca do TIPO.
+    //
+    // Medido em PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1), BEGIN/ROLLBACK:
+    //
+    //   como o framework emite hoje ......... ERROR 42703
+    //     "TOTAL" INTEGER GENERATED ALWAYS AS (QTD * PRECO) STORED
+    //     column "qtd" does not exist
+    //
+    //   com a EXPRESSAO tambem delimitada ... CREATE TABLE (cria)
+    //     "TOTAL" INTEGER GENERATED ALWAYS AS ("QTD" * "PRECO") STORED
+    //
+    //   SEM o tipo .......................... ERROR 42601
+    //     "TOTAL" GENERATED ALWAYS AS ("QTD" * 2) STORED
+    //     syntax error at or near "ALWAYS"
+    //
+    // A terceira medicao e a que da a esta celula o direito de existir: o
+    // PostgreSQL EXIGE o tipo, entao ela e o anti-colateral que impede alguem
+    // de "consertar" o T-SQL tirando o tipo de todo mundo.
+    //
+    // A PRIMEIRA e um defeito REAL e ABERTO, e ele NAO e desta tarefa: o
+    // gerador delimita o NOME da coluna e repassa a EXPRESSAO crua, que o PG
+    // dobra para minuscula. Isso e territorio da T22 (delimitacao de
+    // identificador), parada esperando decisao do dono - a causa e exatamente
+    // a questao que ele precisa decidir. Consertar aqui seria decidir por ele.
+    //
+    // NAO marcada com [Ignore] DE PROPOSITO: desligada, ela deixa de segurar o
+    // anti-colateral e a mutacao "default do gancho -> False" volta a passar.
+    // O aviso fica no texto, nao no atributo.
+    //
+    // Quando a T22 fechar, o texto esperado desta linha muda para
+    //   "TOTAL" INTEGER GENERATED ALWAYS AS ("QTD" * "PRECO") STORED
+    // e esta celula tem de cair junto - e o lembrete de que ela existe.
+    // ====================================================================
     Assert.AreEqual(
       'CREATE TABLE "VENDAS" ("ID" INTEGER, "QTD" INTEGER, "PRECO" INTEGER, ' +
       '"TOTAL" INTEGER GENERATED ALWAYS AS (QTD * PRECO) STORED)',
       _Computada(dbnPostgreSQL), False,
-      'PostgreSQL EXIGE o tipo na coluna gerada.');
+      'PostgreSQL EXIGE o tipo na coluna gerada. ATENCAO: o resto deste ' +
+      'enunciado e recusado pelo motor (42703) - ver T22, defeito aberto.');
   end;
 
   if _EstaRegistrado(dbnMySQL) then
