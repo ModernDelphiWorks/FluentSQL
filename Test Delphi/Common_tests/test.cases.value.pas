@@ -29,15 +29,15 @@
 
   E nao e culpa do CASE: isolado, "SELECT :a FROM RDB$DATABASE" da o mesmo -804.
   E o marcador SEM TIPO. Com CAST nos dois ramos, os dois motores passam do
-  prepare (caso E5 do mesmo arquivo).
+  prepare.
 
   O CAST sai nos SETE, e nao so nos dois que exigem, porque esta e uma sobrecarga
   NOVA: nao ha SQL emitido hoje por ela, logo nao ha oraculo a quebrar, e
-  uniformizar custa zero. A alternativa - manter uma tabela de "quem precisa de
-  tipo" - envelhece com a versao do motor, que e exatamente o modo de falha que a
-  T17 documentou na matriz de CAST.
+  uniformizar custa zero.
 
-  O ORACULO QUE ESTES TESTES USAM
+  ============================================================================
+  O ORACULO: SAO DOIS LADOS, E NENHUM SOZINHO BASTA
+  ============================================================================
 
   Nao basta afirmar que "o texto mudou". O que prova parametrizacao e:
 
@@ -45,19 +45,85 @@
       (b) existe EXATAMENTE UM bind por slot, com o DataType que o chamador
           declarou.
 
-  E o mesmo oraculo que a equipe consumidora usou do lado dela e que pegou o
-  defeito de verdade. Os dois lados estao aqui, e nenhum dos dois sozinho basta:
-  um SQL sem o valor mas com zero parametros teria PERDIDO o dado.
+  Um SQL sem o valor mas com zero parametros teria PERDIDO o dado, nao ligado.
 
+  ============================================================================
+  O INVARIANTE, E POR QUE ELE TEM CELULA EM TODA CAUSA DE RECUSA
+  ============================================================================
+
+      nenhum caminho de recusa pode deixar parametro para tras,
+      e nenhum termo que carrega :pN pode ser SUBSTITUIDO.
+
+  Sao CINCO CAUSAS de recusa, fechadas por QUATRO guardas - a ultima fecha duas:
+
+    causa                          guarda
+    -----------------------------  --------------------------------------------
+    1. sem When                    _AssertHaveWhen
+    2. ramo ja ocupado             _AssertValueSlotFree
+    3. Null / Unassigned           _AssertValueCarriesData
+    4. tipo fora da intersecao     a SONDA (pre-voo do Cast)
+    5. dialeto sem grafia de CAST  a SONDA (a mesma linha)
+
+  A causa 5 e a que mais custou: o Cast do driver levanta DENTRO da chamada, ou
+  seja DEPOIS de o Params.Add ja ter corrido. Medido, antes da correcao, em
+  InterBase e no driver nao relacional: Params.Count=1, com o dado do usuario na
+  colecao e nenhum SQL que o citasse. O controle (causa 4, no PostgreSQL) dava 0
+  - ou seja o padrao existia em toda celula MENOS naquela.
+
+  A SONDA fecha a 4 junto com a 5 porque _AssertCastTypeIsPortable e a PRIMEIRA
+  linha de TFluentSQLFunctions.Cast: provocar o Cast provoca as duas. Isso foi
+  MEDIDO - com a sonda no lugar, uma chamada explicita a _AssertCastTypeIsPortable
+  no slot vira linha morta (move-la para depois do Params.Add nao deixa teste
+  nenhum vermelho), e por isso ela nao existe.
+
+  A causa 2 nem envolve excecao no caminho que a motivou: chamar IfThen duas
+  vezes no mesmo ramo sobrescrevia o TEXTO e abandonava o :pN da primeira
+  chamada. Medido, antes da correcao:
+
+    .When('1').IfThen('A',dftString).IfThen('B',dftString)
+       SQL: THEN CAST(:p2 ...)               colecao: p1=A, p2=B     p1 ORFAO
+    .When('1').IfThen('A',...).ElseIf('B',...).ElseIf('C',...)
+       SQL: THEN CAST(:p1) ELSE CAST(:p3)    colecao: p1,p2,p3       p2 ORFAO
+    .When('1').IfThen('A',dftString).IfThen('''LITERAL''')
+       SQL: THEN 'LITERAL'                   colecao: p1=A           p1 ORFAO
+
+  POR ISSO TODA CELULA DE RECUSA DESTE ARQUIVO CONFERE A COLECAO, e nao so a
+  classe da excecao. Uma celula que so confere a classe nao observa o defeito que
+  mais custou aqui - e era exatamente esse o buraco: o padrao existia em todas as
+  celulas MENOS nas duas em que ele quebraria.
+
+  A FORMA da asercao e Delta = 0, e nao Total = 0, e a diferenca importa numa das
+  cinco causas. Na causa 2 a PRIMEIRA chamada foi legitima e ligou :p1, que o SQL
+  CITA; exigir Total = 0 ali seria exigir que um parametro REFERENCIADO fosse
+  apagado. O que vale nas cinco e:
+
+      a chamada RECUSADA nao acrescenta parametro nenhum
+
+  Nas quatro causas em que nada legitimo veio antes, Delta = 0 e Total = 0 sao a
+  mesma coisa, e as celulas conferem as duas.
+
+  E ha ainda a asercao na forma mais pura, em celula propria
+  (TestNenhumParametroFicaSemReferenciaNoSql): TODO parametro da colecao tem de
+  ser CITADO pelo statement. Essa sozinha teria pego os quatro vazamentos.
+
+  ============================================================================
   O QUE NAO ESTA AQUI, E POR QUE
+  ============================================================================
 
-  nil. Passar nil a esta sobrecarga NAO COMPILA - 'Variant' e 'Pointer' sao tipos
-  incompativeis e o dcc32 recusa com E2010 antes de gerar codigo (medido). A
-  decisao "nil levanta, nao vira NULL" e cumprida pelo sistema de tipos, nao por
-  guarda de runtime, e um teste de runtime para nil seria inescrevivel.
+  nil. Passar nil a esta sobrecarga NAO COMPILA. O erro do dcc32 36.0 e
+
+      E2250 There is no overloaded version of 'IfThen' that can be called
+            with these arguments
+
+  e nao E2010: IfThen e SOBRECARREGADO, entao a resolucao de sobrecarga responde
+  ANTES da compatibilidade de tipos. (O E2010 "Incompatible types: 'Variant' and
+  'Pointer'" sai da atribuicao direta V := nil, que e outro experimento e nao
+  esta chamada.) A conclusao e a mesma - a decisao "nil levanta, nao vira NULL"
+  esta cumprida pelo sistema de tipos -, mas o codigo do erro foi MEDIDO, nao
+  lembrado. Teste de runtime para nil seria inescrevivel.
 
   Null e Unassigned, esses sim, compilam e chegam - e sao recusados, com celula
-  propria abaixo.
+  propria, sem deixar parametro para tras.
   ------------------------------------------------------------------------------
 }
 
@@ -77,22 +143,61 @@ uses
   FluentSQL.Interfaces;
 
 type
+  /// <summary>
+  ///   O que uma chamada RECUSADA deixou para tras. Nao so a classe, porque o
+  ///   defeito que esta entrega mais repetiu foi justamente o parametro que
+  ///   sobrava numa recusa correta.
+  ///
+  ///   O campo que importa e o DELTA, e nao o total. "Params.Count = 0 depois de
+  ///   toda recusa" seria forte demais e ERRADO numa das cinco causas: na causa 2
+  ///   (ramo ja ocupado) a PRIMEIRA chamada foi legitima e ligou :p1, que o SQL
+  ///   CITA. Exigir zero ali seria exigir que um parametro referenciado fosse
+  ///   apagado. O invariante certo e o que vale nas cinco:
+  ///
+  ///       a chamada RECUSADA nao acrescenta parametro nenhum (Delta = 0)
+  ///
+  ///   e para as quatro causas em que nada legitimo veio antes, Delta = 0 e
+  ///   Total = 0 sao a mesma coisa - e as celulas conferem os dois.
+  /// </summary>
+  TRecusaObservada = record
+    Classe: String;
+    Msg: String;
+    Antes: Integer;
+    Params: Integer;
+    function Delta: Integer;
+  end;
+
   [TestFixture]
   TTestCaseValueSlot = class
   private
-    /// <summary>
-    ///   CASE de dois ramos com o slot de VALOR nos dois, sobre o dialeto pedido.
-    ///   Devolve a query para que o teste interrogue AsString E Params - os dois
-    ///   lados do oraculo saem da MESMA construcao.
-    /// </summary>
     function _CaseDeValor(const ADriver: TFluentSQLDriver; const AThen: Variant;
       const AThenType: TFluentSQLDataFieldType; const AElse: Variant;
       const AElseType: TFluentSQLDataFieldType): IFluentSQL;
     function _SoThen(const ADriver: TFluentSQLDriver; const AValue: Variant;
       const ADataType: TFluentSQLDataFieldType): IFluentSQL;
+    /// <summary>
+    ///   Monta o CASE com APreparo (que TEM de passar), anota o tamanho da
+    ///   colecao, e so entao executa AOfensa - a chamada que deve ser recusada.
+    ///   E o unico caminho pelo qual as celulas de recusa deste arquivo passam,
+    ///   exatamente para que nenhuma possa "esquecer" de conferir o orfao.
+    ///
+    ///   Sao dois closures e nao um porque IFluentSQL.CaseExpr constroi um CASE
+    ///   NOVO a cada chamada: preparo e ofensa precisam falar com o MESMO
+    ///   IFluentSQLCriteriaCase, e nao so com a mesma query.
+    /// </summary>
+    function _Recusa(const ADriver: TFluentSQLDriver;
+      const APreparo: TFunc<IFluentSQL, IFluentSQLCriteriaCase>;
+      const AOfensa: TProc<IFluentSQLCriteriaCase>): TRecusaObservada;
+    procedure _AssertRecusa(const ARecusa: TRecusaObservada;
+      const AClasseEsperada, ATrechoDaMsg, AContexto: String);
+    /// <summary>
+    ///   O detector de orfao na forma mais pura: TODO parametro da colecao tem
+    ///   de ser CITADO pelo statement. E a asercao que teria pego os quatro
+    ///   vazamentos desta entrega de uma vez.
+    /// </summary>
+    procedure _AssertSemParametroOrfao(const AQuery: IFluentSQL;
+      const AContexto: String);
     function _ContaOcorrencias(const AHaystack, ANeedle: String): Integer;
-    function _MensagemDe(const AProc: TProc): String;
-    function _ClasseDe(const AProc: TProc): String;
   public
     // --- (a) o valor nao aparece no statement -------------------------------
     [Test]
@@ -132,11 +237,13 @@ type
     procedure TestInterbaseLevantaPelaMesmaPortaDoCastPortavel;
     {$ENDIF}
 
-    // --- guardas ------------------------------------------------------------
+    // --- o invariante: NENHUMA recusa deixa parametro -----------------------
+    [Test]
+    procedure TestNenhumaCausaDeRecusaDeixaParametro;
+    [Test]
+    procedure TestNenhumParametroFicaSemReferenciaNoSql;
     [Test]
     procedure TestTipoForaDaIntersecaoLevantaEmTodosOsMembros;
-    [Test]
-    procedure TestTipoRecusadoNaoDeixaParametroOrfao;
     [Test]
     procedure TestVariantNullLevanta;
     [Test]
@@ -144,21 +251,33 @@ type
     [Test]
     procedure TestVariantNullLevantaTambemNoElseIf;
     [Test]
-    procedure TestVariantNullRecusadoNaoDeixaParametroOrfao;
-    [Test]
     procedure TestSlotDeValorSemWhenLevantaNoIfThen;
     [Test]
     procedure TestSlotDeValorSemWhenLevantaNoElseIf;
     [Test]
-    procedure TestSlotDeValorSemWhenNaoGravaParametro;
+    procedure TestSondaRecusaExatamenteComoAChamadaReal;
+
+    // --- o invariante: nenhum termo com :pN pode ser SUBSTITUIDO ------------
     [Test]
-    procedure TestSlotDeValorSemWhenNoElseIfNaoGravaParametro;
+    procedure TestIfThenDuasVezesNoMesmoRamoLevanta;
+    [Test]
+    procedure TestElseIfDuasVezesLevanta;
+    [Test]
+    procedure TestSobrecargaDeStringNaoSobrescreveSlotDeValorNoThen;
+    [Test]
+    procedure TestSobrecargaDeStringNaoSobrescreveSlotDeValorNoElse;
+    [Test]
+    procedure TestWhenNovoLiberaOSlotDeThen;
+    [Test]
+    procedure TestSlotDeValorDepoisDeStringContinuaPermitido;
 
     // --- controles: o que NAO pode ter mudado -------------------------------
     [Test]
     procedure TestSobrecargaDeStringContinuaVerbatim;
     [Test]
     procedure TestSobrecargaDeInt64ContinuaVerbatim;
+    [Test]
+    procedure TestSobrescreverRamoComStringContinuaPermitido;
     [Test]
     procedure TestSlotDeValorConviveComOSlotDeExpressaoNaNumeracao;
   end;
@@ -168,6 +287,8 @@ implementation
 const
   /// O mesmo payload que derrubou a tabela no oraculo de MERGE (test.merge.mssql.sql).
   cPAYLOAD = '1; DROP TABLE USERS; --';
+  cNAO_PORTAVEL = 'EFluentSQLFunctionNotSupported';
+  cRECUSA_DE_USO = 'EArgumentException';
 
 { helpers }
 
@@ -201,6 +322,69 @@ begin
     .From('T');
 end;
 
+function TRecusaObservada.Delta: Integer;
+begin
+  Result := Params - Antes;
+end;
+
+function TTestCaseValueSlot._Recusa(const ADriver: TFluentSQLDriver;
+  const APreparo: TFunc<IFluentSQL, IFluentSQLCriteriaCase>;
+  const AOfensa: TProc<IFluentSQLCriteriaCase>): TRecusaObservada;
+var
+  LQuery: IFluentSQL;
+  LCase: IFluentSQLCriteriaCase;
+begin
+  LQuery := FluentSQL.Query(ADriver).Select.Column('ID').Column('TIPO');
+  LCase := APreparo(LQuery);
+  Result.Classe := '';
+  Result.Msg := '';
+  Result.Antes := LQuery.Params.Count;
+  try
+    AOfensa(LCase);
+  except
+    on E: Exception do
+    begin
+      Result.Classe := E.ClassName;
+      Result.Msg := E.Message;
+    end;
+  end;
+  Result.Params := LQuery.Params.Count;
+end;
+
+procedure TTestCaseValueSlot._AssertRecusa(const ARecusa: TRecusaObservada;
+  const AClasseEsperada, ATrechoDaMsg, AContexto: String);
+begin
+  Assert.AreEqual(AClasseEsperada, ARecusa.Classe, False,
+    AContexto + ': classe de excecao. Mensagem recebida: ' + ARecusa.Msg);
+  if ATrechoDaMsg <> '' then
+    Assert.Contains(ARecusa.Msg, ATrechoDaMsg, False,
+      AContexto + ': a mensagem tem de nomear a chamada. Recebido: ' + ARecusa.Msg);
+  // O LADO QUE JA FALTOU: recusa correta que deixa parametro para tras.
+  Assert.AreEqual(0, ARecusa.Delta,
+    AContexto + ': a chamada RECUSADA nao pode acrescentar parametro (tinha ' +
+    IntToStr(ARecusa.Antes) + ', ficou com ' + IntToStr(ARecusa.Params) + '). ' +
+    'Um :pN que o SQL nao cita desloca tudo para quem liga por posicao');
+end;
+
+procedure TTestCaseValueSlot._AssertSemParametroOrfao(const AQuery: IFluentSQL;
+  const AContexto: String);
+var
+  LSql: String;
+  LFor: Integer;
+  LNome: String;
+begin
+  LSql := AQuery.AsString;
+  for LFor := 0 to AQuery.Params.Count - 1 do
+  begin
+    LNome := AQuery.Params[LFor].Name;
+    // O MySQL reescreve :pN -> ?; por isso a busca aceita as duas formas.
+    if (Pos(':' + LNome, LSql) > 0) or (Pos('?', LSql) > 0) then
+      Continue;
+    Assert.Fail(AContexto + ': o parametro ' + LNome + ' esta na colecao mas o ' +
+      'statement nao o cita - e um ORFAO. SQL: ' + LSql);
+  end;
+end;
+
 function TTestCaseValueSlot._ContaOcorrencias(const AHaystack, ANeedle: String): Integer;
 var
   LPos: Integer;
@@ -215,28 +399,6 @@ begin
     Inc(Result);
     LFrom := LPos + Length(ANeedle);
   until False;
-end;
-
-function TTestCaseValueSlot._MensagemDe(const AProc: TProc): String;
-begin
-  Result := '';
-  try
-    AProc;
-  except
-    on E: Exception do
-      Result := E.Message;
-  end;
-end;
-
-function TTestCaseValueSlot._ClasseDe(const AProc: TProc): String;
-begin
-  Result := '';
-  try
-    AProc;
-  except
-    on E: Exception do
-      Result := E.ClassName;
-  end;
 end;
 
 { --- (a) o valor nao aparece no statement ---------------------------------- }
@@ -404,13 +566,15 @@ end;
 
 procedure TTestCaseValueSlot.TestMongoDBLevantaPelaMesmaPortaDoCastPortavel;
 begin
-  // Consequencia HERDADA da porta unica do Cast portavel, e nao regra escrita
-  // duas vezes: em MongoDB o Cast(TFluentSQLDataFieldType) levanta, logo o slot
-  // de valor levanta. Erro nomeado, e nao MQL indefensavel.
-  Assert.AreEqual('EFluentSQLFunctionNotSupported',
-    _ClasseDe(procedure begin _SoThen(dbnMongoDB, 'X', dftString) end),
-    False,
-    'O slot de valor em MongoDB tem de levantar pela mesma porta do Cast portavel');
+  // Consequencia HERDADA da porta unica do Cast portavel: onde o Cast levanta, o
+  // slot de valor levanta. E ESTA e a celula da PORTA 5 - a recusa nasce dentro
+  // do Cast do driver, DEPOIS de ele ser chamado, e por isso ela e a que deixava
+  // parametro orfao. Params = 0 aqui e o que a sonda comprou.
+  _AssertRecusa(
+    _Recusa(dbnMongoDB,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftString) end),
+    cNAO_PORTAVEL, '', 'causa 5 (dialeto sem grafia de CAST)');
 end;
 
 {$IFDEF DB2}
@@ -426,22 +590,81 @@ end;
 {$IFDEF INTERBASE}
 procedure TTestCaseValueSlot.TestInterbaseLevantaPelaMesmaPortaDoCastPortavel;
 begin
-  // Mesma razao do MongoDB, motivo diferente: a matriz de CAST do InterBase nao
+  // O InterBase e RELACIONAL e sofre a causa 5 igual: a matriz de CAST dele nao
   // foi medida (nao ha imagem publica do motor) e NAO foi inferida do Firebird.
-  Assert.AreEqual('EFluentSQLFunctionNotSupported',
-    _ClasseDe(procedure begin _SoThen(dbnInterbase, 'X', dftString) end),
-    False,
-    'O slot de valor em InterBase tem de levantar pela mesma porta do Cast portavel');
+  // Esta celula media Params=1 antes da sonda.
+  _AssertRecusa(
+    _Recusa(dbnInterbase,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftString) end),
+    cNAO_PORTAVEL, '', 'causa 5 em dialeto RELACIONAL (InterBase)');
 end;
 {$ENDIF}
 
-{ --- guardas --------------------------------------------------------------- }
+{ --- o invariante: NENHUMA recusa deixa parametro -------------------------- }
+
+procedure TTestCaseValueSlot.TestNenhumaCausaDeRecusaDeixaParametro;
+begin
+  // A celula GUARDA-CHUVA do invariante. As cinco causas numa varredura so, para
+  // que acrescentar uma causa nova sem celula propria ainda assim tropece aqui.
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftString) end),
+    cRECUSA_DE_USO, 'antes de When', 'causa 1 (sem When)');
+
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin
+        Result := Q.CaseExpr.When('1').IfThen('A', dftString) end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('B', dftString) end),
+    cRECUSA_DE_USO, 'IfThen', 'causa 2 (ramo ja ocupado)');
+
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen(Null, dftString) end),
+    cRECUSA_DE_USO, 'IfThen', 'causa 3 (Null)');
+
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftGuid) end),
+    cNAO_PORTAVEL, '', 'causa 4 (tipo fora da intersecao)');
+
+  _AssertRecusa(
+    _Recusa(dbnMongoDB,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftString) end),
+    cNAO_PORTAVEL, '', 'causa 5 (dialeto sem grafia)');
+end;
+
+procedure TTestCaseValueSlot.TestNenhumParametroFicaSemReferenciaNoSql;
+begin
+  // O invariante na forma mais PURA, e a celula que sozinha teria pego os quatro
+  // vazamentos desta entrega: todo :pN da colecao tem de ser citado pelo
+  // statement. Nao depende de saber QUAIS sao as causas - so de o resultado
+  // final ser coerente.
+  _AssertSemParametroOrfao(
+    _SoThen(dbnFirebird, 'A', dftString), 'um ramo so');
+  _AssertSemParametroOrfao(
+    _CaseDeValor(dbnFirebird, 'A', dftString, 'B', dftString), 'dois ramos');
+  _AssertSemParametroOrfao(
+    FluentSQL.Query(dbnFirebird).Select.Column('ID').Column('TIPO')
+      .CaseExpr.When([0]).IfThen('A', dftString).When([1]).IfThen('B', dftString)
+      .ElseIf('C', dftString).EndCase.Alias('R').From('T'),
+    'dois When com valor, mais ELSE, misturado com When(array)');
+  _AssertSemParametroOrfao(
+    FluentSQL.Query(dbnPostgreSQL).Select.Column('ID').Column('TIPO')
+      .CaseExpr.When('1').IfThen('''A''').IfThen('B', dftString)
+      .EndCase.Alias('R').From('T'),
+    'String antes do slot de valor no mesmo ramo');
+end;
 
 procedure TTestCaseValueSlot.TestTipoForaDaIntersecaoLevantaEmTodosOsMembros;
 var
   LType: TFluentSQLDataFieldType;
   LAtual: TFluentSQLDataFieldType;
-  LClasse: String;
   LVistos: Integer;
 begin
   // A intersecao e cFluentSQLCastPortableTypes = [dftString, dftInteger, dftFloat].
@@ -453,10 +676,11 @@ begin
     if LType in cFluentSQLCastPortableTypes then
       Continue;
     LAtual := LType;  // copia local: Delphi nao captura a variavel de controle do for
-    LClasse := _ClasseDe(procedure begin _SoThen(dbnPostgreSQL, 'X', LAtual) end);
-    Assert.AreEqual('EFluentSQLFunctionNotSupported', LClasse, False,
-      'O membro ' + DataFieldTypeName(LAtual) + ' esta fora da intersecao e tem ' +
-      'de ser recusado pelo slot de valor; recebido: ' + LClasse);
+    _AssertRecusa(
+      _Recusa(dbnPostgreSQL,
+        function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+        procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', LAtual) end),
+      cNAO_PORTAVEL, '', 'tipo ' + DataFieldTypeName(LAtual));
     Inc(LVistos);
   end;
   // Trava o TAMANHO da recusa: se alguem alargar cFluentSQLCastPortableTypes sem
@@ -465,135 +689,170 @@ begin
     'O enum tem 10 membros e a intersecao tem 3, logo 7 tem de ser recusados');
 end;
 
-procedure TTestCaseValueSlot.TestTipoRecusadoNaoDeixaParametroOrfao;
-var
-  LQuery: IFluentSQL;
-begin
-  // A guarda de tipo roda ANTES de Params.Add. Se rodasse depois, a chamada
-  // recusada deixaria :p1 na colecao e a numeracao seguinte teria um buraco.
-  LQuery := FluentSQL.Query(dbnPostgreSQL).Select.Column('ID').Column('TIPO');
-  try
-    LQuery.CaseExpr.When('1').IfThen('X', dftGuid);
-  except
-    on E: Exception do ;
-  end;
-  Assert.AreEqual(0, LQuery.Params.Count,
-    'Chamada recusada pela guarda de tipo nao pode deixar parametro na colecao');
-end;
-
 procedure TTestCaseValueSlot.TestVariantNullLevanta;
-var
-  LMsg: String;
 begin
-  LMsg := _MensagemDe(procedure begin _SoThen(dbnFirebird, Null, dftString) end);
-  Assert.AreEqual('EArgumentException',
-    _ClasseDe(procedure begin _SoThen(dbnFirebird, Null, dftString) end), False,
-    'Variant Null no slot de valor tem de levantar EArgumentException');
-  Assert.Contains(LMsg, 'IfThen', False,
-    'A mensagem tem de nomear a chamada que causou o erro. Recebido: ' + LMsg);
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen(Null, dftString) end),
+    cRECUSA_DE_USO, 'IfThen', 'Variant Null no slot de THEN');
 end;
 
 procedure TTestCaseValueSlot.TestVariantUnassignedLevanta;
 var
-  LMsg: String;
+  LRecusa: TRecusaObservada;
 begin
-  LMsg := _MensagemDe(procedure begin _SoThen(dbnFirebird, Unassigned, dftString) end);
-  Assert.AreEqual('EArgumentException',
-    _ClasseDe(procedure begin _SoThen(dbnFirebird, Unassigned, dftString) end), False,
-    'Variant Unassigned no slot de valor tem de levantar EArgumentException');
-  Assert.Contains(LMsg, 'Unassigned', False,
-    'A mensagem tem de dizer QUAL variant chegou. Recebido: ' + LMsg);
+  LRecusa := _Recusa(dbnFirebird,
+    function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+    procedure(C: IFluentSQLCriteriaCase) begin C.IfThen(Unassigned, dftString) end);
+  _AssertRecusa(LRecusa, cRECUSA_DE_USO, 'IfThen', 'Variant Unassigned');
+  Assert.Contains(LRecusa.Msg, 'Unassigned', False,
+    'A mensagem tem de dizer QUAL variant chegou. Recebido: ' + LRecusa.Msg);
 end;
 
 procedure TTestCaseValueSlot.TestVariantNullLevantaTambemNoElseIf;
-var
-  LMsg: String;
 begin
   // Celula PROPRIA, e nao redundante com a de IfThen: sao DOIS sitios de chamada
-  // da guarda (FluentSQL.Cases.pas, IfThen(Variant) e ElseIf(Variant)). Sem esta
-  // celula, apagar a linha do ElseIf nao deixaria teste nenhum vermelho, porque
-  // a de IfThen continuaria verde.
-  LMsg := _MensagemDe(procedure begin
-    FluentSQL.Query(dbnFirebird).Select.Column('ID').Column('TIPO')
-      .CaseExpr.When('1').IfThen('''X''').ElseIf(Null, dftString) end);
-  Assert.Contains(LMsg, 'ElseIf', False,
-    'Variant Null no slot de ELSE tem de levantar nomeando ElseIf. Recebido: ' + LMsg);
-end;
-
-procedure TTestCaseValueSlot.TestVariantNullRecusadoNaoDeixaParametroOrfao;
-var
-  LQuery: IFluentSQL;
-begin
-  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID').Column('TIPO');
-  try
-    LQuery.CaseExpr.When('1').IfThen(Null, dftString);
-  except
-    on E: Exception do ;
-  end;
-  Assert.AreEqual(0, LQuery.Params.Count,
-    'Chamada recusada pela guarda de nulidade nao pode deixar parametro na colecao');
+  // da guarda. Sem esta celula, apagar a linha do ElseIf nao deixaria teste
+  // nenhum vermelho, porque a de IfThen continuaria verde.
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin
+        Result := Q.CaseExpr.When('1').IfThen('''X''') end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.ElseIf(Null, dftString) end),
+    cRECUSA_DE_USO, 'ElseIf', 'Variant Null no slot de ELSE');
 end;
 
 procedure TTestCaseValueSlot.TestSlotDeValorSemWhenLevantaNoIfThen;
-var
-  LMsg: String;
 begin
-  // A guarda estrutural da T14 vale para a sobrecarga nova tambem - ela nao
-  // pode ter aberto uma terceira porta para "CASE THEN <x> END".
-  LMsg := _MensagemDe(procedure begin
-    FluentSQL.Query(dbnFirebird).Select.Column('ID').CaseExpr.IfThen('X', dftString) end);
-  Assert.Contains(LMsg, 'IfThen', False,
-    'IfThen(Variant) antes de When tem de cair na mesma guarda. Recebido: ' + LMsg);
-  Assert.AreEqual('EArgumentException',
-    _ClasseDe(procedure begin
-      FluentSQL.Query(dbnFirebird).Select.Column('ID').CaseExpr.IfThen('X', dftString) end),
-    False);
+  // A guarda estrutural da T14 vale para a sobrecarga nova tambem - ela nao pode
+  // ter aberto uma terceira porta para "CASE THEN <x> END".
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftString) end),
+    cRECUSA_DE_USO, 'antes de When', 'IfThen(Variant) antes de When');
 end;
 
 procedure TTestCaseValueSlot.TestSlotDeValorSemWhenLevantaNoElseIf;
-var
-  LMsg: String;
 begin
-  LMsg := _MensagemDe(procedure begin
-    FluentSQL.Query(dbnFirebird).Select.Column('ID').CaseExpr.ElseIf('X', dftString) end);
-  Assert.Contains(LMsg, 'ElseIf', False,
-    'A mensagem tem de nomear ElseIf, nao IfThen. Recebido: ' + LMsg);
-  Assert.AreEqual('EArgumentException',
-    _ClasseDe(procedure begin
-      FluentSQL.Query(dbnFirebird).Select.Column('ID').CaseExpr.ElseIf('X', dftString) end),
-    False);
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.ElseIf('X', dftString) end),
+    cRECUSA_DE_USO, 'antes de When', 'ElseIf(Variant) antes de When');
 end;
 
-procedure TTestCaseValueSlot.TestSlotDeValorSemWhenNaoGravaParametro;
+procedure TTestCaseValueSlot.TestSondaRecusaExatamenteComoAChamadaReal;
+var
+  LDaSonda: String;
+  LDaReal: String;
+begin
+  // A sonda (causas 4 e 5) so e equivalente a chamada real porque a recusa do Cast
+  // depende de (dialeto, tipo) e NAO da expressao. Isso foi conferido lendo os
+  // nove drivers, mas leitura envelhece: esta celula compara as DUAS recusas.
+  // Se um driver futuro passar a recusar por expressao, a sonda deixa de valer
+  // e este teste vermelha em vez de o defeito voltar calado.
+  LDaSonda := _Recusa(dbnMongoDB,
+    function(Q: IFluentSQL): IFluentSQLCriteriaCase begin Result := Q.CaseExpr.When('1') end,
+    procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('X', dftString) end).Msg;
+  LDaReal := '';
+  try
+    FluentSQL.Func(dbnMongoDB).Cast(':p1', dftString);
+  except
+    on E: Exception do LDaReal := E.Message;
+  end;
+  Assert.AreEqual(LDaReal, LDaSonda, False,
+    'A recusa que a sonda provoca tem de ser a MESMA que a chamada real ' +
+    'provocaria - se divergirem, a sonda esta medindo outra coisa');
+end;
+
+{ --- o invariante: nenhum termo com :pN pode ser SUBSTITUIDO --------------- }
+
+procedure TTestCaseValueSlot.TestIfThenDuasVezesNoMesmoRamoLevanta;
+begin
+  // Antes desta guarda: SQL com CAST(:p2), colecao com p1=A e p2=B. p1 ORFAO,
+  // e sem excecao nenhuma para o chamador perceber.
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin
+        Result := Q.CaseExpr.When('1').IfThen('A', dftString) end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('B', dftString) end),
+    cRECUSA_DE_USO, 'THEN', 'IfThen duas vezes no mesmo ramo');
+end;
+
+procedure TTestCaseValueSlot.TestElseIfDuasVezesLevanta;
+begin
+  // Antes desta guarda: SQL com :p1 e :p3, colecao com p1,p2,p3. p2 ORFAO.
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin
+        Result := Q.CaseExpr.When('1').IfThen('''X''').ElseIf('B', dftString) end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.ElseIf('C', dftString) end),
+    cRECUSA_DE_USO, 'ELSE', 'ElseIf duas vezes');
+end;
+
+procedure TTestCaseValueSlot.TestSobrecargaDeStringNaoSobrescreveSlotDeValorNoThen;
+begin
+  // O PIOR dos tres casos medidos: o SQL fica sem :p1 nenhum, e o dado do
+  // usuario continua na colecao, FORA do statement. A guarda vale nas
+  // sobrecargas antigas por causa DESTE caso - e nao quebra codigo anterior a
+  // esta entrega, porque para o slot estar ocupado alguem tem de ter chamado a
+  // sobrecarga de Variant, que nasceu aqui.
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin
+        Result := Q.CaseExpr.When('1').IfThen('A', dftString) end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.IfThen('''LITERAL''') end),
+    cRECUSA_DE_USO, 'THEN', 'String sobrescrevendo slot de valor no THEN');
+end;
+
+procedure TTestCaseValueSlot.TestSobrecargaDeStringNaoSobrescreveSlotDeValorNoElse;
+begin
+  _AssertRecusa(
+    _Recusa(dbnFirebird,
+      function(Q: IFluentSQL): IFluentSQLCriteriaCase begin
+        Result := Q.CaseExpr.When('1').IfThen('''X''').ElseIf('A', dftString) end,
+      procedure(C: IFluentSQLCriteriaCase) begin C.ElseIf('''LITERAL''') end),
+    cRECUSA_DE_USO, 'ELSE', 'String sobrescrevendo slot de valor no ELSE');
+end;
+
+procedure TTestCaseValueSlot.TestWhenNovoLiberaOSlotDeThen;
 var
   LQuery: IFluentSQL;
 begin
-  // A ordem das guardas: a ESTRUTURAL vem antes de qualquer efeito colateral.
-  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID').Column('TIPO');
-  try
-    LQuery.CaseExpr.IfThen('X', dftString);
-  except
-    on E: Exception do ;
-  end;
-  Assert.AreEqual(0, LQuery.Params.Count,
-    'IfThen sem When e recusado ANTES de gravar o parametro');
+  // CONTROLE da guarda de substituicao: cada WHEN tem o SEU ramo THEN. Por isso
+  // o registro e o INDICE do When, e nao um Boolean - com Boolean, este caso
+  // legitimo passaria a ser recusado.
+  LQuery := FluentSQL.Query(dbnFirebird)
+    .Select.Column('ID').Column('TIPO')
+    .CaseExpr
+      .When('1').IfThen('A', dftString)
+      .When('2').IfThen('B', dftString)
+      .ElseIf('C', dftString)
+    .EndCase.Alias('R').From('T');
+  Assert.AreEqual(
+    'SELECT ID, (CASE TIPO WHEN 1 THEN CAST(:p1 AS VARCHAR(4000)) ' +
+    'WHEN 2 THEN CAST(:p2 AS VARCHAR(4000)) ' +
+    'ELSE CAST(:p3 AS VARCHAR(4000)) END) AS R FROM T',
+    LQuery.AsString, False);
+  Assert.AreEqual(3, LQuery.Params.Count);
 end;
 
-procedure TTestCaseValueSlot.TestSlotDeValorSemWhenNoElseIfNaoGravaParametro;
+procedure TTestCaseValueSlot.TestSlotDeValorDepoisDeStringContinuaPermitido;
 var
   LQuery: IFluentSQL;
 begin
-  // Sitio proprio, mesma razao da celula de Null no ElseIf: sem esta, apagar o
-  // _AssertHaveWhen de ElseIf(Variant) continuaria levantando (a sobrecarga de
-  // String re-assere) e nenhum teste veria o parametro orfao que sobrou.
-  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID').Column('TIPO');
-  try
-    LQuery.CaseExpr.ElseIf('X', dftString);
-  except
-    on E: Exception do ;
-  end;
-  Assert.AreEqual(0, LQuery.Params.Count,
-    'ElseIf sem When e recusado ANTES de gravar o parametro');
+  // CONTROLE: a ORDEM inversa e legitima e continua passando. String primeiro
+  // nao prende :pN nenhum ao ramo, entao o slot esta livre.
+  LQuery := FluentSQL.Query(dbnFirebird)
+    .Select.Column('ID').Column('TIPO')
+    .CaseExpr.When('1').IfThen('''A''').IfThen('B', dftString)
+    .EndCase.Alias('R').From('T');
+  Assert.AreEqual(
+    'SELECT ID, (CASE TIPO WHEN 1 THEN CAST(:p1 AS VARCHAR(4000)) END) AS R FROM T',
+    LQuery.AsString, False);
+  Assert.AreEqual(1, LQuery.Params.Count);
 end;
 
 { --- controles: o que NAO pode ter mudado ---------------------------------- }
@@ -628,6 +887,26 @@ begin
   Assert.AreEqual(0, LQuery.Params.Count,
     'A sobrecarga de Int64 continua virando texto - e o defeito que a sobrecarga ' +
     'nova existe para dar alternativa, nao para apagar em silencio');
+end;
+
+procedure TTestCaseValueSlot.TestSobrescreverRamoComStringContinuaPermitido;
+var
+  LQuery: IFluentSQL;
+begin
+  // CONTROLE que delimita o alcance da guarda nova: String sobre String continua
+  // permitido e continua nao vazando, porque ali nao ha :pN envolvido. E a prova
+  // de que a guarda NAO quebra codigo anterior a esta entrega.
+  LQuery := FluentSQL.Query(dbnPostgreSQL)
+    .Select.Column('ID').Column('TIPO')
+    .CaseExpr.When('1').IfThen('''A''').IfThen('''B''')
+      .ElseIf('''C''').ElseIf('''D''')
+    .EndCase.Alias('R').From('T');
+  Assert.AreEqual(
+    'SELECT ID, (CASE TIPO WHEN 1 THEN ''B'' ELSE ''D'' END) AS R FROM T',
+    LQuery.AsString, False,
+    'Sobrescrever ramo com a sobrecarga de String e comportamento anterior a ' +
+    'esta entrega e tem de continuar valendo');
+  Assert.AreEqual(0, LQuery.Params.Count);
 end;
 
 procedure TTestCaseValueSlot.TestSlotDeValorConviveComOSlotDeExpressaoNaNumeracao;
