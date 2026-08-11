@@ -10,7 +10,12 @@
 *.stat
 
 # DUnitX — saída de runner local/CI (evita poluir git status / diffs)
-dunitx-results.xml
+# Glob, e não nome exato: cada projeto grava <Projeto>-dunitx-results.xml ao lado
+# do próprio EXE, e numa build pela IDE esse "ao lado do EXE" cai dentro da árvore
+# (pasta do projeto ou Win32\Debug). O * inicial casa tanto o nome novo quanto o
+# antigo 'dunitx-results.xml', que ainda existe em árvore de quem rodou a suíte
+# antes desta mudança — e continua valendo para o projeto que alguém criar amanhã.
+*dunitx-results.xml
 
 # Docusaurus (docs-src/) — artefatos locais; build oficial no GitHub Actions
 docs-src/node_modules/
