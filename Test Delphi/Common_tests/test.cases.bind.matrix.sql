@@ -340,7 +340,82 @@
     Interbase                     nao medido
 
   ==============================================================================
-  VEREDITO - POR QUE A ASSINATURA DE IfThen/ElseIf NAO MUDOU NESTA BRANCH
+  ATUALIZACAO T13 - A ASSINATURA MUDOU. LEIA ESTA SECAO ANTES DO VEREDITO ABAIXO
+  ==============================================================================
+
+  O VEREDITO que fecha este arquivo ("por isso a assinatura NAO foi alterada
+  nesta branch") descrevia a situacao na branch da T14. ELE ESTA SUPERADO. Fica
+  aqui porque a medicao que ele resume continua valendo e e a razao de o desenho
+  ter ficado como ficou - mas a conclusao dele nao e mais a conclusao.
+
+  O QUE MUDOU ENTRE UMA COISA E OUTRA: a T17 (PR #157). Ela tirou
+  IFluentSQLFunctions.Cast do padrao A e o pos a despachar por dialeto, com a
+  largura resolvida por driver e a intersecao portavel em fonte unica. Isso
+  entrega, pronta, a peca que faltava - a opcao (i) da lista do veredito.
+
+  A DECISAO DO DONO foi a (i): emitir CAST(:pN AS <tipo do dialeto>) nos SETE, e
+  nao so nos dois que exigem. A razao de uniformizar e que esta e uma sobrecarga
+  NOVA - nao ha SQL emitido hoje por ela, logo nao ha oraculo a quebrar - e a
+  alternativa seria manter uma tabela de "quem precisa de tipo" que envelhece com
+  a versao do motor.
+
+  O QUE A T13 EMITE, MEDIDO NO BUILD (nao inferido da gramatica): o texto exato
+  sai em test.cases.value.pas, celula por celula. Resumo:
+
+    Firebird ..... CASE ... THEN CAST(:p1 AS VARCHAR(4000)) ...
+    SQL Server ... CASE ... THEN CAST(:p1 AS NVARCHAR(4000)) ...
+    MySQL ........ CASE ... THEN CAST(? AS CHAR) ...        (:pN -> ? no driver)
+    Oracle ....... CASE ... THEN CAST(:p1 AS VARCHAR2(4000)) ...
+    PostgreSQL ... CASE ... THEN CAST(:p1 AS VARCHAR) ...
+    SQLite ....... CASE ... THEN CAST(:p1 AS TEXT) ...
+    DB2 .......... CASE ... THEN CAST(:p1 AS VARCHAR) ...   (sem largura)
+    InterBase .... levanta EFluentSQLFunctionNotSupported (matriz nao medida)
+    MongoDB ...... levanta EFluentSQLFunctionNotSupported (fora da intersecao)
+
+  ONDE ESTA A PROVA DE MOTOR REAL PARA OS DOIS QUE RECUSAVAM
+
+  Nao esta neste arquivo - esta em test.cast.matrix.sql, secao "A FORMA QUE
+  DESBLOQUEIA A T13", e ela foi feita com AS STRINGS EXATAS que a implementacao
+  emite. Transcricao resumida, o literal esta la:
+
+    Firebird 5.0.4
+      controle (sem CAST) .. -804 / HY004 "Data type unknown"
+      CAST(:a AS VARCHAR(4000)) nos dois ramos ......... ACEITA, devolve 'yes'
+      CAST(:a AS INTEGER) nos dois ramos .............. ACEITA, devolve 20
+
+    DB2 v12.1.5.0
+      controle (sem CAST) .. SQL0418N / 42610 "untyped parameter marker"
+      CAST(? AS VARCHAR) nos dois ramos ..... SQL0313N -> O PREPARE PASSOU
+      CAST(? AS VARCHAR(4000)) .............. SQL0313N -> O PREPARE PASSOU
+      CAST(? AS INTEGER) .................... SQL0313N -> O PREPARE PASSOU
+
+  As larguras batem com o que a T13 emite: 4000 no Firebird, nenhuma no DB2.
+
+  O QUE NAO FOI MEDIDO CONTRA MOTOR NESTA ENTREGA, E POR QUE
+
+  NENHUMA medicao nova foi feita na branch da T13. O daemon do Docker nao sobe
+  neste ambiente - Docker Desktop 4.84.0 aborta na inicializacao com
+  "loading/formatting settings-store.json: parsing JSON: invalid character
+  '\x00'", e a distro WSL default aponta para um ext4.vhdx que nao existe. Consertar
+  isso e mexer na configuracao da maquina, fora do escopo da tarefa. Toda
+  afirmacao sobre motor real acima e CITACAO de medicao ja registrada (T13/T14 e
+  T17), nao medicao desta branch.
+
+  Fica declarado, entao, o que continua SEM medicao com bind em posicao de
+  THEN/ELSE, para que ninguem o leia como medido:
+
+    * dftFloat nos dois motores que recusavam. A T17 mediu a GRAFIA do alvo
+      ('DOUBLE PRECISION' no Firebird, 'DOUBLE' no DB2) mas nao a executou dentro
+      de um CASE com parametro. O raciocinio de que passa - o que o motor recusava
+      era o marcador SEM tipo, e o CAST da tipo, qualquer que seja - e INFERENCIA,
+      e esta escrito aqui como inferencia.
+    * a forma com CAST em posicao de THEN/ELSE nos outros cinco dialetos. Eles ja
+      aceitavam o parametro NU (casos A/B/D acima), e a T17 mediu a grafia do CAST
+      de cada um isoladamente; o que nao se mediu foi a combinacao das duas.
+    * InterBase, em qualquer forma. Continua sem imagem publica.
+
+  ==============================================================================
+  VEREDITO (HISTORICO, DA BRANCH DA T14) - POR QUE A ASSINATURA NAO MUDOU LA
   ==============================================================================
 
   A forma que a T13 propunha emitir - CASE WHEN <cond> THEN :p1 ELSE :p2 END -
