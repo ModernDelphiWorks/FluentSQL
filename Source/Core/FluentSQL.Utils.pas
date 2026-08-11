@@ -376,6 +376,16 @@ begin
     dbnMongoDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
   end;
   Result := QuotedStr(Result);
+  // Ver DateToSQLFormat: o Oracle exige o literal ANSI tipado. Medido no
+  // Oracle AI Database 26ai Free 23.26.2.0.0, DEFAULT de coluna TIMESTAMP:
+  //   DEFAULT '2026-08-10 12:34:56'            -> ORA-01843 invalid month
+  //   DEFAULT TIMESTAMP '2026-08-10 12:34:56'  -> cria, e o INSERT devolve
+  //                                               2026-08-10 12:34:56
+  // Vale tambem em coluna DATE (o Oracle guarda hora no DATE) e nas posicoes
+  // de WHERE, INSERT VALUES, UPDATE SET e BETWEEN - as submissoes estao
+  // transcritas em Test Delphi\Common_tests\test.date.literal.matrix.sql.
+  if ADriverName = dbnOracle then
+    Result := 'TIMESTAMP ' + Result;
 end;
 
 class function TUtils.DateToSQLFormat(const ADriverName: TFluentSQLDriver;
@@ -394,6 +404,18 @@ begin
     dbnMongoDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
   end;
   Result := QuotedStr(Result);
+  // O Oracle e o UNICO dos sete que recusa o literal cru: com o
+  // NLS_DATE_FORMAT de fabrica (DD-MON-RR), DEFAULT '2026-08-10' devolve
+  // ORA-01861 "literal does not match format string" ja no CREATE TABLE. O
+  // literal ANSI tipado nao depende de NLS e foi medido criando a tabela.
+  //
+  // O ramo e do dialeto, e nao do caminho comum, porque NAO EXISTE forma
+  // aceita pelos sete: SQL Server (Msg 128), MySQL (ERRO 1067) e SQLite
+  // (parse error) recusam DATE '...' na mesma posicao. A matriz completa esta
+  // em Test Delphi\Common_tests\test.date.literal.matrix.sql; o anti-colateral
+  // que trava os outros seis, em test.date.literal.matrix.pas.
+  if ADriverName = dbnOracle then
+    Result := 'DATE ' + Result;
 end;
 
 class function TUtils.GuidStrToSQLFormat(const ADriverName: TFluentSQLDriver;
