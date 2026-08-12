@@ -58,6 +58,29 @@ type
       TSections = set of TSection;
   strict private
     FActiveSection: TSection;
+    /// <summary>
+    ///   A ESPECIE do enunciado - SELECT, INSERT, UPDATE, DELETE ou MERGE -, e
+    ///   nao a secao em que o cursor esta agora. Sao coisas diferentes e a
+    ///   diferenca e observavel: Where(''), GroupBy('') e OrderBy('') MUDAM
+    ///   FActiveSection sem emitir uma letra, e um DELETE continua um DELETE
+    ///   depois de qualquer uma delas.
+    ///
+    ///   Escrito num ponto UNICO - _SetSection, e so para as secoes que ABREM
+    ///   enunciado - e por isso nao ha caminho que o deixe defasado. Nasce
+    ///   secSelect, que e o default neutro e o mesmo que ClearAll restabelece.
+    /// </summary>
+    FStatementKind: TSection;
+    /// <summary>
+    ///   Houve alguma secao que ABRIU enunciado? Distingue "e um SELECT" de
+    ///   "ainda nao e nada", que FStatementKind sozinho nao distingue: ele nasce
+    ///   secSelect, que e o default neutro, e um enunciado recem-criado
+    ///   responderia "sou um SELECT" sem que ninguem tenha chamado Select.
+    ///
+    ///   A diferenca e observavel e foi medida: Query(...).GroupBy('') abre
+    ///   lista de colunas SEM haver enunciado nenhum, e um CaseExpr ali emitia
+    ///   "GROUP BY (CASE ...)" solto - um fragmento que nem enunciado e.
+    /// </summary>
+    FStatementAberto: Boolean;
     FActiveOperator: TOperator;
     FActiveExpr: IFluentSQLCriteriaExpression;
     FActiveValues: IFluentSQLNameValuePairs;
@@ -356,15 +379,14 @@ end;
 ///       -> SELECT ID, (CASE TIPO WHEN 1 THEN ... END) ...
 ///
 ///   Sobre qualquer OUTRO no, as mesmas duas linhas produziam lixo em silencio.
-///   MEDIDO POR MUTACAO, e as duas metades sao load-bearing. A base de contagem
-///   e SEMPRE a mesma - celulas que passam a falhar nos 11 RUNNERS, com
-///   -DDB2 -DINTERBASE:
-///     apagar o ATALHO  -> 31 celulas (24 em Common, 11 delas da suite do slot
-///                         de valor, a T13)
-///     apagar o ANEXO   -> 39 celulas (28 em Common), porque sem ele o CASE nao
-///                         chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T",
-///                         com o CASE inteiro perdido
-///   Nenhuma das duas linhas podia sair. O que faltava era a PERGUNTA.
+///   MEDIDO POR MUTACAO, e as duas metades sao load-bearing. Todo numero abaixo
+///   foi REMEDIDO NO HEAD FINAL - nenhum sobrevive de rodada anterior - e vem
+///   com as DUAS bases, porque publicar so uma confunde:
+///     apagar o ATALHO  -> 33 celulas nos 11 runners, 26 em Common, 11 da T13
+///     apagar o ANEXO   -> 41 celulas nos 11 runners, 30 em Common, 13 da T13
+///   Sem o anexo o CASE nao chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T",
+///   com o CASE inteiro perdido. Nenhuma das duas linhas podia sair. O que
+///   faltava era a PERGUNTA.
 ///
 ///   ==========================================================================
 ///   A PERGUNTA E DE NO, NAO DE SECAO - E ESSA DISTINCAO CUSTOU UMA RODADA
@@ -404,6 +426,10 @@ end;
 ///   que tres varreduras curtas ja respondem sem tocar em superficie publica.
 ///   As listas existem desde TFluentSQLAST.Create e os getters sao puros: varrer
 ///   nao cria secao nenhuma.
+///
+///   OS TRES RAMOS TEM CELULA, e o apagamento de cada um foi medido no HEAD
+///   FINAL (11 runners / Common):
+///     Select ... 37 / 26      GroupBy ... 2 / 2      OrderBy ... 2 / 2
 ///
 ///   ==========================================================================
 ///   PARA ONDE VAI A COLUNA NOVA: ASTColumns, E ISSO FOI MEDIDO
@@ -531,57 +557,61 @@ begin
 end;
 
 /// <summary>
-///   O CASE nao existe em DELETE nem em UPDATE, e a guarda le DUAS coisas pela
-///   mesma razao que a guarda de JOIN em DELETE le (TFluentSQL._CreateJoin, nesta
-///   unit, PR #167): nenhuma das duas cobre a outra.
+///   O CASE nao existe em DELETE nem em UPDATE, e a pergunta e UMA so porque o
+///   discriminador e DURAVEL: FStatementKind, a ESPECIE do enunciado.
 ///
-///     marca DURAVEL ... not FAST.Delete.IsEmpty / not FAST.Update.IsEmpty.
-///       Quem a estabelece e _DefineSectionDelete/_DefineSectionUpdate via
-///       From/Update, e quem a limpa e ClearAll - chamado por
-///       _DefineSectionSelect, Insert e Update. Ela SOBREVIVE a Where, GroupBy,
-///       OrderBy e Having, que trocam a secao e NAO chamam ClearAll.
-///     secao ATIVA .... FActiveSection in [secDelete, secUpdate]. Cobre o
-///       enunciado que ainda nao tem relacao alvo, onde a marca duravel ainda
-///       nao existe.
+///   POR QUE NAO A FORMA DO PR #167, QUE FOI A PRIMEIRA TENTATIVA AQUI. Aquela
+///   guarda le duas coisas - a marca (not FAST.Delete.IsEmpty) e a secao ativa
+///   (FActiveSection = secDelete) - e as duas juntas AINDA deixam um buraco,
+///   medido:
 ///
-///   POR QUE AS DUAS, E NAO SO A SECAO: e a licao da T30, e ela custou uma
-///   rodada la e ia custar outra aqui. Where('') nao emite UMA LETRA e mesmo
-///   assim TROCA a secao ativa. Sem a marca duravel, bastava intercalar
-///   GroupBy('') ou OrderBy('') para o CASE voltar a passar - e passar CALADO,
-///   porque aquelas secoes TEM lista de colunas e a coluna nova nasceria nelas:
+///     Delete.GroupBy('') + CaseExpr   -> "GROUP BY (CASE WHEN 1 THEN 1 END)"
+///     Delete.OrderBy('') + CaseExpr   -> "ORDER BY (CASE ...) ASC"
 ///
-///     Delete.From('T').GroupBy('') + CaseExpr
-///       -> DELETE FROM T GROUP BY (CASE WHEN 1 THEN 1 END)
-///     Update('T').Values('A','1').OrderBy('') + CaseExpr
-///       -> UPDATE T SET A = :p1 ORDER BY (CASE WHEN 1 THEN 1 END) ASC
+///   porque Delete SEM From nao alimenta Delete.TableNames (nao ha marca a ler)
+///   e GroupBy('') ja tirou FActiveSection de secDelete. As duas metades sao
+///   FALSAS ao mesmo tempo, e o que sai nao e sequer um enunciado - e um
+///   fragmento, sem DELETE nenhum. Na base aquilo levantava EAccessViolation,
+///   entao seria crash -> texto invalido CALADO: loud->mute introduzido pela
+///   propria entrega que veio matar loud->mute.
 ///
-///   POR QUE AS DUAS, E NAO SO A MARCA: Delete.CaseExpr direto, sem From
-///   nenhum, nao tem marca a ler.
+///   A saida NAO foi empilhar uma terceira metade. Foi perguntar a coisa certa:
+///   "este enunciado E um DELETE?" e nao "o cursor esta num DELETE agora?".
+///   FStatementKind responde a primeira, e responde sozinho:
+///
+///     escrito ... em _SetSection, ponto UNICO, e so para as secoes que ABREM
+///                  enunciado (secSelect, secDelete, secInsert, secUpdate,
+///                  secMerge)
+///     imune a .... Where, GroupBy, Having e OrderBy, que mudam a secao ATIVA e
+///                  nao a especie - e era exatamente por ali que o buraco vinha
+///     limpo por .. ClearAll, e por qualquer secao que abra outro enunciado, o
+///                  que mantem "trocar para SELECT libera o CaseExpr"
+///
+///   Uma pergunta so, sem estado transitorio, sem particao a manter. A guarda
+///   do #167 em _CreateJoin continua com a forma antiga e com o buraco - isso e
+///   achado REPORTADO, nao consertado aqui: o texto que sai de la e outro e a
+///   decisao de puxar o conserto e do dono.
 ///
 ///   AS DUAS NATUREZAS SAO DIFERENTES, e o registro importa porque a gravidade e:
-///     no DELETE a base ja emitia texto invalido ("DELETE FROM (CASE T ...)"),
-///       entao e invalido -> recusado: melhora sem regressao.
-///     no UPDATE a base levantava EAccessViolation, e sem esta guarda a entrega
-///       trocaria CRASH por TEXTO INVALIDO CALADO - loud->mute, exatamente a
-///       regressao que esta tarefa existe para nao cometer. Foi introduzida por
-///       esta entrega e e fechada por esta guarda, nao catalogada como ressalva.
-///
-///   O QUE CONTINUA LIBERADO, e tem de continuar: trocar para SELECT na mesma
-///   instancia limpa a marca e devolve o CaseExpr.
+///     no DELETE com From a base ja emitia texto invalido
+///       ("DELETE FROM (CASE T ...)"): invalido -> recusado, melhora sem
+///       regressao.
+///     no DELETE sem From e no UPDATE a base levantava EAccessViolation, e sem
+///       esta guarda a entrega trocaria CRASH por TEXTO INVALIDO CALADO. Isso e
+///       fechado aqui, e nao catalogado como ressalva.
 /// </summary>
 procedure TFluentSQL._AssertCaseExprNaoEstaEmDeleteOuUpdate;
 begin
-  if (FActiveSection in [secDelete, secUpdate]) or
-     (Assigned(FAST) and Assigned(FAST.Delete) and (not FAST.Delete.IsEmpty)) or
-     (Assigned(FAST) and Assigned(FAST.Update) and (not FAST.Update.IsEmpty)) then
-    raise EArgumentException.Create(
-      'IFluentSQL.CaseExpr chamado dentro de um DELETE ou de um UPDATE: nem um ' +
-      'nem outro projeta colunas, e um CASE nao tem onde morar ali. O que sairia ' +
-      'nao e aceito por motor nenhum - "DELETE FROM (CASE ...)" com a relacao ' +
-      'substituida, ou, se uma secao com lista de colunas tiver sido aberta no ' +
-      'meio, um "GROUP BY"/"ORDER BY" pendurado num DELETE ou num UPDATE. Se o ' +
-      'CASE e o VALOR a gravar, ele vai no lado dos valores; se e para escolher ' +
-      'as linhas, ele vai na condicao do WHERE; se e para projetar, num SELECT.');
+  if not (FStatementKind in [secDelete, secUpdate]) then
+    Exit;
+  raise EArgumentException.Create(
+    'IFluentSQL.CaseExpr chamado dentro de um DELETE ou de um UPDATE: nem um ' +
+    'nem outro projeta colunas, e um CASE nao tem onde morar ali. O que sairia ' +
+    'nao e aceito por motor nenhum - "DELETE FROM (CASE ...)" com a relacao ' +
+    'substituida, ou, se uma clausula com lista de colunas tiver sido aberta no ' +
+    'meio, um fragmento solto que nem enunciado e. Se o CASE e o VALOR a gravar, ' +
+    'passe-o em Values/SetValue; se e para escolher as linhas, passe-o na ' +
+    'condicao do Where; se e para projetar, abra um Select.');
 end;
 
 /// <summary>
@@ -658,7 +688,13 @@ begin
   if Assigned(FAST) and Assigned(FAST.Insert) and
      (FAST.ASTColumns = FAST.Insert.Columns) then
     _RecusaCaseExprNoInsert;
-  if Assigned(FAST) and Assigned(FAST.ASTColumns) then
+  // ⚠️ A LISTA DE COLUNAS NAO BASTA: GroupBy('') e OrderBy('') abrem lista SEM
+  // que haja enunciado nenhum, e o CASE nascia ali produzindo fragmento solto
+  // ("GROUP BY (CASE ...)" sem SELECT). Medido: na base aquilo levantava
+  // EAccessViolation, entao aceitar seria trocar crash por texto invalido
+  // CALADO. Um CASE precisa de um enunciado que o contenha, e nao so de uma
+  // lista onde encaixar.
+  if Assigned(FAST) and Assigned(FAST.ASTColumns) and FStatementAberto then
     Exit;
   raise EArgumentException.Create(
     'IFluentSQL.CaseExpr chamado numa secao que nao projeta colunas: um CASE ' +
@@ -1057,6 +1093,10 @@ end;
 function TFluentSQL.ClearAll: IFluentSQL;
 begin
   FAST.Clear;
+  // Limpar o enunciado limpa tambem a ESPECIE dele. Sem esta linha, ClearAll
+  // deixaria para tras a marca de um DELETE que nao existe mais.
+  FStatementKind := secSelect;
+  FStatementAberto := False;
   Result := Self;
 end;
 
@@ -1928,6 +1968,14 @@ begin
     secMerge:   ; // MERGE is handled by its own builder but we must allow the section
   else
       raise Exception.Create('TCriteria.SetSection: Unknown section');
+  end;
+  // A ESPECIE muda so quando se ABRE enunciado. As clausulas - Where, GroupBy,
+  // Having, OrderBy - mudam a secao ATIVA e NAO a especie, e e exatamente essa
+  // distincao que faz a marca sobreviver a elas.
+  if ASection in [secSelect, secDelete, secInsert, secUpdate, secMerge] then
+  begin
+    FStatementKind := ASection;
+    FStatementAberto := True;
   end;
   FActiveSection := ASection;
 end;

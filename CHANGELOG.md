@@ -19,7 +19,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - **BREAKING CHANGE (SQL emitido e API) — `CaseExpr` passou a perguntar se o nó do cursor é uma COLUNA antes de se ancorar nele.** `IFluentSQL.CaseExpr` decide **duas** coisas: o operando do `CASE` (o que vem entre `CASE` e o primeiro `WHEN`) e **em que nó da árvore o `CASE` vai morar**. Ele decidia as duas lendo `FAST.ASTName` — um **cursor** que aponta para o último nó tocado pela cadeia fluente — **sem perguntar que nó é aquele**.
 
-  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **35 células nos 11 runners**, das quais **24 em `Common`** (11 destas da suíte do slot de valor) — e apagar o **anexo** derruba **39 nos mesmos 11 runners**, porque sem ele o `CASE` não chega ao `SELECT`. **Toda contagem publicada aqui usa a mesma base: células que passam a falhar nos 11 runners, com `-DDB2 -DINTERBASE`**. `CaseExpr('COLUNA')` explícito também não muda.
+  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **33 células nos 11 runners** (26 em `Common`, 11 da suíte do slot de valor) — e apagar o **anexo** derruba **41 / 30**, porque sem ele o `CASE` não chega ao `SELECT`. **Toda contagem publicada foi remedida no HEAD final, com as duas bases: 11 runners e `Common`, sempre com `-DDB2 -DINTERBASE`**. `CaseExpr('COLUNA')` explícito também não muda.
 
   **E a pergunta é de NÓ, não de seção** — a distinção não é acadêmica, e é o motivo de a primeira versão desta entrega ter sido rejeitada. `FAST.ASTName` é **durável** e atravessa a troca de seção; `FAST.ASTColumns` é **trocado por baixo do cursor** (vira `nil` no `WHERE` e no `HAVING`, vira outra lista no `GROUP BY` e no `ORDER BY`). Duas cadeias com as **mesmas seções** e ordens diferentes são caminhos distintos:
 
@@ -37,7 +37,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | relação, seção `ORDER BY` | `SELECT TIPO FROM (CASE T …)` | `SELECT TIPO FROM T ORDER BY (CASE …) ASC` |
   | relação do `JOIN` | `… INNER JOIN (CASE U …) ON` | `EArgumentException` |
   | seção `WHERE` / `HAVING` | `SELECT … FROM (CASE T …) WHERE …` | `EArgumentException` |
-  | seção `DELETE`, **com ou sem seção intercalada** | `DELETE FROM (CASE T …)` — inválido | `EArgumentException` |
+  | seção `DELETE`, **com `From`, sem `From`, e com qualquer cláusula intercalada** | `DELETE FROM (CASE T …)` inválido — ou **`EAccessViolation`** sem `From` | `EArgumentException` |
   | seção `UPDATE`, **com ou sem seção intercalada** | **`EAccessViolation`** | `EArgumentException` |
   | `Insert.Into('T')` | **`EAccessViolation`** | `EArgumentException` |
   | `Insert.Into('T').Column('A')` | `INSERT INTO T ( (CASE A …) )` | `EArgumentException` |

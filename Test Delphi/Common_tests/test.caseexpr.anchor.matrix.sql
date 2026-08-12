@@ -1,6 +1,36 @@
 /* =============================================================================
    T34 - ONDE O "CASE" SE ANCORA
-   Oraculo de motor real. Transcricao LITERAL das sessoes, nao parafrase.
+   Oraculo de motor real.
+
+   ---------------------------------------------------------------------------
+   ESTE ARQUIVO E GERADO A PARTIR DA CAPTURA CRUA, E NAO TRANSCRITO A MAO
+   ---------------------------------------------------------------------------
+
+   Cada bloco abaixo e o stdout+stderr do comando declarado nele, gravado em
+   arquivo e COPIADO SEM EDICAO. Nenhum apelido, AS, reordenacao, recorte ou
+   reindentacao foi acrescentado.
+
+   E o procedimento e conferivel sem confiar em ninguem. Cada captura esta entre
+   as sentinelas
+
+       /* >>> INICIO DA CAPTURA CRUA: <motor> */
+       /* <<< FIM DA CAPTURA CRUA: <motor> */
+
+   Extraia o que ha entre elas, reexecute o comando declarado no bloco
+   redirecionando para um arquivo, e rode diff entre os dois. DIFF VAZIO e o
+   criterio. Se diferir, o bloco e que esta errado.
+
+   POR QUE ISTO MUDOU. Duas rodadas de revisao acharam adaptacao silenciosa aqui:
+     rodada 2 - o Oracle recebeu "SELECT P.* ... FROM PRODUCTS P", com apelido
+       que o FluentSQL nao emite. A adaptacao ESCONDIA a recusa ORA-00923.
+     rodada 3 - os blocos T1b do MySQL e do SQL Server mostravam uma coluna "R"
+       inexistente no enunciado. Era apelido acrescentado na captura.
+   Transcricao a mao falhou duas vezes seguidas; por isso agora e mecanica.
+
+   UMA DIFERENCA DE FERRAMENTA, DECLARADA: o sqlplus recebe
+   "SET PAGESIZE 50 LINESIZE 200 TAB OFF". Sem TAB OFF ele alinha com TAB e a
+   caixa nao reproduz em editor nenhum. Isso e formatacao de CLIENTE e nao toca
+   o enunciado nem o resultado.
 
    ---------------------------------------------------------------------------
    QUANTOS MOTORES, E QUAIS - OS DOIS NUMEROS, COM OS NOMES
@@ -9,45 +39,8 @@
    SUBMETIDOS: 7
      PostgreSQL, MySQL, SQL Server, Firebird, Oracle, SQLite  ... 6 ATIVOS
      DB2 ......................................................  1 SOB DEFINE
-                                                                 (desligado no
-                                                                  FluentSQL.inc,
-                                                                  so compila com
-                                                                  -DDB2)
    NAO MEDIDO: 1
      InterBase ... nao existe imagem publica. Nao foi inferido do Firebird.
-
-   Uma versao anterior deste arquivo dizia "SEIS de sete" e listava DB2 mas
-   nao SQLite - ou seja, largava um dialeto ATIVO e contava um DESLIGADO. O
-   dado estava aqui; a recitacao e que perdia o SQLite. Os dois numeros acima
-   sao para nao repetir isso.
-
-   ---------------------------------------------------------------------------
-   ⚠️ O QUE FOI SUBMETIDO E O QUE FOI ADAPTADO
-   ---------------------------------------------------------------------------
-
-   TODOS os enunciados abaixo foram submetidos EXATAMENTE como o FluentSQL os
-   emite - sem apelido acrescentado, sem AS, sem reordenar. Onde um motor
-   recusa, a recusa esta transcrita.
-
-   Isto corrige DUAS versoes anteriores deste arquivo:
-
-     rodada 2 - o enunciado do Oracle levava "P.*" com apelido "P" que o
-       FluentSQL NAO emite, e a nota que confessava a adaptacao existia so aqui
-       dentro enquanto o CHANGELOG e a doutrina afirmavam "verbatim". A
-       adaptacao escondia uma RECUSA REAL, hoje transcrita (ORA-00923).
-     rodada 3 - os blocos T1b do MySQL e do SQL Server mostravam uma coluna "R"
-       que o enunciado declarado NAO tem. Era apelido acrescentado na captura,
-       no mesmo arquivo que promete literalidade, logo abaixo do paragrafo que
-       promete te-la corrigido. Ressubmetidos: o MySQL devolve como cabecalho a
-       EXPRESSAO INTEIRA, e o SQL Server devolve CABECALHO VAZIO - que entra
-       como esta, porque cabecalho vazio e DADO e nao falha de captura.
-
-   COMO A LITERALIDADE FOI CONFERIDA NESTA RODADA, e nao apenas afirmada: os
-   SETE motores foram ressubmetidos na mesma sessao, com os enunciados exatos de
-   :56-57, e a caixa devolvida foi comparada com a transcrita bloco a bloco. Os
-   cinco que ja eram literais reproduziram byte a byte; os dois do T1b acima nao
-   reproduziam, e e por isso que foram trocados. Nenhum bloco deste arquivo
-   contem apelido, AS, reordenacao ou recorte que o enunciado nao tenha.
 
    ---------------------------------------------------------------------------
    MASSA, identica nos sete
@@ -55,26 +48,23 @@
 
      PRODUCTS(ID, PRICE, TIPO) = (1, 5.00, 'X'), (2, 15.00, 'Y'), (3, 25.00, 'Y')
      duas linhas com PRICE > 10  ->  esperado BARATO / CARO / CARO
-     contagem ANTES e DEPOIS de cada sessao: 3 e 3, em todos.
+     MASSA_ANTES e MASSA_DEPOIS estao DENTRO de cada bloco, na mesma sessao.
 
    ---------------------------------------------------------------------------
-   OS CINCO ENUNCIADOS
+   OS CINCO ENUNCIADOS, na ordem em que aparecem em cada bloco
    ---------------------------------------------------------------------------
 
-   HEAD  o que a base emitia com o cursor na RELACAO
-         SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
+   Entre MASSA_ANTES e MASSA_DEPOIS, cada bloco traz nesta ordem:
 
-   T1    o que passa a sair de .Select.All.From('PRODUCTS') + CaseExpr
-         SELECT *, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS
+   HEAD  SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
+   T1    SELECT *, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS
+   T1b   SELECT TIPO, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS
+   T2    SELECT TIPO FROM PRODUCTS GROUP BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
+   T3    SELECT TIPO FROM PRODUCTS ORDER BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) ASC
 
-   T1b   o que passa a sair de .Select.Column('TIPO').From('PRODUCTS') + CaseExpr
-         SELECT TIPO, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS
-
-   T2    o que passa a sair com GroupBy('') e cursor na relacao
-         SELECT TIPO FROM PRODUCTS GROUP BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
-
-   T3    o que passa a sair com OrderBy('') e cursor na relacao
-         SELECT TIPO FROM PRODUCTS ORDER BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) ASC
+   HEAD e o que a base emitia com o cursor na RELACAO. T1 e o que passa a sair de
+   .Select.All.From('PRODUCTS'); T1b de .Select.Column('TIPO').From('PRODUCTS');
+   T2 e T3 das mesmas cadeias com GroupBy('') e OrderBy('').
 
    ---------------------------------------------------------------------------
    RESUMO - E ELE NAO E "SEIS ACEITAM"
@@ -91,110 +81,89 @@
    SQLite 3.53.4                RECUSA  3 lin   3 lin   2 lin   3 lin
    InterBase                    ------------ NAO MEDIDO ------------
 
-   LEITURA HONESTA DAS TRES COLUNAS QUE NAO SAO VERDES INTEIRAS:
+   LEITURA HONESTA:
 
    HEAD ... 7 de 7 RECUSAM. E o que justifica a tarefa, e nao tem ressalva.
 
-   T1 ..... RECUSADO por Firebird e Oracle, e a causa NAO E a ancoragem: e a
-            virgula depois da ESTRELA. O Firebird aponta a coluna 9, que e
-            exatamente a virgula; a Oracle devolve ORA-00923. "SELECT *, <expr>"
-            e forma que esses dois nao aceitam, e ela ja saia da base por
-            Select.All seguido de Column - defeito PRE-EXISTENTE do All, com
-            porta propria, fora do escopo desta tarefa. O que esta tarefa
-            mudou foi trocar um texto que 7 de 7 recusam por um que 5 de 7
-            aceitam; nos outros 2 a recusa passou a ser de OUTRA causa, ja
-            catalogada. NAO se afirma aqui que "os seis aceitam T1".
+   T1 ..... RECUSADO por Firebird e Oracle - que sao DOIS DOS SEIS ATIVOS, e nao
+            dois de sete. A causa NAO e a ancoragem: e a virgula depois da
+            ESTRELA. O Firebird aponta a coluna 9, que e exatamente a virgula; a
+            Oracle devolve ORA-00923. "SELECT *, <expr>" ja saia da base por
+            Select.All seguido de Column - defeito PRE-EXISTENTE do All, porta
+            propria, fora do escopo desta tarefa.
 
-   T1b .... 7 de 7 ACEITAM, com o dado certo. E o teste limpo da ancoragem,
-            porque nao carrega a estrela. E a forma que o consumidor obtem
-            projetando colunas nomeadas.
+   T1b .... 7 de 7 ACEITAM, com o dado certo. E o teste limpo da ancoragem.
 
-   T2 ..... RECUSADO por 6 de 7, e a causa TAMBEM nao e a ancoragem: e a
-            CADEIA DO USUARIO. Projetar TIPO agrupando por outra expressao
-            viola a regra de GROUP BY, e os motores dizem isso com todas as
-            letras ("must appear in the GROUP BY clause"). O SQLite aceita
-            porque nao aplica a regra estrita. O CASE esta no lugar certo -
-            quem escreve .Select.Column('TIPO').GroupBy('') e pede um CASE
-            searched no GROUP BY montou uma consulta que nao fecha. Recusa
-            medida e explicada vale mais que texto nao submetido.
+   T2 ..... RECUSADO por 6 de 7, e a causa TAMBEM nao e a ancoragem: e a CADEIA
+            DO USUARIO. Projetar TIPO agrupando por outra expressao viola a
+            regra de GROUP BY, e os motores dizem isso com todas as letras. O
+            SQLite aceita porque nao aplica a regra estrita. O CASE esta no
+            lugar certo.
 
    T3 ..... 7 de 7 ACEITAM.
 
    ============================================================================= */
 
-
 /* ---------------------------------------------------------------------------
    PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1)
-   postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
+   papel na suite: ATIVO
+   imagem: postgres@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
+   comando: docker exec -i t34-pg psql -U postgres -c "<enunciado>"
    --------------------------------------------------------------------------- */
 
-postgres=# SELECT COUNT(*) AS massa_antes FROM PRODUCTS;
- massa_antes
+/* >>> INICIO DA CAPTURA CRUA: pg */
+ massa_antes 
 -------------
            3
+(1 row)
 
--- HEAD
-postgres=# SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END);
 ERROR:  syntax error at or near "CASE"
 LINE 1: SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELS...
                        ^
-
--- T1
-postgres=# SELECT *, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS;
- id | price | tipo |  case
+ id | price | tipo |  case  
 ----+-------+------+--------
   1 |  5.00 | X    | BARATO
   2 | 15.00 | Y    | CARO
   3 | 25.00 | Y    | CARO
 (3 rows)
 
--- T1b
-postgres=# SELECT TIPO, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS;
- tipo |  case
+ tipo |  case  
 ------+--------
  X    | BARATO
  Y    | CARO
  Y    | CARO
 (3 rows)
 
--- T2
-postgres=# SELECT TIPO FROM PRODUCTS GROUP BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END);
 ERROR:  column "products.tipo" must appear in the GROUP BY clause or be used in an aggregate function
 LINE 1: SELECT TIPO FROM PRODUCTS GROUP BY (CASE WHEN PRICE > 10 THE...
                ^
-
--- T3
-postgres=# SELECT TIPO FROM PRODUCTS ORDER BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) ASC;
- tipo
+ tipo 
 ------
  X
  Y
  Y
 (3 rows)
 
-postgres=# SELECT COUNT(*) AS massa_depois FROM PRODUCTS;
- massa_depois
+ massa_depois 
 --------------
             3
-
+(1 row)
+/* <<< FIM DA CAPTURA CRUA: pg */
 
 /* ---------------------------------------------------------------------------
    MySQL 8.4.11
-   mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+   papel na suite: ATIVO
+   imagem: mysql@sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb
+   comando: docker exec -i t34-mysql mysql -uroot -pp t34 --table -e "<enunciado>"
    --------------------------------------------------------------------------- */
 
+/* >>> INICIO DA CAPTURA CRUA: mysql */
 +-------------+
-| massa_antes |
+| MASSA_ANTES |
 +-------------+
 |           3 |
 +-------------+
-
--- HEAD
-ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the
-manual that corresponds to your MySQL server version for the right syntax to use
-near 'CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)' at line 1
-
--- T1
+ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)' at line 1
 +------+-------+------+------------------------------------------------------+
 | ID   | PRICE | TIPO | (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) |
 +------+-------+------+------------------------------------------------------+
@@ -202,8 +171,6 @@ near 'CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)' at line 1
 |    2 | 15.00 | Y    | CARO                                                 |
 |    3 | 25.00 | Y    | CARO                                                 |
 +------+-------+------+------------------------------------------------------+
-
--- T1b
 +------+------------------------------------------------------+
 | TIPO | (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) |
 +------+------------------------------------------------------+
@@ -211,14 +178,7 @@ near 'CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)' at line 1
 | Y    | CARO                                                 |
 | Y    | CARO                                                 |
 +------+------------------------------------------------------+
-
--- T2
-ERROR 1055 (42000) at line 1: Expression #1 of SELECT list is not in GROUP BY
-clause and contains nonaggregated column 't34.PRODUCTS.TIPO' which is not
-functionally dependent on columns in GROUP BY clause; this is incompatible with
-sql_mode=only_full_group_by
-
--- T3
+ERROR 1055 (42000) at line 1: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 't34.PRODUCTS.TIPO' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by
 +------+
 | TIPO |
 +------+
@@ -226,38 +186,35 @@ sql_mode=only_full_group_by
 | Y    |
 | Y    |
 +------+
-
 +--------------+
-| massa_depois |
+| MASSA_DEPOIS |
 +--------------+
 |            3 |
 +--------------+
-
+/* <<< FIM DA CAPTURA CRUA: mysql */
 
 /* ---------------------------------------------------------------------------
    Microsoft SQL Server 2022 (RTM-CU26) (KB5093420) - 16.0.4265.3 (X64)
-   mcr.microsoft.com/mssql/server@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
+   papel na suite: ATIVO
+   imagem: mcr.microsoft.com/mssql/server@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
+   comando: docker exec t34-mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ... -C -Q "<enunciado>"
    --------------------------------------------------------------------------- */
 
-massa_antes
+/* >>> INICIO DA CAPTURA CRUA: mssql */
+MASSA_ANTES
 -----------
           3
 
--- HEAD
-Msg 156, Level 15, State 1, Server d3dd98ce1abe, Line 1
+(1 rows affected)
+Msg 156, Level 15, State 1, Server a5a7d3a9cd9c, Line 1
 Incorrect syntax near the keyword 'CASE'.
-
--- T1
-ID          PRICE        TIPO
+ID          PRICE        TIPO             
 ----------- ------------ ---------- ------
           1         5.00 X          BARATO
-          2        15.00 Y          CARO
-          3        25.00 Y          CARO
-(3 rows affected)
+          2        15.00 Y          CARO  
+          3        25.00 Y          CARO  
 
--- T1b   << o cabecalho da segunda coluna vem VAZIO: o SQL Server nao nomeia
---           expressao sem apelido, e o enunciado nao tem apelido. Cabecalho
---           vazio e DADO, nao falha de captura.
+(3 rows affected)
 TIPO             
 ---------- ------
 X          BARATO
@@ -265,201 +222,204 @@ Y          CARO
 Y          CARO  
 
 (3 rows affected)
-
--- T2
-Msg 8120, Level 16, State 1, Server d3dd98ce1abe, Line 1
-Column 'PRODUCTS.TIPO' is invalid in the select list because it is not contained
-in either an aggregate function or the GROUP BY clause.
-
--- T3
-TIPO
+Msg 8120, Level 16, State 1, Server a5a7d3a9cd9c, Line 1
+Column 'PRODUCTS.TIPO' is invalid in the select list because it is not contained in either an aggregate function or the GROUP BY clause.
+TIPO      
 ----------
-X
-Y
-Y
-(3 rows affected)
+X         
+Y         
+Y         
 
+(3 rows affected)
+MASSA_DEPOIS
+------------
+           3
+
+(1 rows affected)
+/* <<< FIM DA CAPTURA CRUA: mssql */
 
 /* ---------------------------------------------------------------------------
    Firebird 5.0.4
-   firebirdsql/firebird@sha256:85d0f9bf5e5d61dc7a169c6e374ce926b8281e7d8493f37ffeacc23f3d0d040d
+   papel na suite: ATIVO
+   imagem: firebirdsql/firebird@sha256:85d0f9bf5e5d61dc7a169c6e374ce926b8281e7d8493f37ffeacc23f3d0d040d
+   comando: docker exec -i t34-fb isql -u SYSDBA -p p /var/lib/firebird/data/t34.fdb  (enunciados por stdin)
    --------------------------------------------------------------------------- */
 
-          MASSA_ANTES
-=====================
-                    3
+/* >>> INICIO DA CAPTURA CRUA: firebird */
 
--- HEAD
+          MASSA_ANTES 
+===================== 
+                    3 
+
 Statement failed, SQLSTATE = 42000
 Dynamic SQL Error
 -SQL error code = -104
 -Token unknown - line 1, column 16
 -CASE
-
--- T1   <<< RECUSADO, e a causa e a VIRGULA depois da ESTRELA (coluna 9),
---           nao o CASE. Ver a leitura honesta no cabecalho.
 Statement failed, SQLSTATE = 42000
 Dynamic SQL Error
 -SQL error code = -104
 -Token unknown - line 1, column 9
 -,
 
--- T1b
-TIPO       CASE
-========== ======
-X          BARATO
-Y          CARO
-Y          CARO
+TIPO       CASE   
+========== ====== 
+X          BARATO 
+Y          CARO   
+Y          CARO   
 
--- T2
 Statement failed, SQLSTATE = 42000
 Dynamic SQL Error
 -SQL error code = -104
--Invalid expression in the select list (not contained in either an aggregate
- function or the GROUP BY clause)
+-Invalid expression in the select list (not contained in either an aggregate function or the GROUP BY clause)
 
--- T3
-TIPO
-==========
-X
-Y
-Y
+TIPO       
+========== 
+X          
+Y          
+Y          
 
-         MASSA_DEPOIS
-=====================
-                    3
 
+         MASSA_DEPOIS 
+===================== 
+                    3 
+/* <<< FIM DA CAPTURA CRUA: firebird */
 
 /* ---------------------------------------------------------------------------
    Oracle AI Database 26ai Free Release 23.26.2.0.0
-   gvenzl/oracle-free@sha256:d8913e4e4769b6e60197949bef30a4391713afe662b4b4e71a2665c881bdac8b
+   papel na suite: ATIVO
+   imagem: gvenzl/oracle-free@sha256:d8913e4e4769b6e60197949bef30a4391713afe662b4b4e71a2665c881bdac8b
+   comando: docker exec -i t34-ora sqlplus -S system/p@localhost/FREEPDB1  com "SET PAGESIZE 50 LINESIZE 200 TAB OFF"
    --------------------------------------------------------------------------- */
+
+/* >>> INICIO DA CAPTURA CRUA: oracle */
 
 MASSA_ANTES
 -----------
           3
 
--- HEAD
 SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
                              *
 ERROR at line 1:
 ORA-00907: missing right parenthesis
+Help: https://docs.oracle.com/error-help/db/ora-00907/
 
--- T1   <<< RECUSADO. Esta e a recusa que a versao anterior deste arquivo
---           ESCONDIA, ao submeter "SELECT P.*, ... FROM PRODUCTS P" - um texto
---           com apelido que o FluentSQL nao emite.
+
 SELECT *, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS
         *
 ERROR at line 1:
 ORA-00923: FROM keyword not found where expected
+Help: https://docs.oracle.com/error-help/db/ora-00923/
 
--- T1b
+
+
 TIPO       (CASEW
 ---------- ------
 X          BARATO
 Y          CARO
 Y          CARO
 
--- T2
 SELECT TIPO FROM PRODUCTS GROUP BY (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
        *
 ERROR at line 1:
 ORA-00979: "TIPO": must appear in the GROUP BY clause or be used in an aggregate function
+Help: https://docs.oracle.com/error-help/db/ora-00979/
 
--- T3
+
+
 TIPO
 ----------
 X
 Y
 Y
 
-
-/* ---------------------------------------------------------------------------
-   DB2 v12.1.5.0            << SOB DEFINE: desligado no FluentSQL.inc >>
-   icr.io/db2_community/db2@sha256:2de8151713c261843868c5c3411b57be6ae79d99d70a5b3022337836776bfda6
-   --------------------------------------------------------------------------- */
-
-MASSA_ANTES
------------
-          3
-  1 record(s) selected.
-
--- HEAD
-SQL0104N  An unexpected token "CASE PRODUCTS WHEN" was found following "SELECT
-* FROM (".  Expected tokens may include:  "<select>".  SQLSTATE=42601
-
--- T1
-ID          PRICE        TIPO       4
------------ ------------ ---------- ------
-          1         5.00 X          BARATO
-          2        15.00 Y          CARO
-          3        25.00 Y          CARO
-  3 record(s) selected.
-
--- T1b
-TIPO       2
----------- ------
-X          BARATO
-Y          CARO
-Y          CARO
-  3 record(s) selected.
-
--- T2
-SQL0119N  An expression starting with "TIPO" specified in a SELECT clause,
-HAVING clause, or ORDER BY clause is not specified in the GROUP BY clause or
-it is in a SELECT clause, HAVING clause, or ORDER BY clause with a column
-function and no GROUP BY clause is specified.  SQLSTATE=42803
-
--- T3
-TIPO
-----------
-X
-Y
-Y
-  3 record(s) selected.
 
 MASSA_DEPOIS
 ------------
            3
-  1 record(s) selected.
-
+/* <<< FIM DA CAPTURA CRUA: oracle */
 
 /* ---------------------------------------------------------------------------
-   SQLite 3.53.4            << ATIVO, e faltava na recitacao anterior >>
-   keinos/sqlite3@sha256:a5610a155a8c9007f2050120406a0abcffab246570d6ac1ffe370f5f23e14dc1
+   SQLite 3.53.4
+   papel na suite: ATIVO
+   imagem: keinos/sqlite3@sha256:a5610a155a8c9007f2050120406a0abcffab246570d6ac1ffe370f5f23e14dc1
+   comando: docker run --rm -i keinos/sqlite3 sqlite3  (enunciados por stdin)
    --------------------------------------------------------------------------- */
 
-sqlite 3.53.4
+/* >>> INICIO DA CAPTURA CRUA: sqlite */
 massa_antes=3
-
--- HEAD
-Parse error near line 6: near "CASE": syntax error
-  SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END);
-                 ^--- error here
-
--- T1
 1|5|X|BARATO
 2|15|Y|CARO
 3|25|Y|CARO
-
--- T1b
 X|BARATO
 Y|CARO
 Y|CARO
-
--- T2   << o SQLite NAO aplica a regra estrita de GROUP BY, entao ele e o unico
---         que aceita: agrupa em 2 grupos (BARATO, CARO) e devolve um TIPO
---         arbitrario de cada. E dado de dialeto, nao aval a cadeia.
 X
 Y
-
--- T3
 X
 Y
 Y
-
 massa_depois=3
+Parse error near line 4: near "CASE": syntax error
+  SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END);
+                 ^--- error here
+/* <<< FIM DA CAPTURA CRUA: sqlite */
 
+/* ---------------------------------------------------------------------------
+   DB2 v12.1.5.0
+   papel na suite: SOB DEFINE (desligado no FluentSQL.inc)
+   imagem: icr.io/db2_community/db2@sha256:2de8151713c261843868c5c3411b57be6ae79d99d70a5b3022337836776bfda6
+   comando: docker exec -i t34-db2 su - db2inst1 -c "db2 \"<enunciado>\""
+   --------------------------------------------------------------------------- */
+
+/* >>> INICIO DA CAPTURA CRUA: db2 */
+
+MASSA_ANTES
+-----------
+          3
+
+  1 record(s) selected.
+
+SQL0104N  An unexpected token "CASE PRODUCTS WHEN" was found following "SELECT 
+* FROM (".  Expected tokens may include:  "<select>".  SQLSTATE=42601
+
+ID          PRICE        TIPO       4     
+----------- ------------ ---------- ------
+          1         5.00 X          BARATO
+          2        15.00 Y          CARO  
+          3        25.00 Y          CARO  
+
+  3 record(s) selected.
+
+
+TIPO       2     
+---------- ------
+X          BARATO
+Y          CARO  
+Y          CARO  
+
+  3 record(s) selected.
+
+SQL0119N  An expression starting with "TIPO" specified in a SELECT clause, 
+HAVING clause, or ORDER BY clause is not specified in the GROUP BY clause or 
+it is in a SELECT clause, HAVING clause, or ORDER BY clause with a column 
+function and no GROUP BY clause is specified.  SQLSTATE=42803
+
+TIPO      
+----------
+X         
+Y         
+Y         
+
+  3 record(s) selected.
+
+
+MASSA_DEPOIS
+------------
+           3
+
+  1 record(s) selected.
+/* <<< FIM DA CAPTURA CRUA: db2 */
 
 /* ---------------------------------------------------------------------------
    InterBase                NAO MEDIDO

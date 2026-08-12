@@ -72,13 +72,16 @@
   Medido por mutacao, e a base de contagem e SEMPRE a mesma - celulas que passam
   a falhar nos 11 RUNNERS, com -DDB2 -DINTERBASE:
 
-      apagar o ATALHO  ->  35 celulas nos 11 runners, das quais 24 em Common
-                           (11 destas da T13)
-      apagar o ANEXO   ->  39 celulas nos 11 runners, das quais 28 em Common
+      apagar o ATALHO  ->  33 nos 11 runners, 26 em Common, 11 da T13
+      apagar o ANEXO   ->  41 nos 11 runners, 30 em Common, 13 da T13
+      ramo Select      ->  37 nos 11 runners, 26 em Common
+      ramo GroupBy     ->   2 nos 11 runners,  2 em Common
+      ramo OrderBy     ->   2 nos 11 runners,  2 em Common
 
-  Os dois numeros de cada linha existem porque publicar so um confunde: "24" e
-  o de Common e "35" e o dos 11 runners, e a decisao que o dono toma depende de
-  saber qual e qual.
+  Os dois numeros de cada linha existem porque publicar so um confunde, e TODOS
+  foram REMEDIDOS NO HEAD FINAL: numero de rodada anterior nao sobrevive a
+  mudanca de codigo, e publicar um que nao reproduz e o mesmo defeito da citacao
+  arquivo:linha que apodrece.
 
   Sem o anexo o CASE nao chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T", com
   o CASE inteiro perdido. Nenhuma das duas linhas podia sair.
@@ -123,6 +126,18 @@
 
       converter SQL invalido silencioso em SQL VALIDO quando o sentido e
       inequivoco, e em ERRO NOMEADO quando nao e. Nunca em descarte silencioso.
+
+  ============================================================================
+  O QUE ESTE ARQUIVO NAO COBRE, DITO DE PROPOSITO
+  ============================================================================
+
+  As celulas de recusa - DML, INSERT, secao sem projecao - rodam SO em
+  dbnFirebird, e uma so vez cada. Nao e lacuna: elas medem GUARDA DE BUILDER,
+  que corre antes de qualquer driver ser consultado e nao le dialeto nenhum. O
+  que E por dialeto sao as celulas de TEXTO EMITIDO, e essas rodam nos seis
+  ativos (TestIdiomaDaColunaCorrenteSobrevive e
+  TestDepoisDeFromViraSearchedCaseEmColunaNova). Ampliar as de recusa para seis
+  multiplicaria celulas sem medir nada novo.
 
   ============================================================================
   CATALOGADO E NAO CONSERTADO
@@ -255,16 +270,36 @@ type
     procedure TestUpdateComOrderByIntercaladoRecusa;
     [Test]
     procedure TestDeleteSemFromRecusa;
+    { ⭐ o buraco que as DUAS metades da forma do #167 deixavam passar }
+    [Test]
+    procedure TestDeleteSemFromComGroupByRecusa;
+    [Test]
+    procedure TestDeleteSemFromComOrderByRecusa;
+    [Test]
+    procedure TestDeleteSemFromComWhereRecusa;
+    [Test]
+    procedure TestUpdateSemValuesComGroupByRecusa;
+    [Test]
+    procedure TestUpdateSemValuesComOrderByRecusa;
     [Test]
     procedure TestSelectDepoisDeDeleteLiberaOCaseExpr;
     [Test]
     procedure TestSelectDepoisDeUpdateLiberaOCaseExpr;
     [Test]
-    procedure TestAMensagemDoDmlNomeiaAsTresSaidas;
+    procedure TestAMensagemDoDmlPrescreveOutraAcao;
     [Test]
     procedure TestDeleteRecusa;
     [Test]
     procedure TestQueryPuroRecusaEmVezDeAccessViolation;
+    { ⭐ lista de colunas SEM enunciado aberto - e nao e so DELETE/UPDATE }
+    [Test]
+    procedure TestGroupBySemEnunciadoAbertoRecusa;
+    [Test]
+    procedure TestOrderBySemEnunciadoAbertoRecusa;
+    [Test]
+    procedure TestClearAllApagaAEspecieDoEnunciado;
+    [Test]
+    procedure TestClearAllFechaOEnunciado;
     [Test]
     procedure TestAMensagemDaRecusaNomeiaAChamadaEASaida;
     [Test]
@@ -792,30 +827,111 @@ begin
     EArgumentException);
 end;
 
+procedure TTestCaseExprAnchor.TestDeleteSemFromComGroupByRecusa;
+begin
+  // ⭐ O BURACO QUE CUSTOU UMA RODADA, e ele estava UM PASSO ADIANTE do que a
+  // guarda anterior enumerava. Aquela lia duas coisas - a marca durável
+  // (not FAST.Delete.IsEmpty) e a secao ativa - e AS DUAS SAO FALSAS aqui:
+  //
+  //   Delete SEM From    -> nao alimenta Delete.TableNames, nao ha marca
+  //   GroupBy('')        -> ja tirou FActiveSection de secDelete
+  //
+  // O que saia era pior que nas cadeias COM From: nao sobrava DELETE nenhum,
+  // so "GROUP BY (CASE WHEN 1 THEN 1 END)" - um fragmento que nem enunciado e.
+  // E na base aquilo levantava EAccessViolation, entao seria crash -> texto
+  // invalido CALADO: loud->mute introduzido pela entrega que veio mata-lo.
+  //
+  // A licao nao e "faltava uma terceira metade": e que a pergunta estava
+  // errada. "O cursor esta num DELETE agora?" e transitorio; "este enunciado E
+  // um DELETE?" e duravel, e e a que FStatementKind responde.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestDeleteSemFromComOrderByRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestDeleteSemFromComWhereRecusa;
+begin
+  // O Where nao abre lista de colunas, entao esta cadeia ja era recusada pela
+  // guarda generica. A celula existe para que a ENUMERACAO fique fechada: as
+  // tres clausulas que trocam a secao sem emitir letra estao cobertas.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.Where('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestUpdateSemValuesComGroupByRecusa;
+begin
+  // O gemeo no UPDATE. Update('T') SEM Values ja grava TableName, entao aqui a
+  // marca antiga existia - mas a celula fica, porque e a especie que responde
+  // agora e a enumeracao tem de valer para os dois verbos.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Update('T').GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestUpdateSemValuesComOrderByRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Update('T').OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
 procedure TTestCaseExprAnchor.TestDeleteSemFromRecusa;
 var
   LMsg: String;
 begin
-  // A METADE "SECAO ATIVA" da guarda, isolada: sem From nao ha marca duravel a
-  // ler, e so FActiveSection responde. E o gemeo do que o PR #167 fez para o
-  // JOIN em DELETE.
+  // DELETE sem From: nao ha relacao alvo, e portanto nao havia marca a ler na
+  // forma antiga desta guarda. Quem responde e a ESPECIE do enunciado.
   //
-  // ⚠️ ESTA CELULA ASSERE A MENSAGEM, E NAO SO A CLASSE - e a diferenca foi
-  // MEDIDA, nao suposta. Apagando a metade "secao ativa" da guarda, a chamada
-  // continua levantando EArgumentException, porque cai na guarda GENERICA
-  // (_AssertCaseExprTemOndeAncorar: no DELETE nao ha lista de colunas). Ou seja
-  // um WillRaise pela classe daria VERDE sobre a metade apagada, e a mutacao
-  // nao teria quem a derrubasse. O que a metade muda e QUAL guarda responde, e
-  // portanto a MENSAGEM que o chamador le: a do DML, que nomeia as tres saidas,
-  // em vez da generica, que fala em projecao.
+  // ⚠️ ASSERE A PRESCRICAO, e nao so a classe - e a diferenca foi MEDIDA. Com a
+  // guarda de especie removida a chamada CONTINUA levantando
+  // EArgumentException, porque cai na guarda GENERICA (no DELETE nao ha lista
+  // de colunas). Um WillRaise pela classe daria VERDE sobre a guarda removida.
+  // O que muda e QUAL mensagem o chamador recebe - e a generica prescreve
+  // "chame depois de GroupBy(...)", que aqui ROTEIA PARA O BURACO.
   LMsg := _MensagemDe(
     procedure
     begin
       FluentSQL.Query(dbnFirebird).Delete.CaseExpr;
     end);
-  Assert.Contains(LMsg, 'DELETE', False,
-    'Sem From, quem tem de responder e a guarda de DML pela SECAO ATIVA - e a ' +
-    'mensagem dela nomeia o DELETE. Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'Select', False,
+    'PRESCRICAO: quem esta num DELETE puro tem de ser mandado abrir um Select, ' +
+    'e nao chamar GroupBy. Recebido: ' + LMsg);
+  Assert.DoesNotContain(LMsg, 'GroupBy', False,
+    'A prescricao generica roteia para Delete.GroupBy('''') + CaseExpr, que e ' +
+    'exatamente a cadeia do defeito. Recebido: ' + LMsg);
 end;
 
 procedure TTestCaseExprAnchor.TestSelectDepoisDeDeleteLiberaOCaseExpr;
@@ -843,10 +959,32 @@ begin
     LQuery.From('T').AsString, False);
 end;
 
-procedure TTestCaseExprAnchor.TestAMensagemDoDmlNomeiaAsTresSaidas;
+procedure TTestCaseExprAnchor.TestAMensagemDoDmlPrescreveOutraAcao;
 var
   LMsg: String;
 begin
+  // ⭐ ESTA CELULA FIXA A PRESCRICAO, E NAO O DIAGNOSTICO - e a distincao e a
+  // regra da casa, nao estilo:
+  //
+  //   DIAGNOSTICO ... "em que estado voce esta". E o que o HUMANO le, e
+  //     renomea-lo nao muda codigo nenhum. Vale a T35: nao vira celula.
+  //   PRESCRICAO ... "que codigo escrever a seguir". E CONTRATO: ela determina
+  //     a proxima linha que o chamador escreve, e prescricao errada produz SQL
+  //     errado.
+  //
+  // Aqui as duas mensagens candidatas PRESCREVEM ACOES DIFERENTES, e por isso a
+  // mensagem e load-bearing:
+  //
+  //   generica ... "chame depois de Select/Column(...), de GroupBy(...) ou de
+  //                 OrderBy(...)"
+  //   do DML .... "passe em Values/SetValue, ou na condicao do Where, ou abra
+  //                 um Select"
+  //
+  // E a divergencia IMPORTA porque a prescricao generica ROTEIA PARA DENTRO DO
+  // BURACO: quem esta num Delete puro e segue "chame depois de GroupBy(...)" ao
+  // pe da letra escreve Delete.GroupBy('') + CaseExpr - que era exatamente a
+  // cadeia que emitia fragmento invalido calado. Uma mensagem que manda o
+  // chamador para o defeito nao e "menos especifica": e errada.
   LMsg := _MensagemDe(
     procedure
     begin
@@ -854,13 +992,18 @@ begin
     end);
   Assert.Contains(LMsg, 'CaseExpr', False,
     'A mensagem tem de nomear a chamada. Recebido: ' + LMsg);
-  Assert.Contains(LMsg, 'DELETE', False,
-    'A mensagem tem de dizer onde a chamada caiu. Recebido: ' + LMsg);
-  Assert.Contains(LMsg, 'WHERE', False,
-    'A mensagem tem de apontar a saida de quem queria escolher linhas. ' +
+  Assert.Contains(LMsg, 'Select', False,
+    'PRESCRICAO: a saida de quem queria projetar e abrir um Select. ' +
     'Recebido: ' + LMsg);
-  Assert.Contains(LMsg, 'SELECT', False,
-    'E a saida de quem queria projetar. Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'Values', False,
+    'PRESCRICAO: a saida de quem queria GRAVAR o resultado do CASE. ' +
+    'Recebido: ' + LMsg);
+  Assert.DoesNotContain(LMsg, 'GroupBy', False,
+    'A mensagem do DML NAO pode prescrever GroupBy - e a prescricao que ' +
+    'roteia o chamador para a cadeia que emitia fragmento invalido calado. ' +
+    'Recebido: ' + LMsg);
+  Assert.DoesNotContain(LMsg, 'OrderBy', False,
+    'Idem para OrderBy. Recebido: ' + LMsg);
 end;
 
 procedure TTestCaseExprAnchor.TestQueryPuroRecusaEmVezDeAccessViolation;
@@ -876,6 +1019,82 @@ begin
     EArgumentException,
     'Num enunciado que nao abriu secao nenhuma a recusa tem de ser nomeada, e ' +
     'nao um EAccessViolation vindo de dentro da propria guarda');
+end;
+
+procedure TTestCaseExprAnchor.TestGroupBySemEnunciadoAbertoRecusa;
+begin
+  // ⭐ O DEFEITO ERA MAIOR QUE DELETE/UPDATE, e so apareceu quando se mediu o
+  // CONTROLE de um enunciado que NUNCA foi DELETE:
+  //
+  //     Query(dbnFirebird).GroupBy('') + CaseExpr
+  //     base: EAccessViolation   ->   sem esta guarda: "GROUP BY (CASE ...)"
+  //
+  // GroupBy('') abre lista de colunas SEM que exista enunciado, e a coluna nova
+  // nascia nela: sai um fragmento que nem enunciado e. Crash -> texto invalido
+  // CALADO, de novo, e desta vez fora do DML.
+  //
+  // A licao: ter LISTA onde encaixar nao e o mesmo que ter ENUNCIADO que
+  // contenha. A guarda pergunta as duas coisas.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestOrderBySemEnunciadoAbertoRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestClearAllApagaAEspecieDoEnunciado;
+var
+  LMsg: String;
+begin
+  // ClearAll apaga o enunciado, e apagar o enunciado apaga a ESPECIE dele. Sem
+  // esta linha a marca de um DELETE que nao existe mais sobreviveria, e a
+  // recusa MENTIRIA - diria "voce esta num DELETE" a quem acabou de limpar o
+  // DELETE. E a celula assere a PRESCRICAO justamente porque as duas mensagens
+  // candidatas prescrevem acoes diferentes: a do DML manda abrir um Select, a
+  // generica manda abrir projecao. Aqui a certa e a generica.
+  LMsg := _MensagemDe(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.From('T').ClearAll.GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end);
+  Assert.DoesNotContain(LMsg, 'DELETE', False,
+    'Depois de ClearAll nao ha DELETE nenhum: dizer que ha e MENTIR sobre o ' +
+    'estado. Recebido: ' + LMsg);
+end;
+
+procedure TTestCaseExprAnchor.TestClearAllFechaOEnunciado;
+begin
+  // O GEMEO da celula acima, e SEPARADO dela de proposito: ClearAll limpa DUAS
+  // coisas - a especie e o fato de haver enunciado - e cada uma tem a sua
+  // mutacao. Junta-las numa celula so faria as duas mutacoes caírem no mesmo
+  // nome, e a particao deixaria de ser disjunta.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.From('T').ClearAll.GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException,
+    'ClearAll fecha o enunciado: depois dele nao ha onde o CASE morar, e emitir ' +
+    'fragmento seria trocar o crash da base por texto invalido calado');
 end;
 
 procedure TTestCaseExprAnchor.TestAMensagemDaRecusaNomeiaAChamadaEASaida;
