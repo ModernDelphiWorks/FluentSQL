@@ -194,11 +194,22 @@ begin
   Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' ALTER ' + Quote(ADef.OldColumnName) + ' TO ' + Quote(ADef.NewColumnName);
 end;
 
+// T35: o Firebird nao tem DDL de renomear TABELA. Nao e que a forma emitida
+// estivesse errada e outra estivesse certa - nao existe forma. Medido em
+// firebirdsql/firebird:5.0.4 (ENGINE_VERSION perguntado ao motor = 5.0.4):
+//   ALTER TABLE "TAB_A" TO "TAB_B";         -104 -Token unknown ... -TO
+//   ALTER TABLE "TAB_A" RENAME TO "TAB_B";  -104 -Token unknown ... -RENAME
+//   RENAME TABLE "TAB_A" TO "TAB_B";        -104 -Token unknown ... -RENAME
+// O 'ALTER TABLE t ALTER col TO col2' logo acima, para COLUNA, esta certo e foi
+// confirmado no mesmo motor; e so o analogo de tabela que o dialeto nao tem.
+// Recusar segue a convencao que este arquivo ja aplica ao que o Firebird nao
+// expressa (DropTable/IfExists, CreateSchema, DropSchema, sequencias).
 function TFluentDDLSerializerFirebird.AlterTableRenameTable(const ADef: IFluentDDLAlterTableRenameTableDef): string;
 begin
-  if not Assigned(ADef) then
-    Exit('');
-  Result := 'ALTER TABLE ' + Quote(ADef.OldTableName) + ' TO ' + Quote(ADef.NewTableName);
+  raise ENotSupportedException.Create(
+    'DDL Firebird: renaming a table is not supported; Firebird has no table-rename DDL ' +
+    '(measured on 5.0.4: ALTER TABLE ... TO ..., ALTER TABLE ... RENAME TO ... and RENAME TABLE ... ' +
+    'all fail with -104 Token unknown). Recreate the table and migrate the rows in the application.');
 end;
 
 function TFluentDDLSerializerFirebird.AlterTableAlterColumn(const ADef: IFluentDDLAlterTableAlterColumnDef): string;
@@ -246,10 +257,20 @@ begin
   if Trim(ADef.GetTableName) <> '' then
     raise ENotSupportedException.Create('DDL DROP INDEX: table name is not supported for Firebird (DROP INDEX ... ON ...).');
 
+  // T35: medido em firebirdsql/firebird:5.0.4 - 'DROP INDEX IF EXISTS "X"'
+  // devolve -104 -Token unknown - line 1, column 15 -EXISTS, e devolve o MESMO
+  // erro para indice existente e para indice ausente: e recusa de sintaxe, nao
+  // de alvo. A forma nua executa (controle positivo: o indice sumiu de
+  // RDB$INDICES) e sobre indice ausente devolve -607 "Index not found", que e o
+  // que cabe a aplicacao tratar. Mesma regra que DropTable acima ja aplica ao
+  // mesmo modificador neste dialeto.
   if ADef.GetIfExists then
-    Result := 'DROP INDEX IF EXISTS ' + Quote(ADef.IndexName)
-  else
-    Result := 'DROP INDEX ' + Quote(ADef.IndexName);
+    raise ENotSupportedException.Create(
+      'DDL DROP INDEX: IF EXISTS is not emitted for Firebird in this build; Firebird 5.0 rejects it ' +
+      '(-104 Token unknown - EXISTS). Drop the index unconditionally and handle -607 (Index not found) ' +
+      'in the application.');
+
+  Result := 'DROP INDEX ' + Quote(ADef.IndexName);
 end;
 
 function TFluentDDLSerializerFirebird.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
