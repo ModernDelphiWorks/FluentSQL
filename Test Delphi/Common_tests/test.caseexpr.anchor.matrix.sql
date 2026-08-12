@@ -17,9 +17,15 @@
      HEAD  SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
      NOVO  SELECT *, (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) FROM PRODUCTS
 
-   O texto HEAD nasce de CaseExpr sem argumento com o cursor sobre a RELACAO: o
-   nome da tabela virava operando de um CASE simples, comparado com um booleano,
-   e o CASE substituia o proprio FROM.
+   O texto HEAD nasce de CaseExpr com o cursor sobre a RELACAO: o nome da tabela
+   virava operando de um CASE simples, comparado com um booleano, e o CASE
+   substituia o proprio FROM.
+
+   ATENCAO AO QUE ESTE ARQUIVO NAO DIZ. Ele mede o texto emitido com o cursor na
+   RELACAO. Com o cursor sobre uma COLUNA o texto NAO MUDOU nesta entrega, e por
+   isso nao ha o que medir ali: continua sendo o mesmo CASE simples que a suite
+   ja fixava antes. As duas situacoes se alcancam com as MESMAS secoes em ordens
+   diferentes - ver test.caseexpr.anchor.pas, celulas TestOrdemA_* e TestOrdemB_*.
 
    RESUMO
      seis motores medidos, SEIS recusam o texto HEAD.

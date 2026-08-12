@@ -71,8 +71,11 @@ type
     procedure _AssertSection(ASections: TSections);
     procedure _AssertOperator(AOperators: TOperators);
     procedure _AssertHaveName;
-    function _CaseExprAncoraNaColunaCorrente: Boolean;
+    function _NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
+    function _CaseExprAncoraNoNoCorrente: Boolean;
+    procedure _AssertCaseExprNaoEAlvoDeInsert;
     procedure _AssertCaseExprTemOndeAncorar;
+    procedure _AssertCaseExprTemOndeAncorarSeNaoAncora;
     procedure _SetSection(ASection: TSection);
     procedure _DefineSectionSelect;
     procedure _DefineSectionDelete;
@@ -353,25 +356,70 @@ end;
 ///
 ///   Sobre qualquer OUTRO no, as mesmas duas linhas produziam lixo em silencio.
 ///   MEDIDO POR MUTACAO, e as duas metades sao load-bearing: apagar o atalho
-///   derruba 19 celulas verdes; apagar o anexo derruba 25, porque sem ele o CASE
-///   nao chega ao SELECT ("SELECT ID, TIPO AS R FROM T" - o CASE some inteiro).
-///   Nenhuma das duas linhas podia sair. O que faltava era a PERGUNTA.
+///   derruba 27 celulas verdes (10 delas da suite do slot de valor, a T13);
+///   apagar o anexo derruba 25, porque sem ele o CASE nao chega ao SELECT
+///   ("SELECT ID, TIPO AS R FROM T" - o CASE some inteiro). Nenhuma das duas
+///   linhas podia sair. O que faltava era a PERGUNTA.
 ///
-///   O DEFEITO NUNCA FOI "O ATALHO EXISTE". Foi "o atalho nao pergunta se o no
-///   corrente e uma coluna". Com o cursor na relacao do FROM saia
+///   ==========================================================================
+///   A PERGUNTA E DE NO, NAO DE SECAO - E ESSA DISTINCAO CUSTOU UMA RODADA
+///   ==========================================================================
 ///
-///       SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' END)
+///   A primeira tentativa de conserto perguntou "o cursor esta na lista de
+///   colunas da secao CORRENTE?", varrendo so FAST.ASTColumns. Parece a mesma
+///   coisa. NAO E, e a diferenca e observavel:
 ///
-///   - e nao e so SQL invalido, e PERDA DE ESTRUTURA: TFluentSQLName.Serialize
-///   (FluentSQL.Name.pas) PREFERE FCase a FName, entao escrever CaseExpr num no
-///   de relacao APAGA o texto daquele no. Com o cursor na relacao do JOIN a
-///   tabela juntada sumia e o ON ficava orfao. Com o cursor NIL, saia
-///   EAccessViolation lendo 00000000 - e a guarda "if Assigned(FAST)" nao
-///   ajudava, porque FAST NUNCA e nil ali: quem e nil e FAST.ASTName,
-///   desreferenciado duas linhas ACIMA da guarda e tambem DENTRO dela. A guarda
-///   protegia o objeto errado.
+///     FAST.ASTName    e DURAVEL - atravessa a troca de secao.
+///     FAST.ASTColumns e TROCADO por _DefineSectionX POR BAIXO do cursor
+///                     (vira nil no Where e no Having, vira outra lista no
+///                     GroupBy e no OrderBy).
 ///
-///   Submetido VERBATIM aos motores, com massa (test.caseexpr.anchor.matrix.sql):
+///   Entao, com o cursor parado sobre uma coluna do SELECT, bastava entrar no
+///   WHERE para a pergunta passar a responder "nao e coluna" - sobre o MESMO no.
+///   Medido, e as duas cadeias abaixo diferem SO na ordem de Column e From:
+///
+///     .Select.From('T').Column('TIPO').Where('ID').Equal(1)   cursor na COLUNA
+///     .Select.Column('TIPO').From('T').Where('ID').Equal(1)   cursor na RELACAO
+///
+///   A primeira emitia, e emite, "SELECT (CASE TIPO WHEN 1 THEN ...) FROM T
+///   WHERE (ID = :p1)" - valido nos sete. A pergunta de secao a RECUSAVA. Pior:
+///   com GroupBy('') no lugar do Where, ela mandava o CASE para a clausula
+///   errada e o resultado saia VALIDO E DIFERENTE ("SELECT TIPO FROM T GROUP BY
+///   (CASE ...)"), ou seja regressao de ruidoso para MUDO.
+///
+///   Por isso a pergunta varre TODAS as colecoes de coluna, e nao a corrente.
+///
+///   POR QUE NAO UMA MARCA NO NO, que seria mais direto: nao existe. O
+///   TFluentSQLName tem Name, Alias, AliasKeyword e Case, e nada disso diz o
+///   papel. AliasKeyword PARECE servir (nasce 'AS' para coluna e recebe
+///   _RelationAliasKeyword para relacao) mas foi MEDIDO e nao serve: so a Oracle
+///   sobrescreve RelationAliasKeyword, entao nos outros seis dialetos coluna e
+///   relacao carregam ambas 'AS'. Criar marca nova seria membro em
+///   IFluentSQLName - BREAKING E2291, com dois implementadores - para responder o
+///   que tres varreduras curtas ja respondem sem tocar em superficie publica.
+///   As listas existem desde TFluentSQLAST.Create e os getters sao puros: varrer
+///   nao cria secao nenhuma.
+///
+///   ==========================================================================
+///   PARA ONDE VAI A COLUNA NOVA: ASTColumns, E ISSO FOI MEDIDO
+///   ==========================================================================
+///
+///   O destino NAO e "a lista de projecao". Forcar FAST.Select.Columns quebraria
+///   dois casos legitimos, medidos:
+///
+///     .Select.All.From('T').OrderBy('')  -> ORDER BY (CASE ...)   e o certo
+///     .Select.All.From('T').GroupBy('')  -> GROUP BY (CASE ...)   e o certo
+///
+///   Quem chamou OrderBy quer o CASE no ORDER BY. ASTColumns - a lista da secao
+///   corrente - ja era o destino certo; o erro estava no PREDICADO, nao no
+///   destino.
+///
+///   ==========================================================================
+///   O ORACULO DE MOTOR
+///   ==========================================================================
+///
+///   O texto que saia com o cursor na relacao, submetido VERBATIM com massa
+///   (test.caseexpr.anchor.matrix.sql):
 ///     PostgreSQL 16                   ERROR: syntax error at or near "CASE"
 ///     MySQL 8.4                       ERROR 1064 (42000)
 ///     SQL Server 2022 16.0.4265.3     Msg 156 Incorrect syntax near 'CASE'
@@ -379,28 +427,22 @@ end;
 ///     Oracle AI 26ai Free 23.26.2.0.0 ORA-00907: missing right parenthesis
 ///     DB2 v12.1.5.0                   SQL0104N / SQLSTATE=42601
 ///     InterBase                       NAO MEDIDO - nao ha imagem publica
-///   SEIS de sete RECUSAM.
+///   SEIS de sete RECUSAM, e a forma nova devolve o dado certo nos seis.
 ///
-///   A REGRA, e ela vale para os tres casos:
+///   ==========================================================================
+///   A REGRA
+///   ==========================================================================
 ///
 ///       converter SQL invalido silencioso em SQL VALIDO quando o sentido e
 ///       inequivoco, e em ERRO NOMEADO quando nao e. Nunca em descarte silencioso.
-///
-///   1. NO CORRENTE E COLUNA - o idioma, preservado byte a byte.
-///   2. NAO E COLUNA, MAS HA SECAO DE COLUNAS - abre COLUNA NOVA e o CASE nasce
-///      SEARCHED. Um CASE num SELECT so tem um lugar sensato: a lista de
-///      projecao. O sentido e inequivoco, e o texto novo substitui texto que
-///      motor nenhum aceita - nao e "SQL novo onde nao havia", e SQL valido onde
-///      havia lixo.
-///   3. NAO HA SECAO DE COLUNAS - RECUSA nomeada. Ali o sentido NAO e
-///      inequivoco, e a alternativa (no-op) descartaria o CASE em silencio.
 /// </summary>
 function TFluentSQL.CaseExpr(const AExpression: String): IFluentSQLCriteriaCase;
 var
   LExpression: String;
 begin
+  _AssertCaseExprNaoEAlvoDeInsert;
   LExpression := AExpression;
-  if _CaseExprAncoraNaColunaCorrente then
+  if _CaseExprAncoraNoNoCorrente then
   begin
     if LExpression = '' then
       LExpression := FAST.ASTName.Name;
@@ -415,59 +457,122 @@ begin
 end;
 
 /// <summary>
-///   O no corrente e uma COLUNA da secao corrente? A pergunta e de IDENTIDADE, e
-///   nao de tipo: o mesmo TFluentSQLName serve para coluna e para relacao, e o
-///   que distingue um do outro e a LISTA a que ele pertence. From e _CreateJoin
-///   apontam o cursor para nos de ASTTableNames / JoinedTable; Column e OrderBy
-///   apontam para nos de ASTColumns.
-///
-///   Responde False - e nao levanta - quando FAST.ASTName e nil (Select sem
-///   nenhuma coluna, ou nenhum Select) ou quando ASTColumns e nil (secao que nao
-///   projeta). Quem decide o que fazer com o False e o chamador; esta funcao so
-///   informa.
+///   O no do cursor esta NESTA lista? Comparacao de IDENTIDADE de interface, que
+///   e o unico discriminador disponivel: o mesmo TFluentSQLName serve para
+///   coluna e para relacao, e o que distingue um do outro e a LISTA a que ele
+///   pertence.
 /// </summary>
-function TFluentSQL._CaseExprAncoraNaColunaCorrente: Boolean;
+function TFluentSQL._NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
 var
   LFor: Integer;
 begin
   Result := False;
-  if (not Assigned(FAST)) or (not Assigned(FAST.ASTName)) or
-     (not Assigned(FAST.ASTColumns)) then
+  if not Assigned(ALista) then
     Exit;
-  for LFor := 0 to FAST.ASTColumns.Count - 1 do
-    if FAST.ASTColumns[LFor] = FAST.ASTName then
+  for LFor := 0 to ALista.Count - 1 do
+    if ALista[LFor] = FAST.ASTName then
       Exit(True);
 end;
 
 /// <summary>
-///   Recusa a chamada quando nao ha NENHUMA lista de colunas onde ancorar o
-///   CASE - o que acontece nas secoes que nao projetam (WHERE, JOIN, HAVING,
-///   DELETE, UPDATE).
+///   O no do cursor e uma COLUNA - em QUALQUER das listas de coluna, e nao so na
+///   da secao corrente. A razao de varrer todas esta na doutrina de CaseExpr,
+///   logo acima: o cursor e duravel e a lista corrente nao.
 ///
-///   E a terceira metade da regra deste arquivo, e a que exige justificativa:
-///   por que recusar em vez de simplesmente nao anexar? Porque nao anexar
-///   DESCARTA o CASE em silencio - o chamador montou um CASE inteiro, com WHEN e
-///   THEN, e nada dele apareceria no SQL. O que saia antes era pior ainda (o
-///   CASE substituia a relacao do FROM ou a do JOIN), mas as duas saidas erradas
-///   tem a mesma raiz: a chamada nao tem sentido ali, e fingir que tem e que era
-///   o erro.
+///   Insert.Columns NAO entra na varredura, e a ausencia e deliberada: ver
+///   _AssertCaseExprNaoEAlvoDeInsert, que recusa aquela secao inteira antes de
+///   esta pergunta ser feita. Incluir a lista aqui daria a resposta certa para a
+///   pergunta errada.
 ///
-///   Isto e BREAKING, e o alcance dele e conhecido: quebra SO quem ja produzia
-///   SQL que motor nenhum aceitava. Nao ha comportamento a preservar.
+///   Responde False - e nao levanta - quando nao ha AST ou nao ha cursor. Quem
+///   decide o que fazer com o False e o chamador.
+/// </summary>
+function TFluentSQL._CaseExprAncoraNoNoCorrente: Boolean;
+begin
+  Result := False;
+  if (not Assigned(FAST)) or (not Assigned(FAST.ASTName)) then
+    Exit;
+  Result := (Assigned(FAST.Select)  and _NoCorrenteEstaNaLista(FAST.Select.Columns))
+         or (Assigned(FAST.GroupBy) and _NoCorrenteEstaNaLista(FAST.GroupBy.Columns))
+         or (Assigned(FAST.OrderBy) and _NoCorrenteEstaNaLista(FAST.OrderBy.Columns));
+end;
+
+/// <summary>
+///   O INSERT tem lista de colunas, e e por isso que ele precisa de recusa
+///   PROPRIA: sem ela, o CASE seria ancorado ali como em qualquer outra lista e
+///   sairia
+///
+///       INSERT INTO T ( (CASE WHEN 1 THEN 'A' END) )
+///
+///   As colunas do INSERT sao NOMES DE DESTINO - as celulas onde o dado vai ser
+///   gravado - e nao expressoes projetadas. Um CASE nao pode ser alvo de
+///   gravacao em dialeto nenhum, e a lista se parecer com as outras e
+///   coincidencia de REPRESENTACAO, nao de significado.
+///
+///   METADE DISTO NAO E REGRESSAO DESTA ENTREGA, e o registro importa:
+///   Insert.Into('T').Column('A') seguido de CaseExpr JA emitia
+///   "INSERT INTO T ( (CASE A WHEN 1 THEN 'X' END) )" na base, calado. O que a
+///   entrega acrescentaria sem esta guarda seria so o caso sem Column, que antes
+///   dela levantava EAccessViolation.
+/// </summary>
+procedure TFluentSQL._AssertCaseExprNaoEAlvoDeInsert;
+begin
+  if (not Assigned(FAST)) or (not Assigned(FAST.Insert)) or
+     (FAST.ASTColumns <> FAST.Insert.Columns) then
+    Exit;
+  raise EArgumentException.Create(
+    'IFluentSQL.CaseExpr chamado dentro de um INSERT: as colunas do INSERT sao ' +
+    'NOMES DE DESTINO, as celulas onde o dado sera gravado, e um CASE nao pode ' +
+    'ser alvo de gravacao em dialeto nenhum. O que sairia - ' +
+    '"INSERT INTO T ( (CASE ... END) )" - nao e aceito por motor nenhum. Se o ' +
+    'CASE e o VALOR a gravar, ele vai no lado dos valores; se e para projetar, ' +
+    'ele vai num SELECT.');
+end;
+
+/// <summary>
+///   Recusa quando nao ha NENHUMA lista de colunas onde ancorar - o que acontece
+///   nas secoes que nao projetam (WHERE, JOIN, HAVING, DELETE, UPDATE) e num
+///   enunciado que ainda nao abriu secao nenhuma.
+///
+///   Por que recusar em vez de simplesmente nao anexar: nao anexar DESCARTA o
+///   CASE em silencio - o chamador montou um CASE inteiro, com WHEN e THEN, e
+///   nada dele apareceria no SQL. O que saia antes era pior (o CASE substituia a
+///   relacao do FROM ou a do JOIN, apagando o texto dela), mas as duas saidas
+///   erradas tem a mesma raiz: a chamada nao tem sentido ali, e fingir que tem e
+///   que era o erro.
+///
+///   A MENSAGEM NAO NOMEIA A SECAO, e a omissao e o conserto de um defeito real:
+///   a versao anterior formatava FAST.ASTSection.Name DENTRO do raise - ou seja,
+///   desreferenciava um objeto que pode ser nil no exato caminho em que a guarda
+///   ja falhou. Medido: Query(dbnFirebird).CaseExpr, sem Select nenhum, levantava
+///   EAccessViolation DE DENTRO da guarda. E a mesma figura de "guarda no objeto
+///   errado" que esta tarefa existe para matar, e nao ia ficar aqui.
+///
+///   Isto e BREAKING, e o alcance e conhecido: quebra SO quem ja produzia SQL que
+///   motor nenhum aceitava, ou quem ja recebia EAccessViolation.
 /// </summary>
 procedure TFluentSQL._AssertCaseExprTemOndeAncorar;
 begin
   if Assigned(FAST) and Assigned(FAST.ASTColumns) then
     Exit;
-  raise EArgumentException.CreateFmt(
-    'IFluentSQL.CaseExpr chamado na secao [%s], que nao projeta colunas: um ' +
-    'CASE precisa de uma lista de colunas onde morar, e aqui nao ha nenhuma. ' +
+  raise EArgumentException.Create(
+    'IFluentSQL.CaseExpr chamado numa secao que nao projeta colunas: um CASE ' +
+    'precisa de uma lista de colunas onde morar, e aqui nao ha nenhuma. ' +
     'Anexa-lo ao no corrente SUBSTITUIRIA o texto dele - a relacao do FROM ou a ' +
     'do JOIN - e o que sairia nao e CASE de dialeto nenhum; ignora-lo em ' +
     'silencio descartaria o CASE inteiro. Chame CaseExpr onde ha projecao: ' +
-    'depois de Select/Column(...) para projetar, ou depois de OrderBy(...) para ' +
-    'ordenar.',
-    [FAST.ASTSection.Name]);
+    'depois de Select/Column(...), de GroupBy(...) ou de OrderBy(...).');
+end;
+
+/// <summary>
+///   Antecipa a recusa para os chamadores que GRAVAM antes de delegar. Se o no
+///   ancora, nao ha recusa possivel adiante e esta funcao sai calada.
+/// </summary>
+procedure TFluentSQL._AssertCaseExprTemOndeAncorarSeNaoAncora;
+begin
+  if _CaseExprAncoraNoNoCorrente then
+    Exit;
+  _AssertCaseExprTemOndeAncorar;
 end;
 
 /// <summary>
@@ -479,49 +584,74 @@ end;
 ///
 ///   O vazamento e desta entrega, nao anterior a ela: antes nao havia recusa
 ///   nenhuma aqui, entao nao havia caminho que abandonasse parametro. Foi a
-///   guarda nova que o criou, e foi o teste da guarda que o pegou
-///   (test.caseexpr.anchor.pas, TestARecusaNaoDeixaParametroParaTras, medido
+///   guarda nova que o criou, e foi o teste da guarda que o pegou (medido
 ///   Expected [1] but got [2] antes desta linha).
 ///
-///   E a mesma regua ja escrita em TFluentSQLCriteriaCase._ValueSlotTerm e em
-///   TUtils._AssertSingleValue: nenhum caminho de recusa pode deixar parametro
-///   para tras.
+///   O INVARIANTE QUE ESTAS DUAS LINHAS SUSTENTAM, e nada alem dele:
 ///
-///   Chamar a guarda aqui NAO duplica a que corre na sobrecarga de String: se o
-///   cursor ancora numa coluna, ASTColumns esta necessariamente assinado e esta
-///   guarda passa reto - ela so responde pelo caso em que a delegacao iria
-///   recusar de qualquer forma.
+///       nenhum caminho de recusa DESTA FUNCAO grava parametro.
+///
+///   A frase e estreita de proposito. Ela NAO diz "nenhum :pN fica orfao", que
+///   seria falso e nao e consertavel aqui: na sobrecarga de
+///   IFluentSQLCriteriaExpression o argumento e construido pelo CHAMADOR, e os
+///   parametros dele ja estao gravados quando esta unidade recebe o controle.
 /// </summary>
 function TFluentSQL.CaseExpr(const AExpression: array of const): IFluentSQLCriteriaCase;
 begin
-  _AssertCaseExprTemOndeAncorar;
+  _AssertCaseExprNaoEAlvoDeInsert;
+  _AssertCaseExprTemOndeAncorarSeNaoAncora;
   Result := CaseExpr(TUtils.SqlArrayOfConstToParameterizedSql(AExpression, FAST.Params));
 end;
 
 /// <summary>
-///   Esta sobrecarga era PUBLICA e 100% INALCANCAVEL. O corpo era
+///   ESTA SOBRECARGA LEVANTA, E A RECUSA E A ENTREGA - nao um adiamento.
+///
+///   O corpo original era
 ///
 ///       Result := TFluentSQLCriteriaCase.Create(Self, '');
 ///       Result.AndOpe(AExpression);
 ///
-///   e TFluentSQLCriteriaCase.AndOpe (FluentSQL.Cases.pas) le FLastExpression,
-///   que so e preenchido por When. Recem-criado o campo e NIL, entao AndOpe
-///   estourava com EAccessViolation lendo 00000000 - em QUALQUER estado, nao num
-///   canto. Medido em tres: com Column antes, depois de From, e com When
-///   encadeado depois. AV nos tres. Um terco da superficie publica de CaseExpr
-///   nao tinha como ser chamado, e nao havia um unico teste que percebesse.
+///   e TFluentSQLCriteriaCase.AndOpe le FLastExpression, que so When preenche.
+///   Recem-criado o campo e nil, entao a chamada estourava com EAccessViolation
+///   lendo 00000000 em QUALQUER estado - medido em tres (com Column antes,
+///   depois de From, com When encadeado depois). A sobrecarga era PUBLICA e 100%
+///   inalcancavel, sem um unico teste que a exercitasse.
 ///
-///   O conserto NAO precisou de desenho novo em Cases.pas: basta alinhar esta
-///   sobrecarga com as outras duas. Em CaseExpr(String) o argumento e o OPERANDO
-///   do CASE simples, e em CaseExpr(array of const) tambem - aquela serializa o
-///   array em SQL parametrizado e delega. Aqui a expressao ja SABE se
-///   serializar, e os :pN dela ja estao na colecao do dono, entao serializar e
-///   delegar da a MESMA semantica pelo MESMO caminho - inclusive a regra de
-///   ancoragem, que fica valendo para as tres sem ser repetida em nenhuma.
+///   POR QUE NAO FOI "CONSERTADA" PARA FUNCIONAR. A saida obvia seria serializar
+///   a expressao e delegar a sobrecarga de String. Ela FUNCIONA quando a
+///   expressao pertence ao MESMO enunciado, e MENTE quando nao pertence. Medido:
+///
+///       QA.CaseExpr(QB.Expression(['TIPO', '*', 2]))
+///       SQL de QA:  SELECT (CASE TIPO * :p1 WHEN ...) FROM T
+///       QA.Params.Count = 0        <- o :p1 citado NAO EXISTE na colecao de QA
+///       QB.Params.Count = 1        <- o valor ficou na colecao do outro
+///
+///   O enunciado sai citando um parametro fantasma. Quem liga por posicao liga
+///   errado, e nao ha excecao para o chamador perceber - a mesma classe de dano
+///   silencioso que esta tarefa inteira combate, so que introduzida por nos.
+///
+///   E NAO HA COMO DISTINGUIR OS DOIS CASOS EM RUNTIME:
+///   IFluentSQLCriteriaExpression expoe AsString e Expression, e mais nada -
+///   nenhum caminho ate o dono ou ate a colecao de origem. Descobrir exigiria
+///   alargar a interface (E2291), que e exatamente o pre-requisito que o PR #166
+///   ja catalogou sob o nome de FUSAO DE COLECOES DE PARAMETRO.
+///
+///   Entre estourar com EAccessViolation, mentir em silencio e recusar dizendo o
+///   porque, a terceira e a unica honesta. Quando a fusao existir, esta
+///   sobrecarga passa a funcionar e a recusa vira aditiva de remover.
 /// </summary>
 function TFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase;
 begin
-  Result := CaseExpr(AExpression.Expression.Serialize);
+  Result := nil;
+  raise EArgumentException.Create(
+    'IFluentSQL.CaseExpr(IFluentSQLCriteriaExpression) nao esta disponivel. A ' +
+    'sobrecarga precisa de FUSAO DE COLECOES DE PARAMETRO, que ainda nao ' +
+    'existe: uma expressao construida por OUTRO enunciado carrega os :pN na ' +
+    'colecao DELE, e o texto entraria aqui citando parametro que esta colecao ' +
+    'nao tem - quem liga por posicao ligaria errado, sem erro nenhum. Nao ha ' +
+    'como distinguir em runtime a expressao propria da alheia. Use ' +
+    'CaseExpr(const AExpression: String) com o termo, ou a sobrecarga de array ' +
+    'of const, que parametriza na colecao certa.');
 end;
 
 function TFluentSQL.AndOpe(const AExpression: IFluentSQLCriteriaExpression): IFluentSQL;

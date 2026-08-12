@@ -16,98 +16,98 @@
         FAST.ASTName.CaseExpr := Result.CaseExpr;
 
   FAST.ASTName e um CURSOR: aponta para o ultimo no tocado pela cadeia fluente.
-  Depois de Column('TIPO') ele aponta para uma COLUNA; depois de From('T') ele
-  aponta para a RELACAO; depois de InnerJoin('U') para a relacao do JOIN; e num
-  Select sem coluna nenhuma ele e NIL.
+
+  ============================================================================
+  ⭐ A LICAO QUE ESTE ARQUIVO EXISTE PARA NAO DEIXAR REPETIR
+  ============================================================================
+
+  A PRIMEIRA versao destes testes cobriu a ordem intercalada e MESMO ASSIM nao
+  pegou o defeito principal. Porque intercalar secao NAO BASTA: o no em que o
+  cursor cai depende da ORDEM DAS CHAMADAS, e duas cadeias com as MESMAS secoes
+  em ordens diferentes sao CAMINHOS DISTINTOS.
+
+      .Select.From('T').Column('TIPO').Where(...)    Column por ultimo
+                                                     -> cursor na COLUNA
+      .Select.Column('TIPO').From('T').Where(...)    From por ultimo
+                                                     -> cursor na RELACAO
+
+  As duas tem Select, Column, From e Where. Sao o mesmo conjunto de secoes. E
+  produzem resultados OPOSTOS. A primeira versao escreveu so a segunda ordem, e
+  por isso deu verde sobre um conserto que RECUSAVA a primeira - uma cadeia que
+  emitia SQL valido nos sete.
+
+  Por isso cada ponto da cadeia tem AQUI DUAS celulas, A e B, e nao uma.
+
+  ============================================================================
+  A PERGUNTA E DE NO, NAO DE SECAO
+  ============================================================================
+
+  A tentativa que falhou perguntava "o cursor esta na lista de colunas da secao
+  CORRENTE?" - varrendo so FAST.ASTColumns. A diferenca em relacao a "este no e
+  uma coluna?" e observavel, porque:
+
+      FAST.ASTName    e DURAVEL   - atravessa a troca de secao
+      FAST.ASTColumns e TROCADO   - _DefineSectionX o substitui POR BAIXO do
+                                    cursor: vira nil no Where e no Having, e
+                                    vira OUTRA lista no GroupBy e no OrderBy
+
+  Com o cursor parado sobre uma coluna do SELECT, bastava entrar no WHERE para a
+  pergunta de secao responder "nao e coluna" sobre o MESMO no. E no GroupBy era
+  pior que recusa: o CASE ia para a clausula ERRADA e o SQL saia VALIDO E
+  DIFERENTE -
+
+      base    SELECT (CASE TIPO WHEN 1 THEN 'A' END) FROM T
+      errado  SELECT TIPO FROM T GROUP BY (CASE WHEN 1 THEN 'A' END)
+
+  - ou seja regressao de ruidoso para MUDO, que e o oposto do que esta casa faz.
 
   ============================================================================
   O IDIOMA QUE NAO PODE MORRER
   ============================================================================
 
-  Com o cursor sobre uma COLUNA, as duas linhas acima formam um idioma
-  DELIBERADO e publico - "transforme a ultima coluna num CASE simples sobre
-  ela":
-
       .Select.Column('ID').Column('TIPO')
       .CaseExpr.When('1').IfThen('''A''').EndCase.Alias('R').From('T')
       -> SELECT ID, (CASE TIPO WHEN 1 THEN 'A' END) AS R FROM T
 
-  Ele e a forma dominante da suite: apagar o atalho derruba 19 celulas verdes,
-  entre elas a suite inteira do slot de valor (test.cases.value.pas) e o
-  TestSelectColumnsCase dos cinco dialetos. E apagar o ANEXO derruba 25, porque
-  sem ele o CASE nao chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T", com o
-  CASE inteiro perdido. Medido por mutacao, nao suposto.
-
-  ============================================================================
-  O DEFEITO: A PERGUNTA QUE FALTAVA
-  ============================================================================
-
-  O defeito nunca foi "o atalho existe". Foi "o atalho nao pergunta se o no
-  corrente e uma COLUNA". Com o cursor em qualquer outro lugar, o mesmo codigo
-  produz, em silencio:
-
-    cursor na relacao do FROM
-      SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' END)
-      -> o FROM e SUBSTITUIDO. Nao e so SQL invalido: e PERDA DE ESTRUTURA.
-
-    cursor na relacao do JOIN
-      SELECT * FROM T INNER JOIN (CASE U WHEN 1 THEN 'A' END) ON
-      -> a tabela juntada some, e o ON fica orfao.
-
-    cursor NIL (Select sem coluna, ou nem Select)
-      EAccessViolation lendo 00000000.
-      E a guarda "if Assigned(FAST)" nao ajudava: FAST NUNCA e nil ali. Quem e
-      nil e FAST.ASTName - desreferenciado DUAS LINHAS ACIMA da guarda, e
-      tambem DENTRO dela. A guarda protegia o objeto errado.
-
-  Por que a substituicao acontece: TFluentSQLName.Serialize (FluentSQL.Name.pas)
-  PREFERE FCase a FName -
-
-      if Assigned(FCase) then
-        Result := '(' + FCase.Serialize + ')'
-      else
-        Result := FName;
-
-  entao escrever CaseExpr num no de relacao apaga o texto daquele no.
+  Medido por mutacao: apagar o atalho derruba 27 celulas, 10 delas da suite do
+  slot de valor (T13); apagar o ANEXO derruba 25, porque sem ele o CASE nao
+  chega ao SELECT - sai "SELECT ID, TIPO AS R FROM T", com o CASE inteiro
+  perdido. Nenhuma das duas linhas podia sair.
 
   ============================================================================
   O ORACULO DE MOTOR REAL
   ============================================================================
 
-  O texto que o HEAD emitia foi submetido VERBATIM, com massa de 3 linhas
-  (PRODUCTS(ID, PRICE), duas com PRICE > 10). Transcricao em
-  test.caseexpr.anchor.matrix.sql, ao lado deste arquivo.
+  Texto do HEAD anterior, submetido VERBATIM com massa de 3 linhas. Transcricao
+  em test.caseexpr.anchor.matrix.sql.
 
       SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
 
     PostgreSQL 16                     ERROR: syntax error at or near "CASE"
     MySQL 8.4                         ERROR 1064 (42000)
-    SQL Server 2022 16.0.4265.3       Msg 156 Incorrect syntax near the keyword 'CASE'
-    Firebird 5.0.4                    SQLSTATE 42000 / -104 / Token unknown - CASE
+    SQL Server 2022 16.0.4265.3       Msg 156 Incorrect syntax near 'CASE'
+    Firebird 5.0.4                    -104 / Token unknown - CASE
     Oracle AI 26ai Free 23.26.2.0.0   ORA-00907: missing right parenthesis
     DB2 v12.1.5.0                     SQL0104N ... SQLSTATE=42601
     InterBase                         NAO MEDIDO - nao ha imagem publica
 
-  SEIS de sete RECUSAM. E a forma nova nao so passa no parser: ela DEVOLVE O
-  DADO CERTO nos seis, 3 linhas, BARATO/CARO/CARO.
+  SEIS de sete RECUSAM, e a forma nova devolve o DADO certo nos seis.
 
   ============================================================================
-  A REGRA, EM UMA FRASE
+  A REGRA
   ============================================================================
 
       converter SQL invalido silencioso em SQL VALIDO quando o sentido e
       inequivoco, e em ERRO NOMEADO quando nao e. Nunca em descarte silencioso.
 
-  Aplicada aos tres casos:
+  ============================================================================
+  CATALOGADO E NAO CONSERTADO
+  ============================================================================
 
-    no corrente E coluna ......... idioma preservado, byte a byte
-    no corrente NAO e coluna,
-      mas ha secao de colunas .... coluna NOVA, e o CASE vai nela como SEARCHED
-                                   CASE. Um CASE num SELECT so tem um lugar
-                                   sensato: a lista de projecao.
-    nao ha secao de colunas ...... RECUSA nomeada. Ali o sentido NAO e
-                                   inequivoco, e a alternativa (no-op)
-                                   descartaria o CASE em silencio.
+  Dois CaseExpr seguidos sobre a MESMA coluna: o segundo descarta o primeiro em
+  silencio. E PRE-EXISTENTE - medido identico na base e depois desta entrega - e
+  e consequencia direta do idioma "substitui a ultima coluna". Nao ha celula
+  aqui, e nao foi consertado: se virar tarefa, e decisao do dono.
   ------------------------------------------------------------------------------
 }
 
@@ -131,7 +131,7 @@ type
   private
     function _MensagemDe(const AProc: TProc): String;
   public
-    { --- o idioma canonico: o CASE simples herda a COLUNA corrente ---------- }
+    { --- o idioma canonico -------------------------------------------------- }
     [Test]
     [TestCase('Firebird',   '0')]
     [TestCase('MSSQL',      '1')]
@@ -141,7 +141,7 @@ type
     [TestCase('SQLite',     '5')]
     procedure TestIdiomaDaColunaCorrenteSobrevive(const AIdx: Integer);
 
-    { --- expressao vazia SEM coluna corrente vira SEARCHED CASE ------------- }
+    { --- searched CASE em coluna nova --------------------------------------- }
     [Test]
     [TestCase('Firebird',   '0')]
     [TestCase('MSSQL',      '1')]
@@ -151,7 +151,6 @@ type
     [TestCase('SQLite',     '5')]
     procedure TestDepoisDeFromViraSearchedCaseEmColunaNova(const AIdx: Integer);
 
-    { --- o FROM deixa de ser substituido ------------------------------------ }
     [Test]
     procedure TestOFromNaoEMaisSubstituido;
     [Test]
@@ -159,37 +158,59 @@ type
     [Test]
     procedure TestCaseExprComExpressaoDepoisDeFromTambemAbreColunaNova;
 
-    { --- ORDEM INTERCALADA: os seis pontos da cadeia ------------------------ }
+    { --- ⭐ ORDEM INTERCALADA, NAS DUAS ORDENS ------------------------------ }
+    { A = Column por ultimo -> cursor na COLUNA                                }
     [Test]
-    procedure TestOrdemIntercalada_DepoisDeSelectSemColuna;
+    procedure TestOrdemA_ColunaCorrente_Where;
     [Test]
-    procedure TestOrdemIntercalada_DepoisDeColumn;
+    procedure TestOrdemA_ColunaCorrente_GroupBy;
     [Test]
-    procedure TestOrdemIntercalada_DepoisDeFrom;
+    procedure TestOrdemA_ColunaCorrente_OrderBy;
     [Test]
-    procedure TestOrdemIntercalada_DepoisDeWhere;
+    procedure TestOrdemA_ColunaCorrente_Having;
     [Test]
-    procedure TestOrdemIntercalada_DepoisDeInnerJoin;
+    procedure TestOrdemA_ColunaCorrente_InnerJoin;
+    { B = From por ultimo -> cursor na RELACAO                                 }
     [Test]
-    procedure TestOrdemIntercalada_DepoisDeOrderBy;
+    procedure TestOrdemB_RelacaoCorrente_Where;
+    [Test]
+    procedure TestOrdemB_RelacaoCorrente_GroupBy;
+    [Test]
+    procedure TestOrdemB_RelacaoCorrente_OrderBy;
+    [Test]
+    procedure TestOrdemB_RelacaoCorrente_Having;
+    [Test]
+    procedure TestOrdemB_RelacaoCorrente_InnerJoin;
 
-    { --- a recusa nomeada --------------------------------------------------- }
+    { --- INSERT: lista de colunas que NAO aceita expressao ------------------ }
     [Test]
-    procedure TestSemSecaoDeColunasRecusaComEArgumentException;
+    procedure TestInsertSemColunaRecusa;
+    [Test]
+    procedure TestInsertComColunaRecusa;
+    [Test]
+    procedure TestInsertComArrayOfConstRecusaSemGravarParametro;
+    [Test]
+    procedure TestAMensagemDoInsertExplicaOQueAListaDoInsertE;
+
+    { --- secoes que nao projetam -------------------------------------------- }
+    [Test]
+    procedure TestUpdateRecusa;
+    [Test]
+    procedure TestDeleteRecusa;
+    [Test]
+    procedure TestQueryPuroRecusaEmVezDeAccessViolation;
     [Test]
     procedure TestAMensagemDaRecusaNomeiaAChamadaEASaida;
     [Test]
     procedure TestARecusaNaoDeixaParametroParaTras;
 
-    { --- a terceira sobrecarga, que estourava SEMPRE ------------------------ }
+    { --- a terceira sobrecarga: recusa NOMEADA ------------------------------ }
     [Test]
-    procedure TestSobrecargaDeExpressionNaoEstouraMais;
+    procedure TestSobrecargaDeExpressionLevantaEmVezDeMentir;
     [Test]
-    procedure TestSobrecargaDeExpressionDepoisDeFromAbreColunaNova;
-    [Test]
-    procedure TestSobrecargaDeExpressionCarregaOsParametrosDaExpressao;
+    procedure TestAMensagemDaSobrecargaNomeiaOBloqueio;
 
-    { --- controles: o que NAO pode ter mudado ------------------------------- }
+    { --- controles ----------------------------------------------------------- }
     [Test]
     procedure TestCaseSimplesComExpressaoExplicitaContinuaIgual;
     [Test]
@@ -199,9 +220,6 @@ type
 implementation
 
 const
-  /// Os seis dialetos que os .dpr desta pasta ligam por {$DEFINE}. O texto do
-  /// CASE e ANSI e igual nos seis - o que a celula por dialeto trava e que
-  /// nenhum driver resolva a ancoragem de outro jeito.
   cDIALETOS: array[0..5] of TFluentSQLDriver =
     (dbnFirebird, dbnMSSQL, dbnMySQL, dbnOracle, dbnPostgreSQL, dbnSQLite);
 
@@ -224,11 +242,8 @@ procedure TTestCaseExprAnchor.TestIdiomaDaColunaCorrenteSobrevive(const AIdx: In
 var
   LQuery: IFluentSQL;
 begin
-  // A CELULA MAIS IMPORTANTE DESTE ARQUIVO. Com o cursor sobre uma COLUNA,
-  // CaseExpr sem argumento continua herdando o NOME dela como operando do CASE
-  // simples, e o CASE continua substituindo aquela coluna na projecao. Sao as 19
-  // celulas que a mutacao "apague o atalho" derruba - esta aqui as representa em
-  // cada dialeto.
+  // A CELULA MAIS IMPORTANTE DESTE ARQUIVO, em cada dialeto. Sao as 27 que a
+  // mutacao "apague o atalho" derruba.
   LQuery := FluentSQL.Query(cDIALETOS[AIdx])
     .Select.Column('ID').Column('TIPO')
     .CaseExpr
@@ -238,8 +253,8 @@ begin
   Assert.AreEqual(
     'SELECT ID, (CASE TIPO WHEN 1 THEN ''A'' END) AS R FROM T',
     LQuery.AsString, False,
-    'CaseExpr sem argumento sobre uma COLUNA e idioma publico: ele herda o nome ' +
-    'da coluna e substitui a coluna na projecao');
+    'CaseExpr sem argumento sobre uma COLUNA e idioma publico: herda o nome da ' +
+    'coluna e substitui a coluna na projecao');
 end;
 
 { --- searched CASE ---------------------------------------------------------- }
@@ -248,8 +263,6 @@ procedure TTestCaseExprAnchor.TestDepoisDeFromViraSearchedCaseEmColunaNova(const
 var
   LQuery: IFluentSQL;
 begin
-  // Com o cursor na RELACAO, nao ha coluna a herdar: o CASE nasce SEARCHED e vai
-  // para uma coluna NOVA, sem tocar no FROM.
   LQuery := FluentSQL.Query(cDIALETOS[AIdx]).Select.All.From('PRODUCTS');
   LQuery.CaseExpr
     .When('PRICE > 10').IfThen('''CARO''')
@@ -267,8 +280,6 @@ var
 begin
   LSql := FluentSQL.Query(dbnPostgreSQL).Select.All.From('PRODUCTS')
     .CaseExpr.When('PRICE > 10').IfThen('''CARO''').EndCase.AsString;
-  // O oraculo especifico da PERDA DE ESTRUTURA: o nome da relacao tem de
-  // continuar no statement, e nao pode aparecer em posicao de operando de CASE.
   Assert.Contains(LSql, 'FROM PRODUCTS', False,
     'A relacao tem de continuar no FROM. Recebido: ' + LSql);
   Assert.DoesNotContain(LSql, 'CASE PRODUCTS', False,
@@ -279,8 +290,6 @@ procedure TTestCaseExprAnchor.TestSelectSemColunaNaoLevantaMaisAccessViolation;
 var
   LQuery: IFluentSQL;
 begin
-  // O cursor e NIL aqui. Antes: EAccessViolation lendo 00000000, porque a
-  // guarda "if Assigned(FAST)" perguntava pelo objeto errado.
   LQuery := FluentSQL.Query(dbnPostgreSQL).Select;
   LQuery.CaseExpr.When('1').IfThen('''A''').EndCase.Alias('R').From('T');
   Assert.AreEqual(
@@ -292,8 +301,7 @@ procedure TTestCaseExprAnchor.TestCaseExprComExpressaoDepoisDeFromTambemAbreColu
 var
   LQuery: IFluentSQL;
 begin
-  // A ancoragem NAO depende de o argumento ser vazio: CaseExpr('TIPO') com o
-  // cursor na relacao tambem tem de abrir coluna nova em vez de comer o FROM.
+  // A ancoragem NAO depende de o argumento ser vazio.
   LQuery := FluentSQL.Query(dbnPostgreSQL).Select.All.From('T');
   LQuery.CaseExpr('TIPO').When('1').IfThen('''A''');
   Assert.AreEqual(
@@ -301,87 +309,227 @@ begin
     LQuery.AsString, False);
 end;
 
-{ --- ORDEM INTERCALADA ------------------------------------------------------ }
+{ --- ORDEM A: Column por ultimo, cursor na COLUNA --------------------------- }
 
-procedure TTestCaseExprAnchor.TestOrdemIntercalada_DepoisDeSelectSemColuna;
+procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_Where;
 var
   LQuery: IFluentSQL;
 begin
-  LQuery := FluentSQL.Query(dbnFirebird).Select;
-  LQuery.CaseExpr.When('1').IfThen('''A''').EndCase.Alias('R').From('T');
-  Assert.AreEqual('SELECT (CASE WHEN 1 THEN ''A'' END) AS R FROM T',
-    LQuery.AsString, False);
-end;
-
-procedure TTestCaseExprAnchor.TestOrdemIntercalada_DepoisDeColumn;
-var
-  LQuery: IFluentSQL;
-begin
-  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO');
-  LQuery.CaseExpr.When('1').IfThen('''A''').EndCase.Alias('R').From('T');
-  Assert.AreEqual('SELECT (CASE TIPO WHEN 1 THEN ''A'' END) AS R FROM T',
-    LQuery.AsString, False,
-    'Este e o unico dos seis pontos em que o atalho de heranca vale');
-end;
-
-procedure TTestCaseExprAnchor.TestOrdemIntercalada_DepoisDeFrom;
-var
-  LQuery: IFluentSQL;
-begin
-  LQuery := FluentSQL.Query(dbnFirebird).Select.All.From('T');
+  // ESTA e a celula que a primeira versao do conserto QUEBROU e que os testes de
+  // entao nao tinham. O cursor esta na COLUNA, e por isso o idioma vale mesmo
+  // com a secao corrente sendo o WHERE - onde ASTColumns e nil.
+  LQuery := FluentSQL.Query(dbnFirebird).Select.From('T').Column('TIPO')
+    .Where('ID').Equal(1);
   LQuery.CaseExpr.When('1').IfThen('''A''');
-  Assert.AreEqual('SELECT *, (CASE WHEN 1 THEN ''A'' END) FROM T',
-    LQuery.AsString, False);
+  Assert.AreEqual(
+    'SELECT (CASE TIPO WHEN 1 THEN ''A'' END) FROM T WHERE (ID = :p1)',
+    LQuery.AsString, False,
+    'O no e duravel: entrar no WHERE nao transforma a coluna do SELECT em ' +
+    'outra coisa');
 end;
 
-procedure TTestCaseExprAnchor.TestOrdemIntercalada_DepoisDeWhere;
-begin
-  // Na secao WHERE nao ha secao de colunas: o sentido NAO e inequivoco e a
-  // chamada e RECUSADA. Antes daqui saia "SELECT * FROM (CASE T WHEN 1 THEN 'A'
-  // END) WHERE (ID = :p1)" - o FROM comido, calado.
-  Assert.WillRaise(
-    procedure
-    var LQuery: IFluentSQL;
-    begin
-      LQuery := FluentSQL.Query(dbnFirebird).Select.All.From('T').Where('ID').Equal(1);
-      LQuery.CaseExpr.When('1').IfThen('''A''');
-    end,
-    EArgumentException);
-end;
-
-procedure TTestCaseExprAnchor.TestOrdemIntercalada_DepoisDeInnerJoin;
-begin
-  // O SEXTO SINTOMA, achado pela ordem intercalada e por nada mais: com o cursor
-  // na relacao do JOIN, o HEAD emitia
-  //   SELECT * FROM T INNER JOIN (CASE U WHEN 1 THEN 'A' END) ON
-  // - a tabela juntada some e o ON fica orfao. A secao JOIN tambem nao tem
-  // secao de colunas, entao cai na mesma recusa.
-  Assert.WillRaise(
-    procedure
-    var LQuery: IFluentSQL;
-    begin
-      LQuery := FluentSQL.Query(dbnFirebird).Select.All.From('T').InnerJoin('U');
-      LQuery.CaseExpr.When('1').IfThen('''A''');
-    end,
-    EArgumentException);
-end;
-
-procedure TTestCaseExprAnchor.TestOrdemIntercalada_DepoisDeOrderBy;
+procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_GroupBy;
 var
   LQuery: IFluentSQL;
 begin
-  // O ORDER BY TEM secao de colunas, e o cursor esta sobre a coluna que acabou
-  // de ser adicionada - entao o atalho de heranca vale aqui tambem, e vale de
-  // proposito: e a mesma regra, nao uma excecao.
-  LQuery := FluentSQL.Query(dbnFirebird).Select.All.From('T').OrderBy('ID');
+  // E a celula que pegaria o pior sintoma da tentativa anterior: o CASE ir para
+  // o GROUP BY e o SQL sair VALIDO E DIFERENTE.
+  LQuery := FluentSQL.Query(dbnFirebird).Select.From('T').Column('TIPO').GroupBy('');
+  LQuery.CaseExpr.When('1').IfThen('''A''');
+  Assert.AreEqual(
+    'SELECT (CASE TIPO WHEN 1 THEN ''A'' END) FROM T',
+    LQuery.AsString, False,
+    'Com o cursor na coluna do SELECT, o CASE fica no SELECT - nao migra para o ' +
+    'GROUP BY so porque a secao corrente mudou');
+end;
+
+procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_OrderBy;
+var
+  LQuery: IFluentSQL;
+begin
+  LQuery := FluentSQL.Query(dbnFirebird).Select.From('T').Column('TIPO').OrderBy('');
   LQuery.CaseExpr.When('1').IfThen('1');
-  Assert.AreEqual('SELECT * FROM T ORDER BY (CASE ID WHEN 1 THEN 1 END) ASC',
+  Assert.AreEqual(
+    'SELECT (CASE TIPO WHEN 1 THEN 1 END) FROM T',
     LQuery.AsString, False);
 end;
 
-{ --- a recusa nomeada ------------------------------------------------------- }
+procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_Having;
+var
+  LQuery: IFluentSQL;
+begin
+  // Aqui o cursor esta na coluna do GROUP BY - que TAMBEM e coluna, e por isso o
+  // idioma vale e o CASE substitui aquela coluna.
+  LQuery := FluentSQL.Query(dbnFirebird).Select.From('T').Column('TIPO')
+    .GroupBy('TIPO').Having('X');
+  LQuery.CaseExpr.When('1').IfThen('''A''');
+  Assert.AreEqual(
+    'SELECT TIPO FROM T GROUP BY (CASE TIPO WHEN 1 THEN ''A'' END) HAVING X',
+    LQuery.AsString, False);
+end;
 
-procedure TTestCaseExprAnchor.TestSemSecaoDeColunasRecusaComEArgumentException;
+procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_InnerJoin;
+begin
+  // O JOIN e o unico ponto em que as duas ordens coincidem: _CreateJoin aponta o
+  // cursor para a relacao juntada SEMPRE, seja qual for a ordem anterior. Antes
+  // saia "... INNER JOIN (CASE U WHEN 1 THEN 'A' END) ON" - a tabela juntada
+  // sumia e o ON ficava orfao.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.From('T').Column('TIPO')
+        .InnerJoin('U');
+      LQuery.CaseExpr.When('1').IfThen('''A''');
+    end,
+    EArgumentException);
+end;
+
+{ --- ORDEM B: From por ultimo, cursor na RELACAO ---------------------------- }
+
+procedure TTestCaseExprAnchor.TestOrdemB_RelacaoCorrente_Where;
+begin
+  // Mesmas secoes da ordem A, ordem trocada: agora o cursor esta na RELACAO e
+  // nao ha lista de colunas na secao corrente. Antes saia
+  // "SELECT TIPO FROM (CASE T WHEN 1 THEN 'A' END) WHERE (ID = :p1)".
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('T')
+        .Where('ID').Equal(1);
+      LQuery.CaseExpr.When('1').IfThen('''A''');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestOrdemB_RelacaoCorrente_GroupBy;
+var
+  LQuery: IFluentSQL;
+begin
+  // Cursor na relacao, mas a secao corrente TEM lista de colunas: o CASE nasce
+  // searched numa coluna nova DO GROUP BY - que e onde quem chamou GroupBy o
+  // quer. E a medicao que derrubou a hipotese "a coluna nova vai sempre para a
+  // projecao".
+  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('T').GroupBy('');
+  LQuery.CaseExpr.When('1').IfThen('''A''');
+  Assert.AreEqual(
+    'SELECT TIPO FROM T GROUP BY (CASE WHEN 1 THEN ''A'' END)',
+    LQuery.AsString, False);
+end;
+
+procedure TTestCaseExprAnchor.TestOrdemB_RelacaoCorrente_OrderBy;
+var
+  LQuery: IFluentSQL;
+begin
+  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('T').OrderBy('');
+  LQuery.CaseExpr.When('1').IfThen('1');
+  Assert.AreEqual(
+    'SELECT TIPO FROM T ORDER BY (CASE WHEN 1 THEN 1 END) ASC',
+    LQuery.AsString, False);
+end;
+
+procedure TTestCaseExprAnchor.TestOrdemB_RelacaoCorrente_Having;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('T')
+        .Having('X');
+      LQuery.CaseExpr.When('1').IfThen('''A''');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestOrdemB_RelacaoCorrente_InnerJoin;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('T')
+        .InnerJoin('U');
+      LQuery.CaseExpr.When('1').IfThen('''A''');
+    end,
+    EArgumentException);
+end;
+
+{ --- INSERT ----------------------------------------------------------------- }
+
+procedure TTestCaseExprAnchor.TestInsertSemColunaRecusa;
+begin
+  // O INSERT TEM lista de colunas, e e justamente por isso que precisa de recusa
+  // PROPRIA: sem ela o CASE seria ancorado ali como em qualquer outra lista.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T');
+      LQuery.CaseExpr.When('1').IfThen('''A''');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestInsertComColunaRecusa;
+begin
+  // ESTA metade NAO e regressao desta entrega: na base ja saia, calado,
+  // "INSERT INTO T ( (CASE A WHEN 1 THEN 'X' END) )".
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T').Column('A');
+      LQuery.CaseExpr.When('1').IfThen('''X''');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestInsertComArrayOfConstRecusaSemGravarParametro;
+var
+  LQuery: IFluentSQL;
+begin
+  LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T').Column('A');
+  try
+    LQuery.CaseExpr(['A', '=', 1]);
+  except
+    on E: EArgumentException do ;
+  end;
+  Assert.AreEqual(0, LQuery.Params.Count,
+    'A recusa do INSERT corre ANTES de o array virar :pN - senao o parametro ' +
+    'ficaria na colecao sem nada no SQL que o citasse');
+end;
+
+procedure TTestCaseExprAnchor.TestAMensagemDoInsertExplicaOQueAListaDoInsertE;
+var
+  LMsg: String;
+begin
+  LMsg := _MensagemDe(
+    procedure
+    begin
+      FluentSQL.Query(dbnFirebird).Insert.Into('T').CaseExpr;
+    end);
+  Assert.Contains(LMsg, 'INSERT', False,
+    'A mensagem tem de dizer onde a chamada caiu. Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'CaseExpr', False,
+    'A mensagem tem de nomear a chamada. Recebido: ' + LMsg);
+end;
+
+{ --- secoes que nao projetam ------------------------------------------------ }
+
+procedure TTestCaseExprAnchor.TestUpdateRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Update('T');
+      LQuery.CaseExpr.When('1').IfThen('''A''');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestDeleteRecusa;
 begin
   Assert.WillRaise(
     procedure
@@ -393,6 +541,21 @@ begin
     'saida que nao descarta a chamada em silencio');
 end;
 
+procedure TTestCaseExprAnchor.TestQueryPuroRecusaEmVezDeAccessViolation;
+begin
+  // A guarda ANTERIOR formatava FAST.ASTSection.Name DENTRO do raise, e ali
+  // ASTSection e nil: ela estourava com EAccessViolation de dentro de si mesma -
+  // a mesma figura de "guarda no objeto errado" que esta tarefa corrige.
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Query(dbnPostgreSQL).CaseExpr;
+    end,
+    EArgumentException,
+    'Num enunciado que nao abriu secao nenhuma a recusa tem de ser nomeada, e ' +
+    'nao um EAccessViolation vindo de dentro da propria guarda');
+end;
+
 procedure TTestCaseExprAnchor.TestAMensagemDaRecusaNomeiaAChamadaEASaida;
 var
   LMsg: String;
@@ -402,8 +565,6 @@ begin
     begin
       FluentSQL.Query(dbnPostgreSQL).Delete.From('T').CaseExpr;
     end);
-  // False = nao ignore caixa: a mensagem tem de citar os metodos como eles se
-  // escrevem na API.
   Assert.Contains(LMsg, 'CaseExpr', False,
     'A mensagem tem de nomear a chamada que falhou. Recebido: ' + LMsg);
   Assert.Contains(LMsg, 'Column', False,
@@ -414,9 +575,11 @@ procedure TTestCaseExprAnchor.TestARecusaNaoDeixaParametroParaTras;
 var
   LQuery: IFluentSQL;
 begin
-  // O invariante que test.cases.value.pas ja aplica a IfThen/ElseIf vale aqui:
-  // um caminho de recusa nao pode deixar :pN orfao na colecao.
-  LQuery := FluentSQL.Query(dbnPostgreSQL).Select.All.From('T').Where('ID').Equal(1);
+  // O invariante que esta funcao sustenta, e nada alem dele: nenhum caminho de
+  // recusa DESTA funcao grava parametro. O :p1 do Equal(1) e anterior a chamada
+  // e continua contando.
+  LQuery := FluentSQL.Query(dbnPostgreSQL).Select.Column('TIPO').From('T')
+    .Where('ID').Equal(1);
   Assert.AreEqual(1, LQuery.Params.Count, 'pre-condicao');
   try
     LQuery.CaseExpr(['TIPO', '=', 9]);
@@ -429,50 +592,41 @@ end;
 
 { --- a terceira sobrecarga -------------------------------------------------- }
 
-procedure TTestCaseExprAnchor.TestSobrecargaDeExpressionNaoEstouraMais;
-var
-  LQuery: IFluentSQL;
+procedure TTestCaseExprAnchor.TestSobrecargaDeExpressionLevantaEmVezDeMentir;
 begin
-  // CaseExpr(IFluentSQLCriteriaExpression) era 100% inalcancavel: ela fazia
-  // Create(Self, '') e logo Result.AndOpe(...), e AndOpe le FLastExpression, que
-  // so e preenchido por When. Recem-criado, FLastExpression e NIL -> AV em
-  // QUALQUER estado. Medido em tres estados distintos, AV nos tres.
-  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID');
-  LQuery.CaseExpr(LQuery.Expression('TIPO')).When('1').IfThen('''A''');
-  Assert.AreEqual(
-    'SELECT (CASE TIPO WHEN 1 THEN ''A'' END) FROM T',
-    LQuery.From('T').AsString, False,
-    'A sobrecarga de Expression tem de se comportar como as outras duas: o ' +
-    'argumento e o OPERANDO do CASE simples');
+  // Ela era PUBLICA e 100% inalcancavel - EAccessViolation em qualquer estado.
+  // Nao foi "consertada para funcionar" porque a saida obvia (serializar e
+  // delegar) MENTE quando a expressao vem de outro enunciado: medido, o SQL sai
+  // citando :p1 com Params.Count = 0 no dono e o valor preso na colecao alheia.
+  // Nao ha como distinguir os dois casos em runtime.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID');
+      LQuery.CaseExpr(LQuery.Expression('TIPO'));
+    end,
+    EArgumentException,
+    'Entre estourar, mentir em silencio e recusar dizendo o porque, a recusa e ' +
+    'a unica honesta enquanto a fusao de colecoes de parametro nao existir');
 end;
 
-procedure TTestCaseExprAnchor.TestSobrecargaDeExpressionDepoisDeFromAbreColunaNova;
+procedure TTestCaseExprAnchor.TestAMensagemDaSobrecargaNomeiaOBloqueio;
 var
-  LQuery: IFluentSQL;
+  LMsg: String;
 begin
-  // E ela obedece a MESMA regra de ancoragem das outras duas - o conserto e no
-  // ponto unico, nao replicado em tres.
-  LQuery := FluentSQL.Query(dbnFirebird).Select.All.From('T');
-  LQuery.CaseExpr(LQuery.Expression('TIPO')).When('1').IfThen('''A''');
-  Assert.AreEqual(
-    'SELECT *, (CASE TIPO WHEN 1 THEN ''A'' END) FROM T',
-    LQuery.AsString, False);
-end;
-
-procedure TTestCaseExprAnchor.TestSobrecargaDeExpressionCarregaOsParametrosDaExpressao;
-var
-  LQuery: IFluentSQL;
-begin
-  // Expression(['...']) ja parametriza escalares. O que a sobrecarga faz e levar
-  // o TEXTO ja parametrizado para o operando - o :pN tem de continuar unico e
-  // referenciado no SQL.
-  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID');
-  LQuery.CaseExpr(LQuery.Expression(['TIPO', '*', 2])).When('1').IfThen('''A''');
-  Assert.AreEqual(
-    'SELECT (CASE TIPO * :p1 WHEN 1 THEN ''A'' END) FROM T',
-    LQuery.From('T').AsString, False);
-  Assert.AreEqual(1, LQuery.Params.Count);
-  Assert.AreEqual(2, Integer(LQuery.Params[0].Value));
+  LMsg := _MensagemDe(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.Column('ID');
+      LQuery.CaseExpr(LQuery.Expression('TIPO'));
+    end);
+  // A mensagem tem de NOMEAR o bloqueio, para ninguem a ler como capricho.
+  Assert.Contains(LMsg, 'parametro', False,
+    'A mensagem tem de dizer que o bloqueio e de parametros. Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'CaseExpr', False,
+    'A mensagem tem de nomear a chamada. Recebido: ' + LMsg);
 end;
 
 { --- controles -------------------------------------------------------------- }
@@ -481,8 +635,7 @@ procedure TTestCaseExprAnchor.TestCaseSimplesComExpressaoExplicitaContinuaIgual;
 var
   LQuery: IFluentSQL;
 begin
-  // CASE simples legitimo NAO pode morrer: e a forma valida de
-  // "CASE <coluna> WHEN <valor>", e ela nao passa pelo atalho.
+  // CASE simples legitimo NAO pode morrer.
   LQuery := FluentSQL.Query(dbnPostgreSQL)
     .Select.Column('ID')
     .CaseExpr('TIPO')
@@ -497,8 +650,6 @@ procedure TTestCaseExprAnchor.TestArrayOfConstContinuaHerdandoAColunaCorrente;
 var
   LQuery: IFluentSQL;
 begin
-  // A sobrecarga de array of const delega a de String: ela nao tem atalho
-  // proprio, e por isso o conserto num ponto vale para as tres.
   LQuery := FluentSQL.Query(dbnFirebird)
     .Select.Column('ID').Column('TIPO_CLIENTE')
     .CaseExpr(['TIPO_CLIENTE', '*', 2])
