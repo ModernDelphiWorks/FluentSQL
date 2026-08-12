@@ -28,7 +28,11 @@ type
     [Test]
     procedure TestTruncateTable_MySQL_MultiTable_RaisesNotSupported;
     [Test]
-    [Ignore('T6: emite sintaxe Oracle (TRUNCATE TABLE t PARTITION (p)); MySQL exige ALTER TABLE t TRUNCATE PARTITION p.')]
+    // T35: religada. O [Ignore] da T6 dizia exatamente o que a medicao em motor
+    // real confirmou - "emite sintaxe Oracle (TRUNCATE TABLE t PARTITION (p));
+    // MySQL exige ALTER TABLE t TRUNCATE PARTITION p" - e o texto que a celula
+    // ja assertava e o que o HEAD passou a emitir, verbatim. Nada foi ajustado
+    // nela para casar com o codigo: o codigo e que veio ate ela.
     procedure TestTruncateTable_MySQL_Partition_GeneratesExpected;
     [Test]
     procedure TestAlterTableAlterColumn_MySQL_TypeAndNullability_GeneratesExpected;

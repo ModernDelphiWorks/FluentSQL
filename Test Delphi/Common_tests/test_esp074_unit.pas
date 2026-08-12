@@ -129,14 +129,31 @@ begin
     System.SysUtils.ENotSupportedException);
 end;
 
+// T35: 'TRUNCATE TABLE `logs` PARTITION (p2023)' e sintaxe Oracle, e o MySQL a
+// recusa - medido em mysql:8.4 (VERSION() = 8.4.11):
+//   ERROR 1064 (42000) ... near 'PARTITION (p2023)' at line 1
+// A UNICA forma que o MySQL tem para a operacao e ALTER TABLE ... TRUNCATE
+// PARTITION, verificada ponta a ponta numa tabela particionada por RANGE: a
+// particao p2023 foi de 1 para 0 linhas e a pmax ficou intacta com 1. Por ser a
+// unica forma, nao ha desvio de semantica a declarar.
 procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_Partition_GeneratesExpected;
 var
   LSql: string;
 begin
   LSql := FluentSQL.Schema(dbnMySQL).TruncateTable('logs').Partition('p2023').AsString;
-  Assert.AreEqual('TRUNCATE TABLE `logs` PARTITION (p2023)', LSql);
+  Assert.AreEqual('ALTER TABLE `logs` TRUNCATE PARTITION `p2023`', LSql);
 end;
 
+// T35, HONESTIDADE SOBRE ESTA CELULA: ela levanta, e sempre levantou, mas desde
+// que a guarda de multi-tabela entrou (o MySQL nao aceita lista de tabelas) e
+// essa guarda que a atende - a de PARTITION nao e mais alcancada por ela. Isto
+// e, esta celula passou a ser uma SEGUNDA medicao da guarda de multi-tabela, e
+// nao uma medicao da combinacao "multi-tabela COM particao". Provado por
+// mutacao: remover a guarda de multi-tabela mata esta celula junto com
+// TestTruncateTable_MySQL_MultiTable_RaisesNotSupported; mexer no ramo de
+// PARTITION nao a toca. Fica declarada assim em vez de ser reescrita para
+// parecer o que nao e - e nao foi desligada, porque o que ela afirma continua
+// verdadeiro: a chamada levanta.
 procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_MultiTableWithPartition_RaisesNotSupported;
 begin
   Assert.WillRaise(

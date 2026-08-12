@@ -75,6 +75,12 @@
   1, 2 e 5 tem o Firebird e/ou o MySQL fora; as linhas 3, 6 e 7 tem o Firebird
   sozinho fora; a linha 4 tem Firebird e MSSQL fora.
 
+  PLACAR DA RODADA: das sete, QUATRO foram corrigidas (itens 1-2, 3, 5 e 6) e
+  TRES ficam medidas e declaradas sem conserto (itens 4, 7 e 8), porque as tres
+  convergem numa pergunta de convencao que subiu ao dono. Nenhuma foi desligada
+  com [Ignore] para fechar numero; ao contrario, o item 3 RELIGOU uma celula que
+  ja estava desligada.
+
   ------------------------------------------------------------------------------
   ------------------------------------------------------------------------------
   ITEM 1-2   MySQL   TRUNCATE TABLE a, b       >>> CORRIGIDO NESTA RODADA <<<
@@ -142,9 +148,17 @@
   era o unico que conhecia a regra pelo vizinho e nao a aplicava a si.
 
   ------------------------------------------------------------------------------
-  ITEM 3   MySQL   TRUNCATE TABLE t PARTITION (p)   >>> MEDIDO, NAO CORRIGIDO <<<
+  ITEM 3   MySQL   TRUNCATE TABLE t PARTITION (p)   >>> CORRIGIDO NESTA RODADA <<<
 
-  O HEAD emite, e test_esp074_unit.pas fixa VERDE:
+  ORDEM DOS FATOS, que importa: a medicao abaixo foi feita PRIMEIRO e entregue
+  SEM conserto, porque trocar a forma do enunciado e decisao de forma. A decisao
+  veio depois, do orquestrador, com estas razoes - todas medidas aqui: e a UNICA
+  forma que o MySQL tem, a semantica e identica, e a expectativa ja estava
+  escrita e DESLIGADA na suite. Nao e superficie nova: a API JA oferecia
+  TRUNCATE ... PARTITION e ja emitia texto que o motor recusa; faze-la emitir a
+  forma valida e conserto.
+
+  O HEAD ANTES emitia, e test_esp074_unit.pas fixava VERDE:
 
       TRUNCATE TABLE `logs` PARTITION (p2023)
 
@@ -195,13 +209,86 @@
       explicitamente ("PARTITION clause is not supported for TRUNCATE"),
       Firebird levanta, SQLite e MSSQL nao expressam.
 
-  POR QUE NAO FOI CORRIGIDO: a correcao aqui e trocar a FORMA do enunciado
-  emitido - TRUNCATE TABLE vira ALTER TABLE. Isso e decisao de forma, e a ordem
-  recebida foi explicita: medir e trazer, nao adotar sozinho. A expectativa ja
-  esta escrita e DESLIGADA na suite, em test.ddl.mysql.pas, com [Ignore] que diz
-  exatamente isto e assere ALTER TABLE `T1` TRUNCATE PARTITION `p1`.
-  RECOMENDACAO: adotar a forma medida. Custo: reescrever essa celula, religar o
-  [Ignore], e uma celula em test_esp074_unit.pas.
+  DECISAO APLICADA: emitir ALTER TABLE t TRUNCATE PARTITION p. O enunciado com
+  particao deixou de ser "TRUNCATE TABLE com um sufixo" e passou a ser montado
+  como outro comando, porque e outro comando.
+
+  A CELULA [Ignore]ADA FOI RELIGADA, NAO REESCRITA. Ela estava em
+  test.ddl.mysql.pas com o texto "T6: emite sintaxe Oracle (TRUNCATE TABLE t
+  PARTITION (p)); MySQL exige ALTER TABLE t TRUNCATE PARTITION p." e ja
+  assertava ALTER TABLE `T1` TRUNCATE PARTITION `p1`. Esse texto CASA
+  EXATAMENTE com o que o HEAD passou a emitir - conferido caractere a caractere,
+  inclusive as crases no nome da particao, que o motor aceita (medido com e sem).
+  Nenhum ajuste foi feito na celula para casar com o codigo: o codigo veio ate
+  ela. A outra celula, em test_esp074_unit.pas, essa sim foi reescrita, porque
+  fixava o texto invalido.
+
+  VERIFICACAO PONTA A PONTA DO TEXTO FINAL, submetido VERBATIM, com massa em
+  DUAS particoes para que "esvaziou a certa" seja verificavel:
+
+      mysql> SELECT VERSION();                       -> 8.4.11
+      mysql> CREATE TABLE logs (ID INT NOT NULL, D DATE NOT NULL)
+          -> PARTITION BY RANGE (YEAR(D))
+          -> (PARTITION p2023 VALUES LESS THAN (2024),
+          ->  PARTITION pmax  VALUES LESS THAN MAXVALUE);
+      mysql> INSERT INTO logs VALUES (1,'2023-05-01'),(7,'2023-07-07'),(2,'2025-05-01');
+      mysql> SELECT COUNT(*) AS P2023_ANTES FROM logs PARTITION (p2023);   -> 2
+      mysql> SELECT COUNT(*) AS PMAX_ANTES  FROM logs PARTITION (pmax);    -> 1
+
+      -- VERBATIM do HEAD:
+      mysql> ALTER TABLE `logs` TRUNCATE PARTITION `p2023`;
+
+      mysql> SELECT COUNT(*) AS P2023_DEPOIS FROM logs PARTITION (p2023);  -> 0
+      mysql> SELECT COUNT(*) AS PMAX_DEPOIS  FROM logs PARTITION (pmax);   -> 1
+      mysql> SELECT ID, D FROM logs;
+      +----+------------+
+      | ID | D          |
+      +----+------------+
+      |  2 | 2025-05-01 |
+      +----+------------+
+
+      -- CONTROLE NEGATIVO: o texto que o HEAD emitia ANTES
+      mysql> TRUNCATE TABLE `logs` PARTITION (p2023);
+      ERROR 1064 (42000) at line 1: ... near 'PARTITION (p2023)' at line 1
+
+  Nao parou no parser: das tres linhas, sumiram exatamente as duas de 2023 e
+  sobrou exatamente a de 2025.
+
+  E OS DIALETOS SEM PARTICAO? Medido no HEAD final, chamando
+  .TruncateTable('logs').Partition('p2023') em cada um:
+
+      MySQL       EMITE    ALTER TABLE `logs` TRUNCATE PARTITION `p2023`
+      PostgreSQL  LEVANTA  ENotSupportedException: DDL PostgreSQL: PARTITION
+                           clause is not supported for TRUNCATE.
+      Firebird    LEVANTA  ENotSupportedException: DDL Firebird: advanced
+                           TRUNCATE options (RESTART IDENTITY, CASCADE,
+                           PARTITION) are not supported.
+      MSSQL       LEVANTA  ENotSupportedException: DDL MSSQL: advanced TRUNCATE
+                           options are not supported in this build.
+      Oracle      LEVANTA  ENotSupportedException: DDL Oracle: advanced TRUNCATE
+                           options are not supported.
+      SQLite      LEVANTA  ENotSupportedException: DDL SQLite: advanced TRUNCATE
+                           options are not supported.
+
+  Ou seja: NENHUM dos outros emite texto invalido - os cinco ja recusavam antes
+  desta rodada e continuam recusando. Nao ha aqui achado da mesma familia.
+
+  DUAS OBSERVACOES QUE FICAM DECLARADAS, sem conserto, por serem alem do pedido:
+
+    1) Oracle: o dialeto TEM a construcao (ALTER TABLE t TRUNCATE PARTITION p),
+       e mesmo assim o serializador recusa. Isso NAO e o defeito desta tarefa -
+       recusar e honesto, nao produz texto invalido - e sim uma LACUNA DE
+       CAPACIDADE. Se ela deve ser preenchida e decisao de produto.
+    2) NENHUMA celula trava as guardas de PARTICAO de PostgreSQL, Firebird,
+       MSSQL, Oracle e SQLite. Provado por mutacao: M10 troca o raise do
+       PostgreSQL por uma emissao de ' PARTITION (...)' e a suite inteira
+       continua verde - o mutante SOBREVIVE. Os unicos tres usos de .Partition(
+       na suite sao todos dbnMySQL. Recomendacao trazida, nao executada: cinco
+       celulas de WillRaise fechariam a lacuna. Nao as escrevi porque a decisao
+       de ampliar cobertura nao e minha.
+
+  MongoDB, uma linha e fora de toda contagem: emite
+  {"delete":"logs","deletes":[{"q":{},"limit":0}]}, descartando o modificador.
 
   ------------------------------------------------------------------------------
   ITEM 4   Firebird   TRUNCATE TABLE        >>> MEDIDO, NAO CORRIGIDO <<<
@@ -593,7 +680,7 @@
       MY_TRUNC_1     OK     TRUNCATE TABLE `CLIENTES`
       MY_TRUNC_N     RAISE  ENotSupportedException | DDL MySQL: multiple tables
                             in a single TRUNCATE are not supported.
-      MY_TRUNC_PART  OK     TRUNCATE TABLE `logs` PARTITION (p2023)      <- item 3
+      MY_TRUNC_PART  OK     ALTER TABLE `logs` TRUNCATE PARTITION `p2023`
       FB_TRUNC       OK     TRUNCATE TABLE "CLIENTES"                    <- item 4
       FB_RENAME_TAB  RAISE  ENotSupportedException | DDL Firebird: renaming a
                             table is not supported; ...
@@ -609,11 +696,12 @@
   SUBMISSAO VERBATIM, base t35b.fdb / esquema t35db:
 
       [MY_TRUNC_1]     antes 3 linhas -> TRUNCATE TABLE `CLIENTES` -> depois 0. OK
+      [MY_TRUNC_PART]  p2023 2->0 e pmax 1->1; sobrou exatamente a linha de 2025.
+                       Controle negativo: o texto ANTIGO da ERROR 1064. OK
       [FB_RENAME_COL]  SELECT "LEGADO"    -> 'v'
                        ALTER TABLE "TAB_A" ALTER "LEGADO" TO "NOVO_NOME"
                        SELECT "NOVO_NOME" -> 'v'    dado preservado. OK
       [FB_DROPIX]      RDB$INDICES IX_TMP3: 1 -> DROP INDEX "IX_TMP3" -> 0. OK
-      [MY_TRUNC_PART]  ERROR 1064 - item 3, declarado, nao consertado
       [FB_TRUNC]       -104 -TRUNCATE - item 4, declarado, nao consertado
       [FB_BATCH]       -104 -, (col 53) - item 7, declarado, nao consertado
       [FB_INTERSECT]   -104 -SELECT (col 42) - item 8, declarado, nao consertado
@@ -651,13 +739,34 @@
           (Firebird.TestDropIndex_Firebird_GeneratesExpected)
     M8    quebra o TRUNCATE de UMA tabela do MySQL         3
           (Common.TestTruncateTable_MySQL_GeneratesExpected,
-           Common.TestTruncateTable_MySQL_Partition_GeneratesExpected,
-           MySQL.TestTruncateTable_MySQL_GeneratesExpected)
+           Common e MySQL .TestTruncateTable_MySQL_GeneratesExpected)
+    M9    quebra o ramo ALTER TABLE ... TRUNCATE PARTITION 2
+          (Common e MySQL .TestTruncateTable_MySQL_Partition_GeneratesExpected)
+    M10   faz o PostgreSQL EMITIR ' PARTITION (...)' em vez  0  <- SOBREVIVE
+          de levantar                                           (lacuna real de
+          cobertura, declarada no ITEM 3 - nao ha celula alguma que trave as
+          guardas de PARTICAO de PostgreSQL, Firebird, MSSQL, Oracle e SQLite)
+    M1b   remove a guarda multi-tabela do MySQL, ja com o   3
+          item 3 aplicado
+          (Common.TestTruncateTable_MySQL_MultiTableWithPartition_RaisesNotSupported,
+           Common e MySQL .TestTruncateTable_MySQL_MultiTable_RaisesNotSupported)
 
-  M4, M5b, M6 e M7 sao as mutacoes ANTI-COLATERAL: elas provam que se esta
-  correcao tivesse alcancado PostgreSQL, MySQL, SQLite ou o proprio serializador
-  base, a suite teria gritado. Nao gritou porque nao alcancou - o diff nominal de
-  vermelhos entre ffb5701 e o HEAD e VAZIO nas duas configuracoes.
+  M1b RESPONDE A PERGUNTA "a celula MultiTableWithPartition ainda e alcancavel
+  pela razao certa?". O par M1b/M9 mede a resposta em vez de argumenta-la: M1b
+  (guarda de multi-tabela) A MATA; M9 (ramo de PARTICAO) NAO A TOCA. Logo ela e
+  atendida pela guarda de multi-tabela e virou uma SEGUNDA medicao dessa guarda,
+  nao uma medicao da combinacao. Isso esta escrito na propria celula, em
+  test_esp074_unit.pas, e ela nao foi desligada - o que ela afirma continua
+  verdadeiro: a chamada levanta.
+
+  M4, M5b, M6, M7 e M10 sao as mutacoes ANTI-COLATERAL: elas perguntam se a
+  suite gritaria caso esta correcao tivesse alcancado PostgreSQL, MySQL, SQLite
+  ou o proprio serializador base. Quatro responderam que sim. M10 respondeu que
+  NAO, e essa resposta esta declarada como lacuna em vez de escondida - fecha-la
+  e decisao de quem manda ampliar cobertura.
+
+  O diff nominal de vermelhos entre ffb5701 e o HEAD e VAZIO nas duas
+  configuracoes: os 46 (config A) e os 35 (config B) sao nome a nome os mesmos.
 
   ------------------------------------------------------------------------------
 */

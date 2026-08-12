@@ -56,7 +56,13 @@ type
     [Test]
     procedure TestTruncateTable_Firebird_Cascade_RaisesNotSupported;
     [Test]
-    [Ignore('T6: mensagem ESP-029 perdida em FluentSQL.DDL.Serialize.Firebird.pas:261-262.')]
+    // T35: so a CITACAO foi corrigida aqui. A lacuna que a T6 registrou continua
+    // de pe e nao e desta tarefa - o que estava podre era o ENDERECO: as guardas
+    // da T35 deslocaram o arquivo e "261-262" passou a apontar outro trecho.
+    // Recitada pela assinatura e pelo texto do raise, que nao andam com a
+    // proxima edicao, em vez de por numero de linha.
+    [Ignore('T6: mensagem ESP-029 perdida em TFluentDDLSerializerFirebird.TruncateTable, no raise ' +
+            '"DDL Firebird: advanced TRUNCATE options (RESTART IDENTITY, CASCADE, PARTITION) are not supported."')]
     procedure TestTruncateTable_Firebird_Modifier_MessageReferencesESP029;
     [Test]
     procedure TestAlterTableAlterColumn_Firebird_Type_GeneratesExpected;
