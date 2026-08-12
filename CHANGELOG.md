@@ -17,6 +17,40 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (SQL emitido) — `CaseExpr` deixou de adotar o nó corrente como operando quando esse nó não é uma coluna.** `IFluentSQL.CaseExpr` decide **duas** coisas: o operando do `CASE` (o que vem entre `CASE` e o primeiro `WHEN`) e **em que nó da árvore o `CASE` vai morar**. Ele decidia as duas lendo `FAST.ASTName` — um **cursor** que aponta para o último nó tocado pela cadeia fluente — **sem perguntar que tipo de nó é aquele**.
+
+  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna na projeção. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **19 células verdes**, entre elas a suíte inteira do slot de valor. `CaseExpr('COLUNA')` explícito também não muda.
+
+  **O que mudou** é o que acontecia com o cursor em **qualquer outro nó**:
+
+  | Cursor em | Antes | Depois |
+  |---|---|---|
+  | relação do `FROM` | `SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' END)` | `SELECT *, (CASE WHEN PRICE > 10 THEN 'CARO' END) FROM PRODUCTS` |
+  | relação do `JOIN` | `SELECT * FROM T INNER JOIN (CASE U WHEN 1 THEN 'A' END) ON` | `EArgumentException` nomeada |
+  | seção `WHERE` | `SELECT * FROM (CASE T WHEN 1 THEN 'A' END) WHERE (ID = :p1)` | `EArgumentException` nomeada |
+  | `nil` (`Select` sem coluna, ou nem `Select`) | **`EAccessViolation` lendo `00000000`** | `SELECT (CASE WHEN 1 THEN 'A' END) …` |
+
+  **Não é só SQL inválido — é perda de ESTRUTURA da consulta.** `TFluentSQLName.Serialize` (`FluentSQL.Name.pas`) **prefere** `FCase` a `FName`, então escrever o `CASE` num nó de relação **apaga o texto daquele nó**: o `FROM` some, ou a tabela juntada some e o `ON` fica órfão.
+
+  **Sobre o `EAccessViolation`: não era guarda faltando, era guarda no objeto errado.** O código tinha `if Assigned(FAST)` — mas `FAST` **nunca** é `nil` ali. Quem é `nil` é `FAST.ASTName`, e ele era desreferenciado **duas linhas acima** da guarda **e também dentro dela**. Basta um `Select` sem nenhuma `Column`; não é preciso omitir `Select`/`From`.
+
+  **A regra que decide os três casos:** *converter SQL inválido silencioso em SQL **válido** quando o sentido é inequívoco, e em **erro nomeado** quando não é. Nunca em descarte silencioso.* Um `CASE` num `SELECT` só tem um lugar sensato — a lista de projeção —, então onde **há** seção de colunas ele passa a abrir uma **coluna nova** e nascer como *searched* `CASE`. Onde **não há** (`WHERE`, `JOIN`, `HAVING`, `DELETE`, `UPDATE`) o sentido **não** é inequívoco, e a alternativa — não anexar — descartaria em silêncio um `CASE` que o chamador montou inteiro.
+
+  **O texto antigo é recusado por SEIS dos sete motores**, submetido verbatim com massa de 3 linhas; o texto novo passa nos seis **e devolve o dado certo**, contagem 3 antes e 3 depois:
+
+  | Motor | `SELECT * FROM (CASE PRODUCTS WHEN …)` | forma nova |
+  |---|---|---|
+  | PostgreSQL 16 | `ERROR: syntax error at or near "CASE"` | 3 linhas, `BARATO`/`CARO`/`CARO` |
+  | MySQL 8.4 | `ERROR 1064 (42000)` | idem |
+  | SQL Server 2022 16.0.4265.3 | `Msg 156 Incorrect syntax near the keyword 'CASE'` | idem |
+  | Firebird 5.0.4 | `-104` / `Token unknown - CASE` | idem |
+  | Oracle AI 26ai Free 23.26.2.0.0 | `ORA-00907: missing right parenthesis` | idem |
+  | DB2 v12.1.5.0 | `SQL0104N` / `SQLSTATE=42601` | idem |
+
+  **Quem é atingido:** quem chamava `CaseExpr` fora de uma coluna — ou seja, **quem já produzia SQL que motor nenhum aceitava, ou já estourava**. Não há comportamento correto a preservar nesse conjunto. **O que fazer:** chame `CaseExpr` onde há projeção — depois de `Select`/`Column(...)`, ou depois de `OrderBy(...)`. Transcrição literal, com massa e contagem antes/depois, em `Test Delphi\Common_tests\test.caseexpr.anchor.matrix.sql`. **InterBase não foi medido** — não existe imagem pública, e não foi inferido do Firebird.
+
+- **`IFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression)` deixou de levantar `EAccessViolation` — a sobrecarga era pública e 100% inalcançável.** O corpo era `TFluentSQLCriteriaCase.Create(Self, '')` seguido de `Result.AndOpe(AExpression)`, e `TFluentSQLCriteriaCase.AndOpe` lê `FLastExpression`, que **só** é preenchido por `When`. Recém-criado o campo é `nil`, então a chamada estourava em **qualquer** estado — medido em três (com `Column` antes, depois de `From`, com `When` encadeado depois): `EAccessViolation` lendo `00000000` nos três. Não havia um único teste que a exercitasse. Agora ela se alinha às outras duas sobrecargas: o argumento é o **operando** do `CASE` simples, e ela obedece à mesma regra de ancoragem. **Aditivo na prática** — não existe programa que dependesse do comportamento anterior, porque o comportamento anterior era estourar.
+
 - **BREAKING CHANGE (API) — `JOIN` dentro de um `DELETE` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** Atinge os **quatro** tipos: `Delete.From(…).InnerJoin(…)`, `.LeftJoin(…)`, `.RightJoin(…)` e `.FullJoin(…)`, com ou sem apelido, com ou sem `OnCond`, **e em qualquer ordem da cadeia fluente** — inclusive com `Where`, `OrderBy` ou `GroupBy` intercalados entre o `From` e o join.
 
   A guarda mora em `TFluentSQL._CreateJoin` e pergunta *"este statement **é** um `DELETE`?"*, lendo a **marca durável** no AST (`FAST.Delete`, que `_DefineSectionDelete` estabelece e `ClearAll` limpa) — **não** o cursor de seção, que `Where('')` desloca sem emitir uma letra. **Trocar para `SELECT`, `INSERT` ou `UPDATE` na mesma instância limpa a marca e libera o join de novo**, e isso é intencional.
