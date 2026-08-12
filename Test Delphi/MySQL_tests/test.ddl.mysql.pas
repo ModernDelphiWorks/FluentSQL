@@ -26,7 +26,7 @@ type
     [Test]
     procedure TestTruncateTable_MySQL_GeneratesExpected;
     [Test]
-    procedure TestTruncateTable_MySQL_MultiTable_GeneratesExpected;
+    procedure TestTruncateTable_MySQL_MultiTable_RaisesNotSupported;
     [Test]
     [Ignore('T6: emite sintaxe Oracle (TRUNCATE TABLE t PARTITION (p)); MySQL exige ALTER TABLE t TRUNCATE PARTITION p.')]
     procedure TestTruncateTable_MySQL_Partition_GeneratesExpected;
@@ -148,12 +148,19 @@ begin
   Assert.AreEqual('TRUNCATE TABLE `CLIENTES`', LSql);
 end;
 
-procedure TTestDDLMySQL.TestTruncateTable_MySQL_MultiTable_GeneratesExpected;
-var
-  LSql: string;
+// T35: medido em mysql:8.4 (VERSION() = 8.4.11):
+//   TRUNCATE TABLE `T1`, `T2`;
+//   ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; ...
+//   near ', `T2`' at line 1
+// Controle positivo na mesma sessao: TRUNCATE TABLE `T1`; esvaziou a tabela.
+procedure TTestDDLMySQL.TestTruncateTable_MySQL_MultiTable_RaisesNotSupported;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).TruncateTable(['T1', 'T2']).AsString;
-  Assert.AreEqual('TRUNCATE TABLE `T1`, `T2`', LSql);
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMySQL).TruncateTable(['T1', 'T2']).AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
 end;
 
 procedure TTestDDLMySQL.TestTruncateTable_MySQL_Partition_GeneratesExpected;

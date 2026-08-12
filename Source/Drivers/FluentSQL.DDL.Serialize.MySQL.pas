@@ -237,26 +237,30 @@ begin
   Result := 'DROP INDEX ' + Quote(ADef.IndexName) + ' ON ' + Quote(LTable);
 end;
 
+// T35: a lista de tabelas num unico TRUNCATE e exclusividade do PostgreSQL entre
+// os relacionais que este build serve. O MySQL recusa: medido em mysql:8.4
+// (VERSION() = 8.4.11), 'TRUNCATE TABLE `T1`, `T2`' devolve
+// ERROR 1064 (42000) ... near ', `T2`'. A regra ja existia no framework - MSSQL
+// (FluentSQL.DDL.Serialize.MSSQL.pas, TruncateTable), Oracle, SQLite, Firebird e
+// o proprio serializador base levantam ENotSupportedException nesta mesma
+// construcao desde o ESP-074. O que faltava era aplica-la ao MySQL, que ate aqui
+// montava a lista em silencio e entregava texto que o motor rejeita.
+//
+// A guarda entrou ANTES da de PARTITION porque agora a torna inalcancavel:
+// multi-tabela ja nao chega ali. A mensagem muda para quem pedia
+// TruncateTable([...]).Partition(...), a classe da excecao nao.
 function TFluentDDLSerializerMySQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
-var
-  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
 
-  Result := 'TRUNCATE TABLE ';
-  for LI := 0 to Length(ADef.TableNames) - 1 do
-  begin
-    if LI > 0 then Result := Result + ', ';
-    Result := Result + Quote(ADef.TableNames[LI]);
-  end;
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL MySQL: multiple tables in a single TRUNCATE are not supported.');
+
+  Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 
   if ADef.PartitionName <> '' then
-  begin
-    if Length(ADef.TableNames) > 1 then
-      raise ENotSupportedException.Create('DDL MySQL: PARTITION clause is only supported for single-table TRUNCATE.');
     Result := Result + ' PARTITION (' + ADef.PartitionName + ')';
-  end;
 
   if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade then
     raise ENotSupportedException.Create(

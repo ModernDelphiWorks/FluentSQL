@@ -32,7 +32,7 @@ type
     [Test]
     procedure TestAlterTableRenameColumn_Firebird_GeneratesExpected;
     [Test]
-    procedure TestAlterTableRenameTable_Firebird_GeneratesExpected;
+    procedure TestAlterTableRenameTable_Firebird_RaisesNotSupported;
     [Test]
     procedure TestCreateIndex_Firebird_GeneratesExpected;
     [Test]
@@ -42,7 +42,7 @@ type
     [Test]
     procedure TestDropIndex_Firebird_GeneratesExpected;
     [Test]
-    procedure TestDropIndex_Firebird_IfExists_GeneratesExpected;
+    procedure TestDropIndex_Firebird_IfExists_RaisesNotSupported;
     [Test]
     procedure TestDropIndex_Firebird_Concurrently_RaisesNotSupported;
     [Test]
@@ -213,12 +213,25 @@ begin
   Assert.AreEqual('ALTER TABLE "CLIENTES" ALTER "LEGADO" TO "NOVO_NOME"', LSql);
 end;
 
-procedure TTestDDLFirebird.TestAlterTableRenameTable_Firebird_GeneratesExpected;
-var
-  LSql: string;
+// T35: o Firebird nao tem DDL de renomear TABELA - nenhuma forma, nao apenas
+// esta. Medido em firebirdsql/firebird:5.0.4
+// (sha256:85d0f9bf5e5d61dc7a169c6e374ce926b8281e7d8493f37ffeacc23f3d0d040d;
+// ENGINE_VERSION perguntado ao motor = 5.0.4), as tres formas candidatas:
+//   ALTER TABLE "TAB_A" TO "TAB_B";         -104 -Token unknown ... -TO
+//   ALTER TABLE "TAB_A" RENAME TO "TAB_B";  -104 -Token unknown ... -RENAME
+//   RENAME TABLE "TAB_A" TO "TAB_B";        -104 -Token unknown ... -RENAME
+// Controle positivo na mesma sessao: ALTER TABLE "TAB_A" ALTER "LEGADO" TO
+// "NOVO_NOME" executou e RDB$RELATION_FIELDS passou a listar NOVO_NOME - ou
+// seja, o "... ALTER col TO col2" que o driver emite para renomear COLUNA e
+// valido; o que nao existe e o analogo para tabela.
+procedure TTestDDLFirebird.TestAlterTableRenameTable_Firebird_RaisesNotSupported;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).Table('TAB_A').Rename('TAB_B').AsString;
-  Assert.AreEqual('ALTER TABLE "TAB_A" TO "TAB_B"', LSql);
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnFirebird).Table('TAB_A').Rename('TAB_B').AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
 end;
 
 procedure TTestDDLFirebird.TestCreateIndex_Firebird_GeneratesExpected;
@@ -261,12 +274,24 @@ begin
   Assert.AreEqual('DROP INDEX "IX_CLI_NOME"', LSql);
 end;
 
-procedure TTestDDLFirebird.TestDropIndex_Firebird_IfExists_GeneratesExpected;
-var
-  LSql: string;
+// T35: o Firebird 5.0 nao aceita IF EXISTS em DROP INDEX. Medido em
+// firebirdsql/firebird:5.0.4, indice EXISTENTE e indice INEXISTENTE, mesmo erro
+// nos dois casos - portanto e recusa de SINTAXE, nao de alvo:
+//   DROP INDEX IF EXISTS "IX_CLI_NOME";    -104 -Token unknown - line 1, col 15 -EXISTS
+//   DROP INDEX IF EXISTS "IX_NAO_EXISTE";  -104 -Token unknown - line 1, col 15 -EXISTS
+// Controle positivo: DROP INDEX "IX_TMP2" (sem IF EXISTS) removeu o indice -
+// RDB$INDICES passou de 1 para 0 registro. Sobre indice ausente a forma nua
+// devolve -607 "Index not found", que e o que a aplicacao tem de tratar.
+// Esta e a mesma regra que DropTable ja aplica ao mesmo modificador neste
+// dialeto (FluentSQL.DDL.Serialize.Firebird.pas, DropTable / GetIfExists).
+procedure TTestDDLFirebird.TestDropIndex_Firebird_IfExists_RaisesNotSupported;
 begin
-  LSql := FluentSQL.Schema(dbnFirebird).DropIndex('IX_CLI_NOME').IfExists.AsString;
-  Assert.AreEqual('DROP INDEX IF EXISTS "IX_CLI_NOME"', LSql);
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnFirebird).DropIndex('IX_CLI_NOME').IfExists.AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
 end;
 
 procedure TTestDDLFirebird.TestDropIndex_Firebird_Concurrently_RaisesNotSupported;

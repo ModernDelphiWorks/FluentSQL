@@ -26,7 +26,7 @@ type
     [Test]
     procedure TestTruncateTable_PostgreSQL_ContinueIdentity_GeneratesExpected;
     [Test]
-    procedure TestTruncateTable_MySQL_MultiTable_GeneratesExpected;
+    procedure TestTruncateTable_MySQL_MultiTable_RaisesNotSupported;
     [Test]
     procedure TestTruncateTable_MySQL_Partition_GeneratesExpected;
     [Test]
@@ -113,12 +113,20 @@ begin
   Assert.AreEqual('TRUNCATE TABLE "logs" CONTINUE IDENTITY', LSql);
 end;
 
-procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_MultiTable_GeneratesExpected;
-var
-  LSql: string;
+// T35: 'TRUNCATE TABLE `T1`, `T2`' NAO e MySQL. Medido em mysql:8.4
+// (sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb,
+// VERSION() = 8.4.11): ERROR 1064 (42000) ... near ', `T2`'. A lista de tabelas
+// e exclusividade do PostgreSQL entre os 6 relacionais; MSSQL (linha 200) e
+// Oracle (linha 180) ja recusam a mesma construcao desde o ESP-074. O MySQL
+// conhecia a regra e nao a aplicava a si.
+procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_MultiTable_RaisesNotSupported;
 begin
-  LSql := FluentSQL.Schema(dbnMySQL).TruncateTable(['T1', 'T2']).AsString;
-  Assert.AreEqual('TRUNCATE TABLE `T1`, `T2`', LSql);
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMySQL).TruncateTable(['T1', 'T2']).AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
 end;
 
 procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_Partition_GeneratesExpected;
