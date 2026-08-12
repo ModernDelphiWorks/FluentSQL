@@ -54,15 +54,19 @@
   ------------------------------------------------------------------------------
   MATRIZ RESUMO   (S = aceito e verificado ponta a ponta; N = recusado, medido)
 
-  construcao                       MySQL  FB   PG   MSSQL  Oracle  SQLite
-  -------------------------------  -----  ---  ---  -----  ------  ------
-  1  TRUNCATE TABLE a, b             N     n/m  S     N       N      n/m
-  2  TRUNCATE TABLE t PARTITION(p)   N     n/m  n/m   n/m     n/m    n/m
-  3  TRUNCATE TABLE t (uma tabela)   S     N    S     S       S      N
-  4  renomear TABELA por DDL         S     N    S     N(*)    S      S
-  5  DROP INDEX IF EXISTS            N     N    S     S       S      S
-  6  INSERT ... VALUES (..),(..)     S     N    S     S       S(**)  S
-  7  INTERSECT                       S     N    S     S       S      S
+  As linhas levam LETRA, e nao numero, de proposito: a tarefa numerou os achados
+  de 1 a 8 (com "1-2" sendo um so par), e uma segunda numeracao 1..7 aqui
+  convidaria a ler "linha 4" como "item 4". A coluna ITEM faz a ponte.
+
+  ln  item   construcao                     MySQL  FB   PG   MSSQL  Oracle  SQLite
+  --  -----  -----------------------------  -----  ---  ---  -----  ------  ------
+  A   1-2    TRUNCATE TABLE a, b              N     n/m  S     N       N      n/m
+  B   3      TRUNCATE TABLE t PARTITION(p)    N     n/m  n/m   n/m     n/m    n/m
+  C   4      TRUNCATE TABLE t (uma tabela)    S     N    S     S       S      N
+  D   5      renomear TABELA por DDL          S     N    S     N(*)    S      S
+  E   6      DROP INDEX IF EXISTS             N     N    S     S       S      S
+  F   7      INSERT ... VALUES (..),(..)      S     N    S     S       S(**)  S
+  G   8      INTERSECT                        S     N    S     S       S      S
 
   n/m = o serializador daquele dialeto ja levantava antes de emitir, logo nao ha
         texto a submeter. Nao e "nao medido por preguica": e "nao existe enunciado".
@@ -72,8 +76,8 @@
        vale para a versao medida e esta dita assim de proposito.
 
   Conclusao da coluna (c): das sete, NENHUMA esta na intersecao dos 6. As linhas
-  1, 2 e 5 tem o Firebird e/ou o MySQL fora; as linhas 3, 6 e 7 tem o Firebird
-  sozinho fora; a linha 4 tem Firebird e MSSQL fora.
+  A, B e E tem o Firebird e/ou o MySQL fora; as linhas C, F e G tem o Firebird
+  sozinho fora; a linha D tem Firebird e MSSQL fora.
 
   PLACAR DA RODADA: das sete, QUATRO foram corrigidas (itens 1-2, 3, 5 e 6) e
   TRES ficam medidas e declaradas sem conserto (itens 4, 7 e 8), porque as tres
@@ -307,8 +311,19 @@
        contrato aqui; o M10 era buraco real. Cobrir um e recusar o outro e a
        distincao, nao incoerencia.
 
-  MongoDB, uma linha e fora de toda contagem: emite
-  {"delete":"logs","deletes":[{"q":{},"limit":0}]}, descartando o modificador.
+    3) O SEXTO DIALETO ATIVO, que a enumeracao de cinco acima NAO cobre - fica
+       declarado em vez de escondido atras de "os cinco". O dbnMongoDB e ATIVO no
+       FluentSQL.inc, e
+       Schema(dbnMongoDB).TruncateTable('c').Partition('p2023') emite
+       {"delete":"c","deletes":[{"q":{},"limit":0}]} - byte a byte IGUAL a
+       chamada sem .Partition. Ou seja, DESCARTA o modificador em silencio: quem
+       pede para esvaziar uma particao recebe um comando que apaga a colecao
+       inteira. A frase "nenhum outro emite texto invalido" e literalmente
+       verdadeira - o JSON e valido - e justamente por isso nao alcancava este
+       caso, que nao e de texto invalido e sim de descarte destrutivo.
+       NAO consertado e SEM celula, de proposito e com a razao dita: e
+       pre-existente, o MongoDB esta fora da promessa relacional, e uma celula
+       aqui CONGELARIA o descarte silencioso em vez de o denunciar.
 
   ------------------------------------------------------------------------------
   ITEM 4   Firebird   TRUNCATE TABLE        >>> MEDIDO, NAO CORRIGIDO <<<

@@ -133,9 +133,17 @@ end;
 // T35: 'TRUNCATE TABLE `T1`, `T2`' NAO e MySQL. Medido em mysql:8.4
 // (sha256:b3b90af2a6552ae30c266fdb7d5dd55f3afb72404bb78d37fe8a23eb857fd3fb,
 // VERSION() = 8.4.11): ERROR 1064 (42000) ... near ', `T2`'. A lista de tabelas
-// e exclusividade do PostgreSQL entre os 6 relacionais; MSSQL (linha 200) e
-// Oracle (linha 180) ja recusam a mesma construcao desde o ESP-074. O MySQL
+// e exclusividade do PostgreSQL entre os 6 relacionais; as celulas
+// TTestDDLTruncateTable.TestTruncateTable_MSSQL_MultiTable_RaisesNotSupported e
+// TTestDDLTruncateTable.TestTruncateTable_Oracle_MultiTable_RaisesNotSupported,
+// nesta mesma fixture, ja recusam a mesma construcao desde o ESP-074. O MySQL
 // conhecia a regra e nao a aplicava a si.
+//
+// Citadas por ASSINATURA, e nao por numero de linha, porque a versao anterior
+// deste comentario citava "linha 200" e "linha 180" e as duas ja nasceram
+// erradas - endereco em comentario apodrece na primeira edicao do arquivo, e
+// esta e a citacao que sustenta a tese "a convencao ja existia": quem a
+// conferisse abriria no lugar errado e nao acharia convencao nenhuma.
 procedure TTestDDLTruncateTable.TestTruncateTable_MySQL_MultiTable_RaisesNotSupported;
 begin
   Assert.WillRaise(
