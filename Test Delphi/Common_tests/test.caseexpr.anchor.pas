@@ -143,22 +143,38 @@
   CATALOGADO E NAO CONSERTADO
   ============================================================================
 
-  Dois CaseExpr seguidos sobre a MESMA coluna: o segundo descarta o primeiro em
-  silencio. E PRE-EXISTENTE - medido identico na base e depois desta entrega - e
-  e consequencia direta do idioma "substitui a ultima coluna". Nao ha celula
-  aqui, e nao foi consertado: se virar tarefa, e decisao do dono.
+  CADA ITEM ABAIXO FOI RODADO CONTRA O HEAD FINAL, e o texto e o que saiu.
+  Nenhuma linha deste bloco sobrevive de rodada anterior - e a mesma regra dos
+  numeros de mutacao, e ela existe porque uma versao anterior deste catalogo
+  listava como ABERTO um defeito que a propria entrega ja tinha consertado, e
+  que tinha celula VERDE 660 linhas abaixo provando o contrario.
 
-  UPDATE COM LISTA DE COLUNAS ABERTA ANTES. A recusa do UPDATE vale quando
-  nenhuma lista de colunas foi aberta - que e o caso de Update('T') direto. Mas
+  1. DOIS CaseExpr SEGUIDOS SOBRE A MESMA COLUNA - o segundo descarta o
+     primeiro em silencio.
 
-      Update('T').Values('A','1').OrderBy('') + CaseExpr
-      -> UPDATE T SET A = :p1 ORDER BY (CASE WHEN 1 THEN 1 END) ASC
+         .Select.Column('TIPO').CaseExpr.When('1')... e depois CaseExpr de novo
+         -> SELECT (CASE TIPO WHEN 2 THEN 'SEGUNDO' END) FROM T
 
-  emite CALADO, e na base levantava EAccessViolation: e loud->mute, a regressao
-  que esta tarefa existe para nao cometer. A cadeia e absurda - OrderBy depois de
-  Update - e o que falta e uma guarda de BUILDER que recuse OrderBy ali, que e
-  outra tarefa e outra porta. Fica REGISTRADO e nao consertado, e a tabela do
-  CHANGELOG diz que a linha do UPDATE so vale sem lista aberta.
+     PRE-EXISTENTE: medido identico na base e no HEAD. E consequencia direta do
+     idioma "substitui a ultima coluna". Sem celula, sem conserto; se virar
+     tarefa, e decisao do dono.
+
+  2. "FROM" PENDURADO num Select sem relacao.
+
+         .Select.Column('K') + CaseExpr, sem From
+         -> SELECT (CASE K WHEN 1 THEN 1 END) FROM
+
+     PRE-EXISTENTE e IDENTICO na base - a varredura cartesiana confirmou nas
+     duas arvores. E defeito do serializador do FROM vazio, com porta propria, e
+     nao da ancoragem. Esta entrega nao o cria nem o piora: ela apenas passou a
+     alcanca-lo em cadeias que antes estouravam antes de chegar la.
+
+  O QUE NAO ESTA MAIS AQUI, e por que: "UPDATE com lista de colunas aberta
+  antes" era item deste catalogo ate a rodada anterior. Ele foi CONSERTADO por
+  esta entrega - Update('T').Values('A','1').OrderBy('') + CaseExpr levanta
+  EArgumentException, e TestUpdateComOrderByIntercaladoRecusa assere essa cadeia
+  exata e morre sob a mutacao da guarda de especie. Mante-lo seria descrever
+  como aberto um buraco fechado.
   ------------------------------------------------------------------------------
 }
 
@@ -292,8 +308,26 @@ type
     [Test]
     procedure TestQueryPuroRecusaEmVezDeAccessViolation;
     { ⭐ lista de colunas SEM enunciado aberto - e nao e so DELETE/UPDATE }
+    { ⭐ as 3 familias que a VARREDURA CARTESIANA achou - nenhuma foi nomeada
+      por revisao, todas sairam de "o texto emitido E um enunciado?" }
+    [Test]
+    procedure TestInsertComGroupByIntercaladoRecusa;
+    [Test]
+    procedure TestInsertComOrderByIntercaladoRecusa;
+    [Test]
+    procedure TestInsertSemIntoComGroupByRecusa;
+    [Test]
+    procedure TestInsertSemIntoComOrderByRecusa;
+    [Test]
+    procedure TestSelectSemProjecaoComGroupByRecusa;
+    [Test]
+    procedure TestSelectSemProjecaoComOrderByRecusa;
+    [Test]
+    procedure TestColunaCaindoDentroDoGroupBySemProjecaoRecusa;
     [Test]
     procedure TestGroupBySemEnunciadoAbertoRecusa;
+    [Test]
+    procedure TestSemEnunciadoAPrescricaoEhAbrirSelectENaoProjetar;
     [Test]
     procedure TestOrderBySemEnunciadoAbertoRecusa;
     [Test]
@@ -302,6 +336,8 @@ type
     procedure TestClearAllFechaOEnunciado;
     [Test]
     procedure TestAMensagemDaRecusaNomeiaAChamadaEASaida;
+    [Test]
+    procedure TestNenhumaMensagemPrescreveAClausulaQueRoteiaParaODefeito;
     [Test]
     procedure TestARecusaNaoDeixaParametroParaTras;
 
@@ -1021,6 +1057,114 @@ begin
     'nao um EAccessViolation vindo de dentro da propria guarda');
 end;
 
+procedure TTestCaseExprAnchor.TestInsertComGroupByIntercaladoRecusa;
+begin
+  // ⭐ O GEMEO DO INSERT, e ele existia porque a recusa do INSERT era feita por
+  // COMPARACAO DE COLECAO (ASTColumns = Insert.Columns) - pergunta de SECAO. Uma
+  // clausula intercalada bastava para ASTColumns deixar de ser a do INSERT, e o
+  // CASE nascia na lista do GROUP BY:
+  //     INSERT INTO T GROUP BY (CASE WHEN 1 THEN 1 END)
+  // Na base: EAccessViolation. Crash -> texto invalido calado, nos 6 ativos.
+  //
+  // Agora a recusa e pela ESPECIE, que nenhuma clausula muda.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T').GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestInsertComOrderByIntercaladoRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T').OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestInsertSemIntoComGroupByRecusa;
+begin
+  // A segunda familia: sem Into nao ha nem relacao alvo, e saia so o fragmento
+  // "GROUP BY (CASE ...)". E o INSERT sem Into que FALSIFICAVA o invariante do
+  // FStatementAberto: ele e True - Insert ABRIU enunciado - e mesmo assim o
+  // texto nao era enunciado nenhum.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestInsertSemIntoComOrderByRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestSelectSemProjecaoComGroupByRecusa;
+begin
+  // ⭐ A TERCEIRA FAMILIA, e a que NAO E DML - por isso nenhuma guarda de verbo
+  // a pegaria. Select ABRE enunciado e a especie E secSelect, mas a projecao
+  // esta vazia, e GROUP BY sozinho nao e enunciado:
+  //     Select.GroupBy('') + CaseExpr -> GROUP BY (CASE WHEN 1 THEN 1 END)
+  // GROUP BY e ORDER BY sao ADJUNTOS de uma projecao que tem de existir.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestSelectSemProjecaoComOrderByRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestColunaCaindoDentroDoGroupBySemProjecaoRecusa;
+begin
+  // O caso que sobreviveu a PRIMEIRA tentativa de fechar a familia 3, e que so
+  // a varredura devolveu: aqui o Column('K') cai DENTRO de GroupBy.Columns -
+  // porque ASTColumns ja e a do GROUP BY - e o cursor ANCORA nele. Nao ha
+  // coluna nova a criar, entao uma guarda que so perguntasse no caminho da
+  // coluna nova nao corria, e o fragmento saia igual.
+  //
+  // O que decide nao e "vou criar coluna?", e sim "em que lista o CASE fica?".
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Select.GroupBy('').Column('K');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
 procedure TTestCaseExprAnchor.TestGroupBySemEnunciadoAbertoRecusa;
 begin
   // ⭐ O DEFEITO ERA MAIOR QUE DELETE/UPDATE, e so apareceu quando se mediu o
@@ -1043,6 +1187,40 @@ begin
       LQuery.CaseExpr.When('1').IfThen('1');
     end,
     EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestSemEnunciadoAPrescricaoEhAbrirSelectENaoProjetar;
+var
+  LSemEnunciado, LSemProjecao: String;
+begin
+  // ⭐ A CELULA QUE TORNA A PERGUNTA "HA ENUNCIADO?" LOAD-BEARING, e ela existe
+  // porque apagar aquela pergunta NAO derruba nenhuma celula de WillRaise: a
+  // pergunta seguinte - "a clausula acessoria tem projecao?" - responde no lugar
+  // dela e levanta a MESMA classe. Medido.
+  //
+  // O que muda e a PRESCRICAO, e as duas nao sao intercambiaveis:
+  //
+  //   sem enunciado ..... "Abra um Select antes"
+  //   sem projecao ...... "chame Column(...) ou All"
+  //
+  // E seguir a prescricao ERRADA nao resolve, o que foi MEDIDO:
+  //     Query(d).GroupBy('').Column('K') + CaseExpr  -> continua recusando
+  // porque sem Select nao ha enunciado, e Column sozinho nao abre nenhum. Quem
+  // recebesse "chame Column(...)" nesse estado tentaria, falharia de novo, e
+  // nao teria como saber que o que falta e o Select.
+  LSemEnunciado := _MensagemDe(
+    procedure begin FluentSQL.Query(dbnFirebird).GroupBy('').CaseExpr end);
+  LSemProjecao := _MensagemDe(
+    procedure begin FluentSQL.Query(dbnFirebird).Select.GroupBy('').CaseExpr end);
+
+  Assert.Contains(LSemEnunciado, 'Abra um Select', False,
+    'Sem enunciado, a unica saida e abrir um Select. Recebido: ' + LSemEnunciado);
+  Assert.Contains(LSemProjecao, 'Column(', False,
+    'Com Select aberto e projecao vazia, a saida e projetar. Recebido: ' + LSemProjecao);
+  Assert.AreNotEqual(LSemEnunciado, LSemProjecao,
+    'Os dois estados exigem ACOES diferentes do chamador, entao as mensagens ' +
+    'nao podem ser a mesma - e por isso a pergunta "ha enunciado?" nao e ' +
+    'redundante com a de projecao vazia');
 end;
 
 procedure TTestCaseExprAnchor.TestOrderBySemEnunciadoAbertoRecusa;
@@ -1095,6 +1273,11 @@ begin
     EArgumentException,
     'ClearAll fecha o enunciado: depois dele nao ha onde o CASE morar, e emitir ' +
     'fragmento seria trocar o crash da base por texto invalido calado');
+  // ALCANCE, dito para o nome da celula nao prometer mais do que ela mede: o
+  // que esta travado e a forma de argumento VAZIO - GroupBy('')/OrderBy(''). Com
+  // argumento, GroupBy('X') poe a coluna na lista e o caminho de ANCORA responde
+  // antes; ali o comportamento e o MESMO da base, e nao e esta celula que o
+  // fecha nem esta entrega que o cria.
 end;
 
 procedure TTestCaseExprAnchor.TestAMensagemDaRecusaNomeiaAChamadaEASaida;
@@ -1117,6 +1300,52 @@ begin
     'A mensagem tem de nomear a chamada que falhou. Recebido: ' + LMsg);
   Assert.Contains(LMsg, 'Column', False,
     'A mensagem tem de dizer qual e a saida. Recebido: ' + LMsg);
+end;
+
+procedure TTestCaseExprAnchor.TestNenhumaMensagemPrescreveAClausulaQueRoteiaParaODefeito;
+var
+  LSemEnunciado, LDml, LSemProjecao, LAcessoria: String;
+begin
+  // ⭐ O ASSERT NEGATIVO APLICADO A TODAS AS QUATRO MENSAGENS, e nao so a do
+  // DML. A prescricao e CONTRATO: determina o proximo codigo que o chamador
+  // escreve. Uma versao anterior da mensagem generica dizia "chame depois de
+  // Select/Column(...), de GroupBy(...) ou de OrderBy(...)" - e era JUSTAMENTE
+  // essa a mensagem que Query(d).GroupBy('') + CaseExpr recebia. Quem a
+  // seguisse ao pe da letra REFARIA a cadeia do defeito.
+  //
+  // Nenhuma das quatro pode prescrever GroupBy nem OrderBy, porque as quatro
+  // sao emitidas em estados onde essas duas clausulas sao parte do problema.
+  LSemEnunciado := _MensagemDe(
+    procedure begin FluentSQL.Query(dbnFirebird).GroupBy('').CaseExpr end);
+  LDml := _MensagemDe(
+    procedure begin FluentSQL.Query(dbnFirebird).Delete.From('T').CaseExpr end);
+  LSemProjecao := _MensagemDe(
+    procedure
+    var Q: IFluentSQL;
+    begin
+      Q := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('T').Where('ID').Equal(1);
+      Q.CaseExpr;
+    end);
+  LAcessoria := _MensagemDe(
+    procedure begin FluentSQL.Query(dbnFirebird).Select.GroupBy('').CaseExpr end);
+
+  Assert.DoesNotContain(LSemEnunciado, 'GroupBy(', False,
+    'A mensagem de "sem enunciado" nao pode mandar chamar GroupBy - e a chamada ' +
+    'que produz o proprio estado. Recebido: ' + LSemEnunciado);
+  Assert.DoesNotContain(LSemEnunciado, 'OrderBy(', False,
+    'Idem OrderBy. Recebido: ' + LSemEnunciado);
+  Assert.DoesNotContain(LDml, 'GroupBy(', False,
+    'Recebido: ' + LDml);
+  Assert.DoesNotContain(LSemProjecao, 'GroupBy(', False,
+    'Recebido: ' + LSemProjecao);
+  Assert.DoesNotContain(LAcessoria, 'GroupBy(', False,
+    'A mensagem da clausula acessoria nao pode prescrever a propria clausula ' +
+    'acessoria. Recebido: ' + LAcessoria);
+  // E o positivo: todas tem de apontar a projecao, que e a saida real.
+  Assert.Contains(LSemEnunciado, 'Select', False, 'Recebido: ' + LSemEnunciado);
+  Assert.Contains(LDml, 'Select', False, 'Recebido: ' + LDml);
+  Assert.Contains(LSemProjecao, 'Column', False, 'Recebido: ' + LSemProjecao);
+  Assert.Contains(LAcessoria, 'Column', False, 'Recebido: ' + LAcessoria);
 end;
 
 procedure TTestCaseExprAnchor.TestARecusaNaoDeixaParametroParaTras;

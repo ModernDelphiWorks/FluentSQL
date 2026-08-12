@@ -65,9 +65,11 @@ type
     ///   FActiveSection sem emitir uma letra, e um DELETE continua um DELETE
     ///   depois de qualquer uma delas.
     ///
-    ///   Escrito num ponto UNICO - _SetSection, e so para as secoes que ABREM
-    ///   enunciado - e por isso nao ha caminho que o deixe defasado. Nasce
-    ///   secSelect, que e o default neutro e o mesmo que ClearAll restabelece.
+    ///   Escrito por DOIS pontos, e sao dois mesmo - dizer "ponto unico" seria
+    ///   falso: _SetSection, que grava a especie para as secoes que ABREM
+    ///   enunciado, e ClearAll, que a devolve ao neutro. Nao ha um terceiro, e e
+    ///   isso que garante que a marca nunca fique defasada. Nasce secSelect, que
+    ///   e o default neutro e o mesmo que ClearAll restabelece.
     /// </summary>
     FStatementKind: TSection;
     /// <summary>
@@ -96,10 +98,9 @@ type
     procedure _AssertHaveName;
     function _NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
     function _CaseExprAncoraNoNoCorrente: Boolean;
-    procedure _AssertCaseExprNaoEstaEmDeleteOuUpdate;
-    procedure _RecusaCaseExprNoInsert;
-    procedure _AssertCaseExprTemOndeAncorar;
-    procedure _AssertCaseExprTemOndeAncorarSeNaoAncora;
+    procedure _AssertCaseExprEnunciadoHospedaCase;
+    procedure _AssertCaseExprDestinoAceitaColunaNova;
+    procedure _AssertCaseExprAcessoriaTemProjecao(const ANaProjecao: Boolean);
     procedure _SetSection(ASection: TSection);
     procedure _DefineSectionSelect;
     procedure _DefineSectionDelete;
@@ -497,17 +498,19 @@ function TFluentSQL.CaseExpr(const AExpression: String): IFluentSQLCriteriaCase;
 var
   LExpression: String;
 begin
-  _AssertCaseExprNaoEstaEmDeleteOuUpdate;
+  _AssertCaseExprEnunciadoHospedaCase;
   LExpression := AExpression;
   if _CaseExprAncoraNoNoCorrente then
   begin
+    _AssertCaseExprAcessoriaTemProjecao(
+      Assigned(FAST.Select) and _NoCorrenteEstaNaLista(FAST.Select.Columns));
     if LExpression = '' then
       LExpression := FAST.ASTName.Name;
     Result := TFluentSQLCriteriaCase.Create(Self, LExpression);
     FAST.ASTName.CaseExpr := Result.CaseExpr;
     Exit;
   end;
-  _AssertCaseExprTemOndeAncorar;
+  _AssertCaseExprDestinoAceitaColunaNova;
   Result := TFluentSQLCriteriaCase.Create(Self, LExpression);
   FAST.ASTName := FAST.ASTColumns.Add;
   FAST.ASTName.CaseExpr := Result.CaseExpr;
@@ -539,181 +542,166 @@ end;
 ///   Responde False - e nao levanta - quando nao ha AST ou nao ha cursor. Quem
 ///   decide o que fazer com o False e o chamador.
 ///
-///   A UNICA saida por excecao daqui e o ramo do INSERT, e ela e deliberada: ver
-///   _RecusaCaseExprNoInsert.
 /// </summary>
 function TFluentSQL._CaseExprAncoraNoNoCorrente: Boolean;
 begin
   Result := False;
   if (not Assigned(FAST)) or (not Assigned(FAST.ASTName)) then
     Exit;
-  // A QUARTA colecao entra na MESMA varredura, e nao numa guarda a parte: o no
-  // ancora nela como ancoraria em qualquer outra, so que ancorar ali nao pode.
-  if Assigned(FAST.Insert) and _NoCorrenteEstaNaLista(FAST.Insert.Columns) then
-    _RecusaCaseExprNoInsert;
+  // Insert.Columns NAO entra na varredura, e a ausencia agora e CONSEQUENCIA e
+  // nao excecao: _AssertCaseExprEnunciadoHospedaCase recusa o INSERT inteiro pela
+  // ESPECIE, antes de esta pergunta ser feita. Enquanto a recusa era por
+  // comparacao de colecao, uma clausula intercalada a contornava.
   Result := (Assigned(FAST.Select)  and _NoCorrenteEstaNaLista(FAST.Select.Columns))
          or (Assigned(FAST.GroupBy) and _NoCorrenteEstaNaLista(FAST.GroupBy.Columns))
          or (Assigned(FAST.OrderBy) and _NoCorrenteEstaNaLista(FAST.OrderBy.Columns));
 end;
 
 /// <summary>
-///   O CASE nao existe em DELETE nem em UPDATE, e a pergunta e UMA so porque o
-///   discriminador e DURAVEL: FStatementKind, a ESPECIE do enunciado.
+///   ONDE UM CASE PODE MORAR - a pergunta unica desta unit, derivada da ESPECIE
+///   do enunciado e do PAPEL da lista de destino. Substitui tres guardas que
+///   perguntavam coisas diferentes e deixavam buraco entre si.
 ///
-///   POR QUE NAO A FORMA DO PR #167, QUE FOI A PRIMEIRA TENTATIVA AQUI. Aquela
-///   guarda le duas coisas - a marca (not FAST.Delete.IsEmpty) e a secao ativa
-///   (FActiveSection = secDelete) - e as duas juntas AINDA deixam um buraco,
-///   medido:
+///   ==========================================================================
+///   POR QUE UMA SO, E NAO QUATRO
+///   ==========================================================================
 ///
-///     Delete.GroupBy('') + CaseExpr   -> "GROUP BY (CASE WHEN 1 THEN 1 END)"
-///     Delete.OrderBy('') + CaseExpr   -> "ORDER BY (CASE ...) ASC"
+///   As versoes anteriores desta entrega tinham guarda para DELETE/UPDATE, uma
+///   para o INSERT por comparacao de colecao, e uma generica de "ha lista?".
+///   Cada rodada de revisao achou o IRMAO de um passo adiante do que a rodada
+///   anterior fechou:
 ///
-///   porque Delete SEM From nao alimenta Delete.TableNames (nao ha marca a ler)
-///   e GroupBy('') ja tirou FActiveSection de secDelete. As duas metades sao
-///   FALSAS ao mesmo tempo, e o que sai nao e sequer um enunciado - e um
-///   fragmento, sem DELETE nenhum. Na base aquilo levantava EAccessViolation,
-///   entao seria crash -> texto invalido CALADO: loud->mute introduzido pela
-///   propria entrega que veio matar loud->mute.
+///     rodada 3 - fechou DELETE/UPDATE com clausula, faltou Delete SEM From
+///     rodada 4 - fechou Delete sem From, faltou enunciado que nunca foi DML
+///     rodada 5 - fechou a especie, faltou INSERT com clausula intercalada
 ///
-///   A saida NAO foi empilhar uma terceira metade. Foi perguntar a coisa certa:
-///   "este enunciado E um DELETE?" e nao "o cursor esta num DELETE agora?".
-///   FStatementKind responde a primeira, e responde sozinho:
+///   Tres rodadas, o mesmo movimento. A causa nao era desatencao: era ENUMERAR
+///   CASO A CASO, e enumeracao caso a caso para onde a lista acaba. Esta versao
+///   foi desenhada a partir de uma VARREDURA CARTESIANA de 300 cadeias -
+///   especie x posicao do alvo x clausula intercalada x forma da chamada - e
+///   nao a partir da lista de defeitos nomeados. O criterio da varredura nao e
+///   "esta na lista": e "o texto emitido E um enunciado?".
 ///
-///     escrito ... em _SetSection, ponto UNICO, e so para as secoes que ABREM
-///                  enunciado (secSelect, secDelete, secInsert, secUpdate,
-///                  secMerge)
-///     imune a .... Where, GroupBy, Having e OrderBy, que mudam a secao ATIVA e
-///                  nao a especie - e era exatamente por ali que o buraco vinha
-///     limpo por .. ClearAll, e por qualquer secao que abra outro enunciado, o
-///                  que mantem "trocar para SELECT libera o CaseExpr"
+///   ==========================================================================
+///   AS TRES PERGUNTAS, E POR QUE SAO ESSAS
+///   ==========================================================================
 ///
-///   Uma pergunta so, sem estado transitorio, sem particao a manter. A guarda
-///   do #167 em _CreateJoin continua com a forma antiga e com o buraco - isso e
-///   achado REPORTADO, nao consertado aqui: o texto que sai de la e outro e a
-///   decisao de puxar o conserto e do dono.
+///   1. HA ENUNCIADO? (FStatementAberto)
+///      Sem nenhuma secao que abra enunciado, uma clausula sozinha ja cria
+///      lista de colunas - GroupBy('') e OrderBy('') criam - e o CASE nascia
+///      nela produzindo "GROUP BY (CASE ...)" solto.
 ///
-///   AS DUAS NATUREZAS SAO DIFERENTES, e o registro importa porque a gravidade e:
-///     no DELETE com From a base ja emitia texto invalido
-///       ("DELETE FROM (CASE T ...)"): invalido -> recusado, melhora sem
-///       regressao.
-///     no DELETE sem From e no UPDATE a base levantava EAccessViolation, e sem
-///       esta guarda a entrega trocaria CRASH por TEXTO INVALIDO CALADO. Isso e
-///       fechado aqui, e nao catalogado como ressalva.
+///   2. QUE ESPECIE E? (FStatementKind)
+///      So o SELECT hospeda CASE. No INSERT a lista de colunas e de NOMES DE
+///      DESTINO - as celulas onde o dado vai ser gravado - e um CASE nao pode
+///      ser alvo de gravacao em dialeto nenhum. No UPDATE e no DELETE nao ha
+///      projecao. E a mesma resposta para os quatro verbos, e por isso e UMA
+///      pergunta e nao quatro.
+///
+///   3. A LISTA DE DESTINO E ACESSORIA? (ASTColumns vs Select.Columns)
+///      As listas de GROUP BY e de ORDER BY sao ACESSORIAS da projecao: elas
+///      qualificam um SELECT que precisa existir. Com a projecao vazia, um CASE
+///      ancorado nelas produz "GROUP BY (CASE ...)" sem SELECT nenhum. Ancorar
+///      na PROJECAO nao tem essa condicao, porque e a projecao que faz do texto
+///      um enunciado.
+///
+///   ==========================================================================
+///   O QUE A VARREDURA MEDIU
+///   ==========================================================================
+///
+///   Das 300 cadeias, 18 emitiam texto que NAO e enunciado e que a base
+///   respondia com EAccessViolation - ou seja, crash -> texto invalido calado,
+///   introduzido por esta entrega:
+///
+///     Insert.Into('T') + GroupBy('')/OrderBy('')  -> INSERT INTO T GROUP BY (CASE ...)
+///     Insert sem Into  + GroupBy('')/OrderBy('')  -> GROUP BY (CASE ...)
+///     Select sem coluna+ GroupBy('')/OrderBy('')  -> GROUP BY (CASE ...)
+///
+///   (3 formas de chamada cada: sem argumento, com String, com array of const.)
+///   As tres perguntas acima fecham as 18 sem enumerar nenhuma.
+///
+///   NAO E DESTA GUARDA, e fica dito para nao se cobrar dela: "SELECT (CASE ...)
+///   FROM" com FROM pendurado sai de Select.Column('K') + CaseExpr sem From, e
+///   sai IGUAL na base. E defeito do serializador do FROM vazio, pre-existente,
+///   com porta propria.
 /// </summary>
-procedure TFluentSQL._AssertCaseExprNaoEstaEmDeleteOuUpdate;
+/// <summary>
+///   PERGUNTAS 1 e 2 - sobre o ENUNCIADO. Valem SEMPRE, ancorando ou nao: nem o
+///   idioma da coluna corrente salva um CASE que nao tem enunciado que o
+///   contenha, ou que esta num verbo que nao projeta.
+/// </summary>
+procedure TFluentSQL._AssertCaseExprEnunciadoHospedaCase;
 begin
-  if not (FStatementKind in [secDelete, secUpdate]) then
-    Exit;
-  raise EArgumentException.Create(
-    'IFluentSQL.CaseExpr chamado dentro de um DELETE ou de um UPDATE: nem um ' +
-    'nem outro projeta colunas, e um CASE nao tem onde morar ali. O que sairia ' +
-    'nao e aceito por motor nenhum - "DELETE FROM (CASE ...)" com a relacao ' +
-    'substituida, ou, se uma clausula com lista de colunas tiver sido aberta no ' +
-    'meio, um fragmento solto que nem enunciado e. Se o CASE e o VALOR a gravar, ' +
-    'passe-o em Values/SetValue; se e para escolher as linhas, passe-o na ' +
-    'condicao do Where; se e para projetar, abra um Select.');
+  if not FStatementAberto then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado sem enunciado nenhum aberto: nao houve ' +
+      'Select, Insert, Update nem Delete antes. Uma clausula como GroupBy ou ' +
+      'OrderBy cria lista de colunas por si, e o CASE nasceria nela produzindo ' +
+      'um fragmento solto ("GROUP BY (CASE ... END)"), que nao e enunciado em ' +
+      'dialeto nenhum. Abra um Select antes.');
+
+  if FStatementKind <> secSelect then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado dentro de um INSERT, UPDATE ou DELETE: ' +
+      'nenhum dos tres projeta colunas, e um CASE nao tem onde morar ali. No ' +
+      'INSERT a lista de colunas e de NOMES DE DESTINO - as celulas onde o dado ' +
+      'sera gravado - e um CASE nao pode ser alvo de gravacao. O que sairia nao ' +
+      'e aceito por motor nenhum. Se o CASE e o VALOR a gravar, passe-o em ' +
+      'Values/SetValue; se e para escolher as linhas, passe-o na condicao do ' +
+      'Where; se e para projetar, abra um Select.');
 end;
 
 /// <summary>
-///   A recusa do INSERT, chamada de DOIS pontos porque sao DUAS perguntas
-///   diferentes, e as duas precisam dela:
-///
-///     _CaseExprAncoraNoNoCorrente ... "o NO do cursor e uma coluna do INSERT?"
-///     _AssertCaseExprTemOndeAncorar  "a lista onde eu CRIARIA a coluna nova e
-///                                     a do INSERT?"
-///
-///   A primeira e de NO e a segunda e de DESTINO, e nenhuma cobre a outra.
-///   Houve uma versao desta entrega em que existia so a segunda, escrita como
-///   FAST.ASTColumns = FAST.Insert.Columns - ou seja, pergunta de SECAO, o mesmo
-///   padrao que ja tinha derrubado a primeira rodada. Ela deixava passar, medido:
-///
-///       Insert.Into('T').Column('A').GroupBy('') + CaseExpr
-///       -> INSERT INTO T ( A ) GROUP BY (CASE WHEN 1 THEN 1 END)
-///
-///   porque o cursor estava numa coluna do INSERT enquanto a lista corrente ja
-///   era a do GROUP BY. Com a pergunta de no no lugar, o contra-exemplo morre.
-///
-///   POR QUE O INSERT E DIFERENTE DAS OUTRAS TRES LISTAS: as colunas do INSERT
-///   sao NOMES DE DESTINO - as celulas onde o dado vai ser gravado - e nao
-///   expressoes projetadas. Um CASE nao pode ser alvo de gravacao em dialeto
-///   nenhum. A lista se parecer com as outras e coincidencia de REPRESENTACAO,
-///   nao de significado.
-///
-///   METADE DISTO NAO E REGRESSAO DESTA ENTREGA, e o registro importa:
-///   Insert.Into('T').Column('A') seguido de CaseExpr JA emitia, calado,
-///   "INSERT INTO T ( (CASE A WHEN 1 THEN 'X' END) )" na base. O caso sem Column
-///   levantava EAccessViolation. Nenhum dos dois tinha comportamento a preservar.
+///   PERGUNTAS 3 e 4 - sobre o DESTINO da COLUNA NOVA, e por isso SO valem no
+///   caminho que cria coluna nova. Quando o no corrente ancora, nao ha coluna a
+///   criar e nao ha destino a validar: o CASE substitui um no que ja esta no
+///   lugar certo. Foi MEDIDO que perguntar isto no caminho de ancora quebra
+///   .Select.From('T').Column('TIPO').Where(...) + CaseExpr, que emite SQL
+///   valido nos sete e e a celula TestOrdemA_ColunaCorrente_Where.
 /// </summary>
-procedure TFluentSQL._RecusaCaseExprNoInsert;
+procedure TFluentSQL._AssertCaseExprDestinoAceitaColunaNova;
 begin
-  raise EArgumentException.Create(
-    'IFluentSQL.CaseExpr chamado dentro de um INSERT: as colunas do INSERT sao ' +
-    'NOMES DE DESTINO, as celulas onde o dado sera gravado, e um CASE nao pode ' +
-    'ser alvo de gravacao em dialeto nenhum. O que sairia - ' +
-    '"INSERT INTO T ( (CASE ... END) )" - nao e aceito por motor nenhum. Se o ' +
-    'CASE e o VALOR a gravar, ele vai no lado dos valores; se e para projetar, ' +
-    'ele vai num SELECT.');
+  if not Assigned(FAST.ASTColumns) then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado numa clausula que nao projeta colunas: um ' +
+      'CASE precisa de uma lista de colunas onde morar, e aqui nao ha nenhuma. ' +
+      'Anexa-lo ao no corrente SUBSTITUIRIA o texto dele - a relacao do FROM ou ' +
+      'a do JOIN - e o que sairia nao e CASE de dialeto nenhum; ignora-lo em ' +
+      'silencio descartaria o CASE inteiro. Volte a projecao: chame Column(...) ' +
+      'e entao CaseExpr.');
+
+  _AssertCaseExprAcessoriaTemProjecao(FAST.ASTColumns = FAST.Select.Columns);
 end;
 
 /// <summary>
-///   Recusa quando nao ha ONDE criar a coluna nova. Sao dois motivos, e o
-///   segundo e de DESTINO e nao de no:
+///   PERGUNTA 4 - a clausula ACESSORIA precisa de uma projecao que ela
+///   qualifique. GROUP BY e ORDER BY nao sao enunciado: sao adjuntos de um
+///   SELECT que tem de existir. Com a projecao vazia, um CASE que va parar
+///   numa delas produz "GROUP BY (CASE ... END)" solto.
 ///
-///   1. nao ha lista de colunas nenhuma - as secoes que nao projetam (WHERE,
-///      JOIN, HAVING, DELETE, UPDATE) e o enunciado que ainda nao abriu secao.
-///   2. a lista corrente e a do INSERT, onde a coluna nova nao pode nascer. Esta
-///      metade NAO e coberta pela pergunta de no: no Insert.Into('T') sem Column
-///      nenhuma, o cursor esta na relacao e nao ha no de coluna a encontrar - o
-///      que impede o "INSERT INTO T ( (CASE ...) )" e esta linha aqui.
+///   ⚠️ VALE NOS DOIS CAMINHOS, e isso foi MEDIDO e nao suposto. A primeira
+///   versao desta guarda so perguntava no caminho da COLUNA NOVA, e a varredura
+///   cartesiana devolveu 6 cadeias sobreviventes, todas do caminho de ANCORA:
 ///
-///   Por que recusar em vez de simplesmente nao anexar: nao anexar DESCARTA o
-///   CASE em silencio - o chamador montou um CASE inteiro, com WHEN e THEN, e
-///   nada dele apareceria no SQL. O que saia antes era pior (o CASE substituia a
-///   relacao do FROM ou a do JOIN, apagando o texto dela), mas as duas saidas
-///   erradas tem a mesma raiz: a chamada nao tem sentido ali, e fingir que tem e
-///   que era o erro.
+///       Select.GroupBy('').Column('K') + CaseExpr -> GROUP BY (CASE K ...)
 ///
-///   A MENSAGEM NAO NOMEIA A SECAO, e a omissao e o conserto de um defeito real:
-///   a versao anterior formatava FAST.ASTSection.Name DENTRO do raise - ou seja,
-///   desreferenciava um objeto que pode ser nil no exato caminho em que a guarda
-///   ja falhou. Medido: Query(dbnFirebird).CaseExpr, sem Select nenhum, levantava
-///   EAccessViolation DE DENTRO da guarda. E a mesma figura de "guarda no objeto
-///   errado" que esta tarefa existe para matar, e nao ia ficar aqui.
-///
-///   Isto e BREAKING, e o alcance e conhecido: quebra SO quem ja produzia SQL que
-///   motor nenhum aceitava, ou quem ja recebia EAccessViolation.
+///   Ali o Column('K') cai DENTRO de GroupBy.Columns - porque ASTColumns ja e a
+///   do GROUP BY - e o cursor ancora nele. Nao havia coluna nova a criar, entao
+///   a pergunta de destino nao corria, e o fragmento saia. O que decide nao e
+///   "vou criar coluna?", e sim "em que lista o CASE vai ficar?".
 /// </summary>
-procedure TFluentSQL._AssertCaseExprTemOndeAncorar;
+procedure TFluentSQL._AssertCaseExprAcessoriaTemProjecao(const ANaProjecao: Boolean);
 begin
-  if Assigned(FAST) and Assigned(FAST.Insert) and
-     (FAST.ASTColumns = FAST.Insert.Columns) then
-    _RecusaCaseExprNoInsert;
-  // ⚠️ A LISTA DE COLUNAS NAO BASTA: GroupBy('') e OrderBy('') abrem lista SEM
-  // que haja enunciado nenhum, e o CASE nascia ali produzindo fragmento solto
-  // ("GROUP BY (CASE ...)" sem SELECT). Medido: na base aquilo levantava
-  // EAccessViolation, entao aceitar seria trocar crash por texto invalido
-  // CALADO. Um CASE precisa de um enunciado que o contenha, e nao so de uma
-  // lista onde encaixar.
-  if Assigned(FAST) and Assigned(FAST.ASTColumns) and FStatementAberto then
+  if ANaProjecao then
+    Exit;
+  if Assigned(FAST.Select) and (not FAST.Select.Columns.IsEmpty) then
     Exit;
   raise EArgumentException.Create(
-    'IFluentSQL.CaseExpr chamado numa secao que nao projeta colunas: um CASE ' +
-    'precisa de uma lista de colunas onde morar, e aqui nao ha nenhuma. ' +
-    'Anexa-lo ao no corrente SUBSTITUIRIA o texto dele - a relacao do FROM ou a ' +
-    'do JOIN - e o que sairia nao e CASE de dialeto nenhum; ignora-lo em ' +
-    'silencio descartaria o CASE inteiro. Chame CaseExpr onde ha projecao: ' +
-    'depois de Select/Column(...), de GroupBy(...) ou de OrderBy(...).');
-end;
-
-/// <summary>
-///   Antecipa a recusa para os chamadores que GRAVAM antes de delegar. Se o no
-///   ancora, nao ha recusa possivel adiante e esta funcao sai calada.
-/// </summary>
-procedure TFluentSQL._AssertCaseExprTemOndeAncorarSeNaoAncora;
-begin
-  if _CaseExprAncoraNoNoCorrente then
-    Exit;
-  _AssertCaseExprTemOndeAncorar;
+    'IFluentSQL.CaseExpr chamado numa clausula ACESSORIA - GroupBy ou ' +
+    'OrderBy - de um Select que ainda nao projeta nada. Essas clausulas ' +
+    'qualificam uma projecao; sem ela o que sairia e um fragmento solto ' +
+    '("GROUP BY (CASE ... END)"), sem SELECT nenhum. Projete primeiro: chame ' +
+    'Column(...) ou All, e so entao a clausula.');
 end;
 
 /// <summary>
@@ -739,8 +727,12 @@ end;
 /// </summary>
 function TFluentSQL.CaseExpr(const AExpression: array of const): IFluentSQLCriteriaCase;
 begin
-  _AssertCaseExprNaoEstaEmDeleteOuUpdate;
-  _AssertCaseExprTemOndeAncorarSeNaoAncora;
+  _AssertCaseExprEnunciadoHospedaCase;
+  if _CaseExprAncoraNoNoCorrente then
+    _AssertCaseExprAcessoriaTemProjecao(
+      Assigned(FAST.Select) and _NoCorrenteEstaNaLista(FAST.Select.Columns))
+  else
+    _AssertCaseExprDestinoAceitaColunaNova;
   Result := CaseExpr(TUtils.SqlArrayOfConstToParameterizedSql(AExpression, FAST.Params));
 end;
 
