@@ -58,6 +58,31 @@ type
       TSections = set of TSection;
   strict private
     FActiveSection: TSection;
+    /// <summary>
+    ///   A ESPECIE do enunciado - SELECT, INSERT, UPDATE, DELETE ou MERGE -, e
+    ///   nao a secao em que o cursor esta agora. Sao coisas diferentes e a
+    ///   diferenca e observavel: Where(''), GroupBy('') e OrderBy('') MUDAM
+    ///   FActiveSection sem emitir uma letra, e um DELETE continua um DELETE
+    ///   depois de qualquer uma delas.
+    ///
+    ///   Escrito por DOIS pontos, e sao dois mesmo - dizer "ponto unico" seria
+    ///   falso: _SetSection, que grava a especie para as secoes que ABREM
+    ///   enunciado, e ClearAll, que a devolve ao neutro. Nao ha um terceiro, e e
+    ///   isso que garante que a marca nunca fique defasada. Nasce secSelect, que
+    ///   e o default neutro e o mesmo que ClearAll restabelece.
+    /// </summary>
+    FStatementKind: TSection;
+    /// <summary>
+    ///   Houve alguma secao que ABRIU enunciado? Distingue "e um SELECT" de
+    ///   "ainda nao e nada", que FStatementKind sozinho nao distingue: ele nasce
+    ///   secSelect, que e o default neutro, e um enunciado recem-criado
+    ///   responderia "sou um SELECT" sem que ninguem tenha chamado Select.
+    ///
+    ///   A diferenca e observavel e foi medida: Query(...).GroupBy('') abre
+    ///   lista de colunas SEM haver enunciado nenhum, e um CaseExpr ali emitia
+    ///   "GROUP BY (CASE ...)" solto - um fragmento que nem enunciado e.
+    /// </summary>
+    FStatementAberto: Boolean;
     FActiveOperator: TOperator;
     FActiveExpr: IFluentSQLCriteriaExpression;
     FActiveValues: IFluentSQLNameValuePairs;
@@ -71,6 +96,11 @@ type
     procedure _AssertSection(ASections: TSections);
     procedure _AssertOperator(AOperators: TOperators);
     procedure _AssertHaveName;
+    function _NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
+    function _CaseExprAncoraNoNoCorrente: Boolean;
+    procedure _AssertCaseExprEnunciadoHospedaCase;
+    procedure _AssertCaseExprDestinoAceitaColunaNova;
+    procedure _AssertCaseExprAcessoriaTemProjecao(const ANaProjecao: Boolean);
     procedure _SetSection(ASection: TSection);
     procedure _DefineSectionSelect;
     procedure _DefineSectionDelete;
@@ -328,27 +358,433 @@ begin
   Result := ForDialectOnly(ADialect, TUtils.SqlArrayOfConstToParameterizedSql(AExpression, FAST.Params));
 end;
 
+/// <summary>
+///   O PONTO UNICO DE ANCORAGEM DO CASE. As tres sobrecargas de CaseExpr passam
+///   por aqui, e por isso a regra e escrita uma vez so.
+///
+///   CaseExpr decide DUAS coisas, nao uma: o OPERANDO do CASE (o que vem entre
+///   "CASE" e o primeiro "WHEN") e o NO da arvore em que o CASE vai morar. Antes
+///   desta tarefa as duas eram decididas sem perguntar nada sobre o no corrente:
+///
+///       if LExpression = '' then
+///         LExpression := FAST.ASTName.Name;
+///       Result := TFluentSQLCriteriaCase.Create(Self, LExpression);
+///       if Assigned(FAST) then
+///         FAST.ASTName.CaseExpr := Result.CaseExpr;
+///
+///   FAST.ASTName e um CURSOR: aponta para o ultimo no tocado pela cadeia
+///   fluente. Sobre uma COLUNA aquilo forma um idioma publico e deliberado -
+///   "transforme a ultima coluna num CASE simples sobre ela":
+///
+///       .Select.Column('ID').Column('TIPO').CaseExpr.When('1')...
+///       -> SELECT ID, (CASE TIPO WHEN 1 THEN ... END) ...
+///
+///   Sobre qualquer OUTRO no, as mesmas duas linhas produziam lixo em silencio.
+///   MEDIDO POR MUTACAO, e as duas metades sao load-bearing. Todo numero abaixo
+///   foi REMEDIDO NO HEAD FINAL - nenhum sobrevive de rodada anterior - e vem
+///   com as DUAS bases, porque publicar so uma confunde:
+///     apagar o ATALHO  -> 33 celulas nos 11 runners, 26 em Common, 11 da T13
+///     apagar o ANEXO   -> 41 celulas nos 11 runners, 30 em Common, 13 da T13
+///   Sem o anexo o CASE nao chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T",
+///   com o CASE inteiro perdido. Nenhuma das duas linhas podia sair. O que
+///   faltava era a PERGUNTA.
+///
+///   ==========================================================================
+///   A PERGUNTA E DE NO, NAO DE SECAO - E ESSA DISTINCAO CUSTOU UMA RODADA
+///   ==========================================================================
+///
+///   A primeira tentativa de conserto perguntou "o cursor esta na lista de
+///   colunas da secao CORRENTE?", varrendo so FAST.ASTColumns. Parece a mesma
+///   coisa. NAO E, e a diferenca e observavel:
+///
+///     FAST.ASTName    e DURAVEL - atravessa a troca de secao.
+///     FAST.ASTColumns e TROCADO por _DefineSectionX POR BAIXO do cursor
+///                     (vira nil no Where e no Having, vira outra lista no
+///                     GroupBy e no OrderBy).
+///
+///   Entao, com o cursor parado sobre uma coluna do SELECT, bastava entrar no
+///   WHERE para a pergunta passar a responder "nao e coluna" - sobre o MESMO no.
+///   Medido, e as duas cadeias abaixo diferem SO na ordem de Column e From:
+///
+///     .Select.From('T').Column('TIPO').Where('ID').Equal(1)   cursor na COLUNA
+///     .Select.Column('TIPO').From('T').Where('ID').Equal(1)   cursor na RELACAO
+///
+///   A primeira emitia, e emite, "SELECT (CASE TIPO WHEN 1 THEN ...) FROM T
+///   WHERE (ID = :p1)" - valido nos sete. A pergunta de secao a RECUSAVA. Pior:
+///   com GroupBy('') no lugar do Where, ela mandava o CASE para a clausula
+///   errada e o resultado saia VALIDO E DIFERENTE ("SELECT TIPO FROM T GROUP BY
+///   (CASE ...)"), ou seja regressao de ruidoso para MUDO.
+///
+///   Por isso a pergunta varre TODAS as colecoes de coluna, e nao a corrente.
+///
+///   POR QUE NAO UMA MARCA NO NO, que seria mais direto: nao existe. O
+///   TFluentSQLName tem Name, Alias, AliasKeyword e Case, e nada disso diz o
+///   papel. AliasKeyword PARECE servir (nasce 'AS' para coluna e recebe
+///   _RelationAliasKeyword para relacao) mas foi MEDIDO e nao serve: so a Oracle
+///   sobrescreve RelationAliasKeyword, entao nos outros seis dialetos coluna e
+///   relacao carregam ambas 'AS'. Criar marca nova seria membro em
+///   IFluentSQLName - BREAKING E2291, com dois implementadores - para responder o
+///   que tres varreduras curtas ja respondem sem tocar em superficie publica.
+///   As listas existem desde TFluentSQLAST.Create e os getters sao puros: varrer
+///   nao cria secao nenhuma.
+///
+///   OS TRES RAMOS TEM CELULA, e o apagamento de cada um foi medido no HEAD
+///   FINAL (11 runners / Common):
+///     Select ... 37 / 26      GroupBy ... 2 / 2      OrderBy ... 2 / 2
+///
+///   ==========================================================================
+///   PARA ONDE VAI A COLUNA NOVA: ASTColumns, E ISSO FOI MEDIDO
+///   ==========================================================================
+///
+///   O destino NAO e "a lista de projecao". Forcar FAST.Select.Columns quebraria
+///   dois casos legitimos, medidos:
+///
+///     .Select.All.From('T').OrderBy('')  -> ORDER BY (CASE ...)   e o certo
+///     .Select.All.From('T').GroupBy('')  -> GROUP BY (CASE ...)   e o certo
+///
+///   Quem chamou OrderBy quer o CASE no ORDER BY. ASTColumns - a lista da secao
+///   corrente - ja era o destino certo; o erro estava no PREDICADO, nao no
+///   destino.
+///
+///   ==========================================================================
+///   O ORACULO DE MOTOR
+///   ==========================================================================
+///
+///   Transcricao literal em test.caseexpr.anchor.matrix.sql. SUBMETIDOS 7: seis
+///   ATIVOS (PostgreSQL, MySQL, SQL Server, Firebird, Oracle, SQLite) e um SOB
+///   DEFINE (DB2, desligado no FluentSQL.inc). InterBase NAO MEDIDO - nao ha
+///   imagem publica, e nao foi inferido do Firebird.
+///
+///   O texto que saia com o cursor na relacao,
+///     SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
+///   e RECUSADO por SETE de sete:
+///     PostgreSQL 16.14                ERROR: syntax error at or near "CASE"
+///     MySQL 8.4.11                    ERROR 1064 (42000)
+///     SQL Server 2022 16.0.4265.3     Msg 156 Incorrect syntax near 'CASE'
+///     Firebird 5.0.4                  -104 / Token unknown - CASE
+///     Oracle AI 26ai Free 23.26.2.0.0 ORA-00907: missing right parenthesis
+///     DB2 v12.1.5.0                   SQL0104N / SQLSTATE=42601
+///     SQLite 3.53.4                   Parse error near "CASE"
+///
+///   E A FORMA NOVA NAO PASSA EM TODOS - esta doutrina nao afirma isso, e a
+///   distincao e o motivo de o oraculo ter sido reexecutado:
+///     projecao SEM estrela ... 7 de 7 aceitam, dado certo
+///     projecao COM estrela ... 5 de 7. Firebird e Oracle recusam pela VIRGULA
+///                              depois da ESTRELA (o Firebird aponta a coluna 9;
+///                              a Oracle devolve ORA-00923), e nao pelo CASE.
+///                              "SELECT *, <expr>" ja saia da base por All
+///                              seguido de Column: defeito PRE-EXISTENTE, porta
+///                              propria, fora do escopo desta tarefa
+///     ORDER BY ............... 7 de 7 aceitam
+///     GROUP BY ............... 1 de 7. Os outros recusam porque projetar uma
+///                              coluna agrupando por outra expressao viola a
+///                              regra de GROUP BY - causa da CADEIA DO USUARIO,
+///                              e nao da ancoragem
+///
+///   Uma versao anterior deste oraculo submeteu a Oracle um enunciado COM
+///   apelido ("SELECT P.* ... FROM PRODUCTS P") que o FluentSQL nao emite, e a
+///   ressalva ficava so dentro do .sql enquanto aqui se afirmava "verbatim". A
+///   adaptacao escondia a recusa real. Agora todos os enunciados vao como sao
+///   emitidos, e onde o motor recusa a recusa esta transcrita.
+///
+///   ==========================================================================
+///   A REGRA
+///   ==========================================================================
+///
+///       converter SQL invalido silencioso em SQL VALIDO quando o sentido e
+///       inequivoco, e em ERRO NOMEADO quando nao e. Nunca em descarte silencioso.
+/// </summary>
 function TFluentSQL.CaseExpr(const AExpression: String): IFluentSQLCriteriaCase;
 var
   LExpression: String;
 begin
+  _AssertCaseExprEnunciadoHospedaCase;
   LExpression := AExpression;
-  if LExpression = '' then
-    LExpression := FAST.ASTName.Name;
-  Result := TFluentSQLCriteriaCase.Create(Self, LExpression);
-  if Assigned(FAST) then
+  if _CaseExprAncoraNoNoCorrente then
+  begin
+    _AssertCaseExprAcessoriaTemProjecao(
+      Assigned(FAST.Select) and _NoCorrenteEstaNaLista(FAST.Select.Columns));
+    if LExpression = '' then
+      LExpression := FAST.ASTName.Name;
+    Result := TFluentSQLCriteriaCase.Create(Self, LExpression);
     FAST.ASTName.CaseExpr := Result.CaseExpr;
+    Exit;
+  end;
+  _AssertCaseExprDestinoAceitaColunaNova;
+  Result := TFluentSQLCriteriaCase.Create(Self, LExpression);
+  FAST.ASTName := FAST.ASTColumns.Add;
+  FAST.ASTName.CaseExpr := Result.CaseExpr;
 end;
 
+/// <summary>
+///   O no do cursor esta NESTA lista? Comparacao de IDENTIDADE de interface, que
+///   e o unico discriminador disponivel: o mesmo TFluentSQLName serve para
+///   coluna e para relacao, e o que distingue um do outro e a LISTA a que ele
+///   pertence.
+/// </summary>
+function TFluentSQL._NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
+var
+  LFor: Integer;
+begin
+  Result := False;
+  if not Assigned(ALista) then
+    Exit;
+  for LFor := 0 to ALista.Count - 1 do
+    if ALista[LFor] = FAST.ASTName then
+      Exit(True);
+end;
+
+/// <summary>
+///   O no do cursor e uma COLUNA - em QUALQUER das listas de coluna, e nao so na
+///   da secao corrente. A razao de varrer todas esta na doutrina de CaseExpr,
+///   logo acima: o cursor e duravel e a lista corrente nao.
+///
+///   Responde False - e nao levanta - quando nao ha AST ou nao ha cursor. Quem
+///   decide o que fazer com o False e o chamador.
+///
+/// </summary>
+function TFluentSQL._CaseExprAncoraNoNoCorrente: Boolean;
+begin
+  Result := False;
+  if (not Assigned(FAST)) or (not Assigned(FAST.ASTName)) then
+    Exit;
+  // Insert.Columns NAO entra na varredura, e a ausencia agora e CONSEQUENCIA e
+  // nao excecao: _AssertCaseExprEnunciadoHospedaCase recusa o INSERT inteiro pela
+  // ESPECIE, antes de esta pergunta ser feita. Enquanto a recusa era por
+  // comparacao de colecao, uma clausula intercalada a contornava.
+  Result := (Assigned(FAST.Select)  and _NoCorrenteEstaNaLista(FAST.Select.Columns))
+         or (Assigned(FAST.GroupBy) and _NoCorrenteEstaNaLista(FAST.GroupBy.Columns))
+         or (Assigned(FAST.OrderBy) and _NoCorrenteEstaNaLista(FAST.OrderBy.Columns));
+end;
+
+/// <summary>
+///   ONDE UM CASE PODE MORAR - a pergunta unica desta unit, derivada da ESPECIE
+///   do enunciado e do PAPEL da lista de destino. Substitui tres guardas que
+///   perguntavam coisas diferentes e deixavam buraco entre si.
+///
+///   ==========================================================================
+///   POR QUE UMA SO, E NAO QUATRO
+///   ==========================================================================
+///
+///   As versoes anteriores desta entrega tinham guarda para DELETE/UPDATE, uma
+///   para o INSERT por comparacao de colecao, e uma generica de "ha lista?".
+///   Cada rodada de revisao achou o IRMAO de um passo adiante do que a rodada
+///   anterior fechou:
+///
+///     rodada 3 - fechou DELETE/UPDATE com clausula, faltou Delete SEM From
+///     rodada 4 - fechou Delete sem From, faltou enunciado que nunca foi DML
+///     rodada 5 - fechou a especie, faltou INSERT com clausula intercalada
+///
+///   Tres rodadas, o mesmo movimento. A causa nao era desatencao: era ENUMERAR
+///   CASO A CASO, e enumeracao caso a caso para onde a lista acaba. Esta versao
+///   foi desenhada a partir de uma VARREDURA CARTESIANA de 300 cadeias -
+///   especie x posicao do alvo x clausula intercalada x forma da chamada - e
+///   nao a partir da lista de defeitos nomeados. O criterio da varredura nao e
+///   "esta na lista": e "o texto emitido E um enunciado?".
+///
+///   ==========================================================================
+///   AS TRES PERGUNTAS, E POR QUE SAO ESSAS
+///   ==========================================================================
+///
+///   1. HA ENUNCIADO? (FStatementAberto)
+///      Sem nenhuma secao que abra enunciado, uma clausula sozinha ja cria
+///      lista de colunas - GroupBy('') e OrderBy('') criam - e o CASE nascia
+///      nela produzindo "GROUP BY (CASE ...)" solto.
+///
+///   2. QUE ESPECIE E? (FStatementKind)
+///      So o SELECT hospeda CASE. No INSERT a lista de colunas e de NOMES DE
+///      DESTINO - as celulas onde o dado vai ser gravado - e um CASE nao pode
+///      ser alvo de gravacao em dialeto nenhum. No UPDATE e no DELETE nao ha
+///      projecao. E a mesma resposta para os quatro verbos, e por isso e UMA
+///      pergunta e nao quatro.
+///
+///   3. A LISTA DE DESTINO E ACESSORIA? (ASTColumns vs Select.Columns)
+///      As listas de GROUP BY e de ORDER BY sao ACESSORIAS da projecao: elas
+///      qualificam um SELECT que precisa existir. Com a projecao vazia, um CASE
+///      ancorado nelas produz "GROUP BY (CASE ...)" sem SELECT nenhum. Ancorar
+///      na PROJECAO nao tem essa condicao, porque e a projecao que faz do texto
+///      um enunciado.
+///
+///   ==========================================================================
+///   O QUE A VARREDURA MEDIU
+///   ==========================================================================
+///
+///   Das 300 cadeias, 18 emitiam texto que NAO e enunciado e que a base
+///   respondia com EAccessViolation - ou seja, crash -> texto invalido calado,
+///   introduzido por esta entrega:
+///
+///     Insert.Into('T') + GroupBy('')/OrderBy('')  -> INSERT INTO T GROUP BY (CASE ...)
+///     Insert sem Into  + GroupBy('')/OrderBy('')  -> GROUP BY (CASE ...)
+///     Select sem coluna+ GroupBy('')/OrderBy('')  -> GROUP BY (CASE ...)
+///
+///   (3 formas de chamada cada: sem argumento, com String, com array of const.)
+///   As tres perguntas acima fecham as 18 sem enumerar nenhuma.
+///
+///   NAO E DESTA GUARDA, e fica dito para nao se cobrar dela: "SELECT (CASE ...)
+///   FROM" com FROM pendurado sai de Select.Column('K') + CaseExpr sem From, e
+///   sai IGUAL na base. E defeito do serializador do FROM vazio, pre-existente,
+///   com porta propria.
+/// </summary>
+/// <summary>
+///   PERGUNTAS 1 e 2 - sobre o ENUNCIADO. Valem SEMPRE, ancorando ou nao: nem o
+///   idioma da coluna corrente salva um CASE que nao tem enunciado que o
+///   contenha, ou que esta num verbo que nao projeta.
+/// </summary>
+procedure TFluentSQL._AssertCaseExprEnunciadoHospedaCase;
+begin
+  if not FStatementAberto then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado sem enunciado nenhum aberto: nao houve ' +
+      'Select, Insert, Update nem Delete antes. Uma clausula como GroupBy ou ' +
+      'OrderBy cria lista de colunas por si, e o CASE nasceria nela produzindo ' +
+      'um fragmento solto ("GROUP BY (CASE ... END)"), que nao e enunciado em ' +
+      'dialeto nenhum. Abra um Select antes.');
+
+  if FStatementKind <> secSelect then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado dentro de um INSERT, UPDATE ou DELETE: ' +
+      'nenhum dos tres projeta colunas, e um CASE nao tem onde morar ali. No ' +
+      'INSERT a lista de colunas e de NOMES DE DESTINO - as celulas onde o dado ' +
+      'sera gravado - e um CASE nao pode ser alvo de gravacao. O que sairia nao ' +
+      'e aceito por motor nenhum. Se o CASE e o VALOR a gravar, passe-o em ' +
+      'Values/SetValue; se e para escolher as linhas, passe-o na condicao do ' +
+      'Where; se e para projetar, abra um Select.');
+end;
+
+/// <summary>
+///   PERGUNTAS 3 e 4 - sobre o DESTINO da COLUNA NOVA, e por isso SO valem no
+///   caminho que cria coluna nova. Quando o no corrente ancora, nao ha coluna a
+///   criar e nao ha destino a validar: o CASE substitui um no que ja esta no
+///   lugar certo. Foi MEDIDO que perguntar isto no caminho de ancora quebra
+///   .Select.From('T').Column('TIPO').Where(...) + CaseExpr, que emite SQL
+///   valido nos sete e e a celula TestOrdemA_ColunaCorrente_Where.
+/// </summary>
+procedure TFluentSQL._AssertCaseExprDestinoAceitaColunaNova;
+begin
+  if not Assigned(FAST.ASTColumns) then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado numa clausula que nao projeta colunas: um ' +
+      'CASE precisa de uma lista de colunas onde morar, e aqui nao ha nenhuma. ' +
+      'Anexa-lo ao no corrente SUBSTITUIRIA o texto dele - a relacao do FROM ou ' +
+      'a do JOIN - e o que sairia nao e CASE de dialeto nenhum; ignora-lo em ' +
+      'silencio descartaria o CASE inteiro. Volte a projecao: chame Column(...) ' +
+      'e entao CaseExpr.');
+
+  _AssertCaseExprAcessoriaTemProjecao(FAST.ASTColumns = FAST.Select.Columns);
+end;
+
+/// <summary>
+///   PERGUNTA 4 - a clausula ACESSORIA precisa de uma projecao que ela
+///   qualifique. GROUP BY e ORDER BY nao sao enunciado: sao adjuntos de um
+///   SELECT que tem de existir. Com a projecao vazia, um CASE que va parar
+///   numa delas produz "GROUP BY (CASE ... END)" solto.
+///
+///   ⚠️ VALE NOS DOIS CAMINHOS, e isso foi MEDIDO e nao suposto. A primeira
+///   versao desta guarda so perguntava no caminho da COLUNA NOVA, e a varredura
+///   cartesiana devolveu 6 cadeias sobreviventes, todas do caminho de ANCORA:
+///
+///       Select.GroupBy('').Column('K') + CaseExpr -> GROUP BY (CASE K ...)
+///
+///   Ali o Column('K') cai DENTRO de GroupBy.Columns - porque ASTColumns ja e a
+///   do GROUP BY - e o cursor ancora nele. Nao havia coluna nova a criar, entao
+///   a pergunta de destino nao corria, e o fragmento saia. O que decide nao e
+///   "vou criar coluna?", e sim "em que lista o CASE vai ficar?".
+/// </summary>
+procedure TFluentSQL._AssertCaseExprAcessoriaTemProjecao(const ANaProjecao: Boolean);
+begin
+  if ANaProjecao then
+    Exit;
+  if Assigned(FAST.Select) and (not FAST.Select.Columns.IsEmpty) then
+    Exit;
+  raise EArgumentException.Create(
+    'IFluentSQL.CaseExpr chamado numa clausula ACESSORIA - GroupBy ou ' +
+    'OrderBy - de um Select que ainda nao projeta nada. Essas clausulas ' +
+    'qualificam uma projecao; sem ela o que sairia e um fragmento solto ' +
+    '("GROUP BY (CASE ... END)"), sem SELECT nenhum. Projete primeiro: chame ' +
+    'Column(...) ou All, e so entao a clausula.');
+end;
+
+/// <summary>
+///   A recusa corre ANTES de SqlArrayOfConstToParameterizedSql, e a ordem nao e
+///   estilo: aquela chamada e quem GRAVA os :pN do array na colecao. Delegar
+///   primeiro e recusar depois deixaria o parametro na colecao sem nada no SQL
+///   que o referenciasse - e quem liga por POSICAO, que e como todo driver Delphi
+///   liga, passaria a ligar errado a partir do buraco.
+///
+///   O vazamento e desta entrega, nao anterior a ela: antes nao havia recusa
+///   nenhuma aqui, entao nao havia caminho que abandonasse parametro. Foi a
+///   guarda nova que o criou, e foi o teste da guarda que o pegou (medido
+///   Expected [1] but got [2] antes desta linha).
+///
+///   O INVARIANTE QUE ESTAS DUAS LINHAS SUSTENTAM, e nada alem dele:
+///
+///       nenhum caminho de recusa DESTA FUNCAO grava parametro.
+///
+///   A frase e estreita de proposito. Ela NAO diz "nenhum :pN fica orfao", que
+///   seria falso e nao e consertavel aqui: na sobrecarga de
+///   IFluentSQLCriteriaExpression o argumento e construido pelo CHAMADOR, e os
+///   parametros dele ja estao gravados quando esta unidade recebe o controle.
+/// </summary>
 function TFluentSQL.CaseExpr(const AExpression: array of const): IFluentSQLCriteriaCase;
 begin
+  _AssertCaseExprEnunciadoHospedaCase;
+  if _CaseExprAncoraNoNoCorrente then
+    _AssertCaseExprAcessoriaTemProjecao(
+      Assigned(FAST.Select) and _NoCorrenteEstaNaLista(FAST.Select.Columns))
+  else
+    _AssertCaseExprDestinoAceitaColunaNova;
   Result := CaseExpr(TUtils.SqlArrayOfConstToParameterizedSql(AExpression, FAST.Params));
 end;
 
+/// <summary>
+///   ESTA SOBRECARGA LEVANTA, E A RECUSA E A ENTREGA - nao um adiamento.
+///
+///   O corpo original era
+///
+///       Result := TFluentSQLCriteriaCase.Create(Self, '');
+///       Result.AndOpe(AExpression);
+///
+///   e TFluentSQLCriteriaCase.AndOpe le FLastExpression, que so When preenche.
+///   Recem-criado o campo e nil, entao a chamada estourava com EAccessViolation
+///   lendo 00000000 em QUALQUER estado - medido em tres (com Column antes,
+///   depois de From, com When encadeado depois). A sobrecarga era PUBLICA e 100%
+///   inalcancavel, sem um unico teste que a exercitasse.
+///
+///   POR QUE NAO FOI "CONSERTADA" PARA FUNCIONAR. A saida obvia seria serializar
+///   a expressao e delegar a sobrecarga de String. Ela FUNCIONA quando a
+///   expressao pertence ao MESMO enunciado, e MENTE quando nao pertence. Medido:
+///
+///       QA.CaseExpr(QB.Expression(['TIPO', '*', 2]))
+///       SQL de QA:  SELECT (CASE TIPO * :p1 WHEN ...) FROM T
+///       QA.Params.Count = 0        <- o :p1 citado NAO EXISTE na colecao de QA
+///       QB.Params.Count = 1        <- o valor ficou na colecao do outro
+///
+///   O enunciado sai citando um parametro fantasma. Quem liga por posicao liga
+///   errado, e nao ha excecao para o chamador perceber - a mesma classe de dano
+///   silencioso que esta tarefa inteira combate, so que introduzida por nos.
+///
+///   E NAO HA COMO DISTINGUIR OS DOIS CASOS EM RUNTIME:
+///   IFluentSQLCriteriaExpression expoe AsString e Expression, e mais nada -
+///   nenhum caminho ate o dono ou ate a colecao de origem. Descobrir exigiria
+///   alargar a interface (E2291), que e exatamente o pre-requisito que o PR #166
+///   ja catalogou sob o nome de FUSAO DE COLECOES DE PARAMETRO.
+///
+///   Entre estourar com EAccessViolation, mentir em silencio e recusar dizendo o
+///   porque, a terceira e a unica honesta. Quando a fusao existir, esta
+///   sobrecarga passa a funcionar e a recusa vira aditiva de remover.
+/// </summary>
 function TFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression): IFluentSQLCriteriaCase;
 begin
-  Result := TFluentSQLCriteriaCase.Create(Self, '');
-  Result.AndOpe(AExpression);
+  Result := nil;
+  raise EArgumentException.Create(
+    'IFluentSQL.CaseExpr(IFluentSQLCriteriaExpression) nao esta disponivel. A ' +
+    'sobrecarga precisa de FUSAO DE COLECOES DE PARAMETRO, que ainda nao ' +
+    'existe: uma expressao construida por OUTRO enunciado carrega os :pN na ' +
+    'colecao DELE, e o texto entraria aqui citando parametro que esta colecao ' +
+    'nao tem - quem liga por posicao ligaria errado, sem erro nenhum. Nao ha ' +
+    'como distinguir em runtime a expressao propria da alheia. Use ' +
+    'CaseExpr(const AExpression: String) com o termo, ou a sobrecarga de array ' +
+    'of const, que parametriza na colecao certa.');
 end;
 
 function TFluentSQL.AndOpe(const AExpression: IFluentSQLCriteriaExpression): IFluentSQL;
@@ -649,6 +1085,10 @@ end;
 function TFluentSQL.ClearAll: IFluentSQL;
 begin
   FAST.Clear;
+  // Limpar o enunciado limpa tambem a ESPECIE dele. Sem esta linha, ClearAll
+  // deixaria para tras a marca de um DELETE que nao existe mais.
+  FStatementKind := secSelect;
+  FStatementAberto := False;
   Result := Self;
 end;
 
@@ -1520,6 +1960,14 @@ begin
     secMerge:   ; // MERGE is handled by its own builder but we must allow the section
   else
       raise Exception.Create('TCriteria.SetSection: Unknown section');
+  end;
+  // A ESPECIE muda so quando se ABRE enunciado. As clausulas - Where, GroupBy,
+  // Having, OrderBy - mudam a secao ATIVA e NAO a especie, e e exatamente essa
+  // distincao que faz a marca sobreviver a elas.
+  if ASection in [secSelect, secDelete, secInsert, secUpdate, secMerge] then
+  begin
+    FStatementKind := ASection;
+    FStatementAberto := True;
   end;
   FActiveSection := ASection;
 end;

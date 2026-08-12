@@ -17,6 +17,128 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **BREAKING CHANGE (SQL emitido e API) — `CaseExpr` passou a perguntar se o nó do cursor é uma COLUNA antes de se ancorar nele.** `IFluentSQL.CaseExpr` decide **duas** coisas: o operando do `CASE` (o que vem entre `CASE` e o primeiro `WHEN`) e **em que nó da árvore o `CASE` vai morar**. Ele decidia as duas lendo `FAST.ASTName` — um **cursor** que aponta para o último nó tocado pela cadeia fluente — **sem perguntar que nó é aquele**.
+
+  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **33 células nos 11 runners** (26 em `Common`, 11 da suíte do slot de valor) — e apagar o **anexo** derruba **41 / 30**, porque sem ele o `CASE` não chega ao `SELECT`. **Toda contagem publicada foi remedida no HEAD final, com as duas bases: 11 runners e `Common`, sempre com `-DDB2 -DINTERBASE`**. `CaseExpr('COLUNA')` explícito também não muda.
+
+  **E a pergunta é de NÓ, não de seção** — a distinção não é acadêmica, e é o motivo de a primeira versão desta entrega ter sido rejeitada. `FAST.ASTName` é **durável** e atravessa a troca de seção; `FAST.ASTColumns` é **trocado por baixo do cursor** (vira `nil` no `WHERE` e no `HAVING`, vira outra lista no `GROUP BY` e no `ORDER BY`). Duas cadeias com as **mesmas seções** e ordens diferentes são caminhos distintos:
+
+  | Cadeia | cursor cai em | antes | depois |
+  |---|---|---|---|
+  | `.Select.From('T').Column('TIPO').Where(…)` | **coluna** | `SELECT (CASE TIPO …) FROM T WHERE …` | **inalterado** |
+  | `.Select.Column('TIPO').From('T').Where(…)` | **relação** | `SELECT TIPO FROM (CASE T …) WHERE …` | `EArgumentException` |
+
+  **O que mudou** é o que acontecia com o cursor em qualquer nó que **não** é coluna:
+
+  | Cursor em / seção | Antes | Depois |
+  |---|---|---|
+  | relação do `FROM`, seção `SELECT` | `SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 …)` — **recusado pelos 7** | `SELECT *, (CASE WHEN PRICE > 10 …) FROM PRODUCTS` — ⚠️ **2 dos 6 dialetos ATIVOS (Firebird e Oracle) recusam este texto**, pela vírgula depois da estrela; ver a nota do `All` abaixo |
+  | relação, seção `GROUP BY` | `SELECT TIPO FROM (CASE T …)` | `SELECT TIPO FROM T GROUP BY (CASE …)` |
+  | relação, seção `ORDER BY` | `SELECT TIPO FROM (CASE T …)` | `SELECT TIPO FROM T ORDER BY (CASE …) ASC` |
+  | relação do `JOIN` | `… INNER JOIN (CASE U …) ON` | `EArgumentException` |
+  | seção `WHERE` / `HAVING` | `SELECT … FROM (CASE T …) WHERE …` | `EArgumentException` |
+  | seção `DELETE`, **com `From`, sem `From`, e com qualquer cláusula intercalada** | `DELETE FROM (CASE T …)` inválido — ou **`EAccessViolation`** sem `From` | `EArgumentException` |
+  | seção `UPDATE`, **com ou sem seção intercalada** | **`EAccessViolation`** | `EArgumentException` |
+  | `Insert.Into('T')` | **`EAccessViolation`** | `EArgumentException` |
+  | `Insert.Into('T').Column('A')` | `INSERT INTO T ( (CASE A …) )` | `EArgumentException` |
+  | `nil` (`Select` sem coluna, ou nem `Select`) | **`EAccessViolation`** | emite, ou recusa nomeada |
+
+  **Não é só SQL inválido — é perda de ESTRUTURA.** `TFluentSQLName.Serialize` **prefere** `FCase` a `FName`, então escrever o `CASE` num nó de relação **apaga o texto daquele nó**: o `FROM` some, ou a tabela juntada some e o `ON` fica órfão.
+
+  **Sobre o `EAccessViolation`: não era guarda faltando, era guarda no objeto errado.** O código tinha `if Assigned(FAST)` — mas `FAST` **nunca** é `nil` ali. Quem é `nil` é `FAST.ASTName`, desreferenciado **duas linhas acima** da guarda **e dentro dela**.
+
+  **A coluna nova vai para `ASTColumns`, a lista da seção corrente — e não para a projeção.** Forçar `Select.Columns` foi medido e quebraria dois casos legítimos: quem chamou `OrderBy('')` quer o `CASE` no `ORDER BY`, e quem chamou `GroupBy('')` quer no `GROUP BY`. O destino já estava certo; o erro estava no predicado.
+
+  **O `INSERT` recusa por razão própria:** as colunas do `INSERT` são **nomes de destino** — as células onde o dado será gravado — e não expressões projetadas; um `CASE` não pode ser alvo de gravação em dialeto nenhum. **Metade disso não é regressão desta entrega:** `Insert.Into('T').Column('A')` **já** emitia `INSERT INTO T ( (CASE A …) )` calado na base.
+
+  **A regra que decide todos os casos:** *converter SQL inválido silencioso em SQL **válido** quando o sentido é inequívoco, e em **erro nomeado** quando não é. Nunca em descarte silencioso.*
+
+  **O oráculo de motor: 7 submetidos — 6 ativos (PostgreSQL, MySQL, SQL Server, Firebird, Oracle, **SQLite**) e 1 sob define (**DB2**, desligado no `FluentSQL.inc`).** Todos os enunciados foram submetidos **como o FluentSQL os emite** — sem apelido acrescentado, sem `AS`, sem reordenar; onde o motor recusa, a recusa está transcrita. Massa de 3 linhas, contagem 3 antes e 3 depois.
+
+  | Motor | texto antigo | projeção **sem** estrela | projeção **com** estrela | `ORDER BY` | `GROUP BY` |
+  |---|---|---|---|---|---|
+  | PostgreSQL 16.14 | `syntax error at or near "CASE"` | 3 linhas ✔ | 3 linhas ✔ | 3 ✔ | `42803` |
+  | MySQL 8.4.11 | `ERROR 1064 (42000)` | 3 ✔ | 3 ✔ | 3 ✔ | `ERROR 1055` |
+  | SQL Server 16.0.4265.3 | `Msg 156` | 3 ✔ | 3 ✔ | 3 ✔ | `Msg 8120` |
+  | Firebird 5.0.4 | `-104 Token unknown - CASE` | 3 ✔ | **`-104` na vírgula** | 3 ✔ | `-104` |
+  | Oracle AI 26ai 23.26.2.0.0 | `ORA-00907` | 3 ✔ | **`ORA-00923`** | 3 ✔ | `ORA-00979` |
+  | DB2 v12.1.5.0 | `SQL0104N` | 3 ✔ | 3 ✔ | 3 ✔ | `SQL0119N` |
+  | SQLite 3.53.4 | `Parse error near "CASE"` | 3 ✔ | 3 ✔ | 3 ✔ | 2 linhas |
+
+  **O texto antigo é recusado por SETE de sete.** Mas **a forma nova não passa em todos, e esta entrada não afirma que passa:**
+
+  - **projeção sem estrela e `ORDER BY`: 7 de 7 aceitam**, com o dado certo;
+  - **projeção com estrela: 5 de 7 submetidos — e, na unidade que importa para decidir, 4 dos 6 ATIVOS.** Firebird e Oracle recusam, e são **dois dos seis dialetos ativos**, não dois de sete. **A causa não é a ancoragem, é a vírgula depois da estrela**: o Firebird aponta a coluna 9 (a vírgula) e a Oracle devolve `ORA-00923`. `SELECT *, <expr>` **já saía da base** por `Select.All` seguido de `Column`; é defeito **pré-existente** do `All`, com porta própria, fora do escopo desta tarefa. O que mudou foi trocar um texto que **7 de 7** recusam por um que **5 de 7** aceitam, e nos outros 2 a recusa passou a ser de outra causa, já catalogada.
+  - **`GROUP BY`: 1 de 7.** Os seis recusam porque **projetar uma coluna agrupando por outra expressão viola a regra de `GROUP BY`** — causa da **cadeia do usuário**, não da ancoragem. O SQLite aceita por não aplicar a regra estrita.
+
+  **Quem é atingido:** quem chamava `CaseExpr` com o cursor fora de uma coluna — ou seja, **quem já produzia SQL que motor nenhum aceitava, ou já estourava**. As cadeias que emitiam SQL válido continuam emitindo o mesmo texto. **O que fazer:** chame `CaseExpr` com uma coluna corrente (`Column(...)` antes), ou numa seção que projete (`Select`, `GroupBy`, `OrderBy`). Transcrição literal, com massa e contagem antes/depois, em `Test Delphi\Common_tests\test.caseexpr.anchor.matrix.sql`. **InterBase não foi medido** — não existe imagem pública, e não foi inferido do Firebird.
+
+  **`CASE` fora de um `SELECT` que projeta passou a ser recusado, e a guarda faz QUATRO perguntas — desenhadas a partir de uma VARREDURA, não de uma lista.** As versões anteriores desta entrega tinham guarda para `DELETE`/`UPDATE`, outra para o `INSERT` por comparação de coleção, e uma genérica — e **três rodadas de revisão seguidas acharam o irmão de um passo adiante do que a rodada anterior fechara**. A causa era o método: enumerar caso a caso para onde a lista acaba. Esta versão saiu de um **produto cartesiano de 300 cadeias** (espécie × posição do alvo × cláusula intercalada × forma da chamada), com o critério *"o texto emitido É um enunciado?"* — e a varredura devolveu **18 cadeias que a base respondia com `EAccessViolation` e o HEAD emitia calado**, em três famílias, das quais **só uma tinha sido nomeada por revisão**:
+
+  | família | exemplo | base | antes da correção |
+  |---|---|---|---|
+  | `INSERT` com cláusula intercalada | `Insert.Into('T').GroupBy('')` | `EAccessViolation` | `INSERT INTO T GROUP BY (CASE …)` |
+  | `INSERT` sem `Into` | `Insert.GroupBy('')` | `EAccessViolation` | `GROUP BY (CASE …)` |
+  | **`SELECT` sem projeção** (não é DML) | `Select.GroupBy('')` | `EAccessViolation` | `GROUP BY (CASE …)` |
+
+  As quatro perguntas, cada uma com célula própria e partição medida: **(1)** há enunciado aberto? **(2)** a espécie é `SELECT`? — *uma* resposta para `INSERT`, `UPDATE` e `DELETE`, porque é a mesma; **(3)** há lista de colunas? **(4)** se a lista é **acessória** (`GROUP BY`/`ORDER BY`), existe projeção que ela qualifique? A (4) vale **nos dois caminhos** — âncora e coluna nova —, e foi a varredura que mostrou por quê: `Select.GroupBy('').Column('K')` põe a coluna *dentro* do `GROUP BY`, o cursor ancora nela, e não havia coluna nova a criar. **Após a correção: 0 defeitos em 300 cadeias** — pelo critério da varredura, que é *"o texto emitido é um enunciado?"*. **O zero é qualificado:** ele **não** cobre o `FROM` pendurado, que é pré-existente e independente do `CaseExpr` (ver *Catalogado e NÃO consertado*).
+
+  **A partição real das quatro perguntas, medida em `Common`, com o sítio que cada número mutou:**
+
+  | pergunta | sítio mutado | células que caem |
+  |---|---|---|
+  | (1) há enunciado aberto? | corpo da guarda | **1** |
+  | (2) a espécie é `SELECT`? | corpo da guarda | **4** |
+  | (3) há lista de colunas? | corpo da guarda | **7** |
+  | (4) a acessória tem projeção? | **corpo** da guarda | **5** |
+  | | só o sítio da **coluna nova** | 4 |
+  | | só o sítio da **âncora** | 1 |
+
+  Os dois sítios acima são **disjuntos e somam o corpo** (4 + 1 = 5); publicar só o "4" deixaria de fora `TestColunaCaindoDentroDoGroupBySemProjecaoRecusa`, a única que o sítio de âncora derruba.
+
+  **A (4) é chamada de TRÊS sítios, e o terceiro não aparece na tabela porque responde a outro invariante.** São `FluentSQL.pas:505` (âncora, sobrecarga `String`), `:673` (coluna nova) e `:732` (âncora, sobrecarga `array of const`). Mutados isoladamente, `505` derruba **1** célula e **`732` derruba 0** — e isso **não** é sítio esquecido: `:732` existe pelo **invariante de vazamento de parâmetro** documentado em `FluentSQL.pas:707-727` (a recusa tem de correr **antes** de `SqlArrayOfConstToParameterizedSql` gravar os `:pN`), e quem o expõe é a mutação **(3)**, não a (4). O **1** publicado para o sítio de âncora vem de `505` e é robusto.
+
+  ⚠️ **O número `772/718` sai com o símbolo GLOBAL do compilador, não pelo `.inc`** — `dcc32 -DDB2;INTERBASE`. Ligar `INTERBASE`/`DB2` em `Source\FluentSQL.inc` devolve **`770/716/19/35`**: as 2 células a mais são `{$IFDEF DB2}` e `{$IFDEF INTERBASE}` em `test.cases.value.pas:231` e `:235`, e **essa unit não inclui o `.inc`**. Numa entrega cuja tese é medição reproduzível, o caminho que se tentaria primeiro dá outro número — então o comando fica dito junto do número.
+
+  **A suíte NÃO é verde, e `11/11 runners` e `0 leaked` não devem ser lidos como tal:** são **46** células vermelhas sem defines e **35** com eles, **todas pré-existentes** — o `comm` vazio nos dois sentidos prova que **nenhuma é desta entrega**. Distribuição medida: config commitada — **DB2 23, InterBase 15, Oracle 8**; config all-drivers — **DB2 13, Firebird 9, Oracle 8, InterBase 5**.
+
+  **A não-redundância da (1) é DE MENSAGEM, não de aceitar/recusar** — e a distinção é medida: apagando-a, a cadeia **continua recusada e com a mesma classe**, porque a (4) responde no lugar. O que muda é a **prescrição**, e a alternativa realmente falha: `Query(d).GroupBy('').Column('K')` + `CaseExpr` **continua levantando**, logo quem recebesse *"chame `Column(...)`"* naquele estado seguiria a prescrição e falharia de novo.
+
+  **ESTA ENTREGA SUBSTITUIU a forma do PR #167, não a estendeu.** Uma versão intermediária desta branch usava a forma de lá — **marca durável** (`not FAST.Delete.IsEmpty`) **mais seção ativa** (`FActiveSection`) — e ela **não embarca**: no HEAD, `FAST.Delete.IsEmpty` aparece **duas vezes em todo o `Source\`** — `FluentSQL.pas:1248`, em código, e `:1232`, no comentário da mesma rotina —, **ambas dentro do `_CreateJoin`**, que é a guarda do #167 e não faz parte desta entrega. **No caminho do `CaseExpr` não há marca durável nem leitura de `FActiveSection`: quem responde é `FStatementKind`.** O motivo da troca é medido: a forma do #167 pergunta sobre **verbos DML**, e **`Select.GroupBy('')` não é DML** — ela não alcançaria a terceira família de defeitos, que é justamente a que nenhuma revisão tinha nomeado.
+
+  **Sem as perguntas (2) e (4), esta entrega introduziria `loud→mute` — e duas dessas linhas seriam regressão nossa, não herdada:**
+
+  | cadeia | base `d867cad` | sem a guarda | com a guarda |
+  |---|---|---|---|
+  | `Delete.From('T').GroupBy('')` | `DELETE FROM (CASE T …)` inválido | `DELETE FROM T GROUP BY (CASE …)` calado | recusa |
+  | `Delete.From('T').OrderBy('')` | `DELETE FROM (CASE T …)` inválido | `DELETE FROM T ORDER BY (CASE …) ASC` calado | recusa |
+  | `Update('T').Values(…).GroupBy('')` | **`EAccessViolation`** | `UPDATE T SET A = :p1 GROUP BY (CASE …)` calado | recusa |
+  | `Update('T').Values(…).OrderBy('')` | **`EAccessViolation`** | `… ORDER BY (CASE …) ASC` calado | recusa |
+
+  **As duas naturezas são diferentes e o texto as distingue:** no `DELETE` a base já emitia texto inválido, então é **inválido → recusado**, melhora sem regressão; no `UPDATE` a base **estourava**, e sem a guarda a entrega trocaria **crash por texto inválido calado** — exatamente a regressão que esta tarefa existe para não cometer. **Continua liberado** trocar para `SELECT` na mesma instância, que reabre a espécie e devolve o `CaseExpr` (duas células travam isso).
+
+  ⚠️ **As quatro linhas da tabela acima são cobertas EM DOBRO por (2) e (4)**, e por isso **nenhuma mutação individual as derruba** — medido, `q1=q2=q3=q4` devolvem zero para elas; caem sob o par **(2)+(4)**. Com a espécie neutralizada, a pergunta da acessória responde no lugar, porque `Select.Columns` está vazia. Isso não enfraquece a correção — as células estão verdes —, mas **cobertura em dobro não é partição**, e a diferença só aparece rodando.
+
+  **Catalogado e NÃO consertado**, dois itens, os dois **pré-existentes** e medidos nas duas árvores:
+
+  1. **Dois `CaseExpr` seguidos sobre a mesma coluna** — o segundo descarta o primeiro em silêncio. Consequência direta do idioma "substitui a última coluna".
+  2. **`FROM` pendurado num `SELECT` sem relação** — `.Select.Column('K')` + `CaseExpr`, sem `From`, emite `SELECT (CASE K …) FROM`. **É independente do `CaseExpr`**: `Select.Column('K').AsString` já devolve `SELECT K FROM` **nas duas árvores**. É defeito do serializador do `FROM` vazio, com porta própria. Esta entrega não o cria nem o piora — apenas passou a alcançá-lo em cadeias que antes estouravam antes de chegar lá.
+
+- **BREAKING CHANGE (API) — `IFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression)` passou a levantar `EArgumentException` nomeada.** A sobrecarga era pública e **100% inalcançável**: o corpo fazia `TFluentSQLCriteriaCase.Create(Self, '')` seguido de `Result.AndOpe(AExpression)`, e `AndOpe` lê `FLastExpression`, que **só** é preenchido por `When`. Recém-criado o campo é `nil`, então a chamada estourava com `EAccessViolation` em **qualquer** estado — medido em três. Não havia um único teste que a exercitasse.
+
+  **Ela não foi "consertada para funcionar", e a razão é medida.** A saída óbvia — serializar a expressão e delegar à sobrecarga de `String` — **funciona quando a expressão pertence ao mesmo enunciado e MENTE quando não pertence**:
+
+  ```
+  QA.CaseExpr(QB.Expression(['TIPO', '*', 2]))
+  SQL de QA:  SELECT (CASE TIPO * :p1 WHEN …) FROM T
+  QA.Params.Count = 0      <- o :p1 citado NÃO EXISTE na coleção de QA
+  QB.Params.Count = 1      <- o valor ficou na coleção do outro
+  ```
+
+  O enunciado sairia citando um **parâmetro fantasma**, e quem liga por posição ligaria errado sem erro nenhum — a mesma classe de dano silencioso que esta entrega combate. **E não há como distinguir os dois casos em runtime:** `IFluentSQLCriteriaExpression` expõe `AsString` e `Expression`, e nada mais; descobrir o dono exigiria alargar a interface, que é exatamente o pré-requisito já catalogado como **fusão de coleções de parâmetro** (PR #166).
+
+  Entre estourar, mentir em silêncio e recusar dizendo o porquê, a recusa é a única honesta. **Quando a fusão existir, a recusa vira aditiva de remover.** **Quem é atingido:** ninguém com código que funcionasse — o comportamento anterior era `EAccessViolation`. **O que fazer:** use `CaseExpr(const AExpression: String)` com o termo, ou a sobrecarga de `array of const`, que parametriza na coleção certa.
+
 - **BREAKING CHANGE (API) — `Schema(dbnMySQL).TruncateTable([…])` com mais de uma tabela deixou de emitir SQL e passou a levantar `ENotSupportedException`.** Antes saía ``TRUNCATE TABLE `T1`, `T2` ``, e **duas** células verdes fixavam esse texto (`test_esp074_unit.pas` e `test.ddl.mysql.pas`). O MySQL recusa: medido em `mysql:8.4` (`sha256:b3b90af2…fd3fb`, `SELECT VERSION()` = **8.4.11**), o enunciado devolve `ERROR 1064 (42000) … near ', `T2`'`. **Controle positivo na mesma sessão:** ``TRUNCATE TABLE `T1` `` executou e esvaziou a tabela (3 → 0).
 
   **Isto não é convenção nova — é a convenção que o próprio framework já aplicava a todos menos ao MySQL.** `TFluentDDLSerializerMSSQL.TruncateTable`, `…Oracle.TruncateTable`, `…SQLite.TruncateTable`, `…Firebird.TruncateTable` e `TFluentDDLSerializeAbstract.TruncateTable` já levantavam `ENotSupportedException` nesta mesma construção desde o ESP-074. A lista de tabelas num único `TRUNCATE` é **exclusividade do PostgreSQL** entre os 6 relacionais ativos, e isso foi medido nos seis: PostgreSQL 16.14 executa (`a1`: 2 → 0, `a2`: 2 → 0); SQL Server 2022 devolve `Msg 102 … Incorrect syntax near ','`; Oracle 23.26 devolve `ORA-03291: Invalid truncate option - missing STORAGE keyword`; SQLite e Firebird não têm `TRUNCATE`.
