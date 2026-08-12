@@ -94,7 +94,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | | só o sítio da **coluna nova** | 4 |
   | | só o sítio da **âncora** | 1 |
 
-  Os dois sítios da (4) são **disjuntos e somam o corpo** (4 + 1 = 5); publicar só o "4" deixaria de fora `TestColunaCaindoDentroDoGroupBySemProjecaoRecusa`, a única que o sítio de âncora derruba.
+  Os dois sítios acima são **disjuntos e somam o corpo** (4 + 1 = 5); publicar só o "4" deixaria de fora `TestColunaCaindoDentroDoGroupBySemProjecaoRecusa`, a única que o sítio de âncora derruba.
+
+  **A (4) é chamada de TRÊS sítios, e o terceiro não aparece na tabela porque responde a outro invariante.** São `FluentSQL.pas:505` (âncora, sobrecarga `String`), `:673` (coluna nova) e `:732` (âncora, sobrecarga `array of const`). Mutados isoladamente, `505` derruba **1** célula e **`732` derruba 0** — e isso **não** é sítio esquecido: `:732` existe pelo **invariante de vazamento de parâmetro** documentado em `FluentSQL.pas:707-727` (a recusa tem de correr **antes** de `SqlArrayOfConstToParameterizedSql` gravar os `:pN`), e quem o expõe é a mutação **(3)**, não a (4). O **1** publicado para o sítio de âncora vem de `505` e é robusto.
+
+  ⚠️ **O número `772/718` sai com o símbolo GLOBAL do compilador, não pelo `.inc`** — `dcc32 -DDB2;INTERBASE`. Ligar `INTERBASE`/`DB2` em `Source\FluentSQL.inc` devolve **`770/716/19/35`**: as 2 células a mais são `{$IFDEF DB2}` e `{$IFDEF INTERBASE}` em `test.cases.value.pas:231` e `:235`, e **essa unit não inclui o `.inc`**. Numa entrega cuja tese é medição reproduzível, o caminho que se tentaria primeiro dá outro número — então o comando fica dito junto do número.
+
+  **A suíte NÃO é verde, e `11/11 runners` e `0 leaked` não devem ser lidos como tal:** são **46** células vermelhas sem defines e **35** com eles, **todas pré-existentes** — o `comm` vazio nos dois sentidos prova que **nenhuma é desta entrega**. Distribuição medida: config commitada — **DB2 23, InterBase 15, Oracle 8**; config all-drivers — **DB2 13, Firebird 9, Oracle 8, InterBase 5**.
 
   **A não-redundância da (1) é DE MENSAGEM, não de aceitar/recusar** — e a distinção é medida: apagando-a, a cadeia **continua recusada e com a mesma classe**, porque a (4) responde no lugar. O que muda é a **prescrição**, e a alternativa realmente falha: `Query(d).GroupBy('').Column('K')` + `CaseExpr` **continua levantando**, logo quem recebesse *"chame `Column(...)`"* naquele estado seguiria a prescrição e falharia de novo.
 

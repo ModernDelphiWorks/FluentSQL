@@ -88,10 +88,24 @@
                                     so o sitio da COLUNA NOVA .. 4 celulas
                                     so o sitio da ANCORA ....... 1 celula
 
-  Os dois sitios da (4) sao DISJUNTOS e somam o corpo: 4 + 1 = 5. Publicar so o
+  Os dois sitios acima sao DISJUNTOS e somam o corpo: 4 + 1 = 5. Publicar so o
   "4" subdeclararia, porque deixaria de fora TestColunaCaindoDentroDoGroupBy-
   SemProjecaoRecusa, que e a unica que o sitio de ancora derruba - e foi ela que
   mostrou que a pergunta (4) tem de valer nos DOIS caminhos.
+
+  E A (4) E CHAMADA DE TRES SITIOS, nao dois - o terceiro nao entra na tabela
+  acima porque responde a OUTRO invariante, e a distincao importa para quem for
+  mexer nele:
+
+      FluentSQL.pas:505   ancora, sobrecarga String ......... derruba 1
+      FluentSQL.pas:673   coluna nova ....................... derruba 4
+      FluentSQL.pas:732   ancora, sobrecarga array of const . derruba 0
+
+  O ZERO NAO E SITIO ESQUECIDO. O :732 existe pelo invariante de VAZAMENTO DE
+  PARAMETRO (docstring em FluentSQL.pas:707-727) - a recusa tem de correr ANTES de SqlArrayOfConstToParameterizedSql
+  gravar os :pN - e quem o expoe e a mutacao (3), nao a (4). Apagar aquele sitio
+  achando que e redundante reabre o vazamento sem derrubar celula nenhuma da
+  particao da (4).
 
   Os dois numeros de cada linha existem porque publicar so um confunde, e TODOS
   foram REMEDIDOS NO HEAD FINAL: numero de rodada anterior nao sobrevive a
