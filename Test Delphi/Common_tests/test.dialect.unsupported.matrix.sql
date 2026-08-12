@@ -279,13 +279,33 @@
        e mesmo assim o serializador recusa. Isso NAO e o defeito desta tarefa -
        recusar e honesto, nao produz texto invalido - e sim uma LACUNA DE
        CAPACIDADE. Se ela deve ser preenchida e decisao de produto.
-    2) NENHUMA celula trava as guardas de PARTICAO de PostgreSQL, Firebird,
-       MSSQL, Oracle e SQLite. Provado por mutacao: M10 troca o raise do
-       PostgreSQL por uma emissao de ' PARTITION (...)' e a suite inteira
-       continua verde - o mutante SOBREVIVE. Os unicos tres usos de .Partition(
-       na suite sao todos dbnMySQL. Recomendacao trazida, nao executada: cinco
-       celulas de WillRaise fechariam a lacuna. Nao as escrevi porque a decisao
-       de ampliar cobertura nao e minha.
+    2) [ACHADO NA PRIMEIRA PASSAGEM, FECHADO NESTA] Ate aqui NENHUMA celula
+       travava as guardas de PARTICAO de PostgreSQL, Firebird, MSSQL, Oracle e
+       SQLite - os unicos tres usos de .Partition( na suite eram todos dbnMySQL.
+       Provado por mutacao, nao suposto: M10 trocava o raise do PostgreSQL por
+       uma emissao de ' PARTITION (...)' e a suite INTEIRA continuava verde - o
+       mutante SOBREVIVIA.
+
+       A lacuna foi trazida como recomendacao, sem execucao, porque ampliar
+       cobertura nao e decisao do implementador. O orquestrador autorizou
+       fecha-la, com a razao que a torna necessaria AGORA e nao antes: ate esta
+       rodada o .Partition(...) nao produzia SQL valido em dialeto NENHUM - o
+       MySQL emitia sintaxe Oracle, os outros cinco levantavam - e o que os
+       cinco faziam era indiferente. Ao fazer um dialeto EMITIR de verdade, esta
+       entrega criou o contrato "particao e so do MySQL". Guarda de contrato que
+       ninguem mede e guarda que alguem remove por acidente, e a remocao passava
+       silenciosa.
+
+       As cinco celulas estao em test_esp074_unit.pas, como
+       TestTruncateTable_<dialeto>_Partition_RaisesNotSupported, e cada uma foi
+       medida load-bearing: M10..M14 na tabela de mutacao, cada mutante matando
+       EXATAMENTE a sua celula e nenhuma outra. O M10 agora MORRE.
+
+       O QUE CONTINUA SEM COBERTURA, de proposito: o M2, que troca so a MENSAGEM
+       de um raise, segue sobrevivendo. Nao e o mesmo caso e nao vira celula. O
+       M2 e decoracao - nenhuma celula assere mensagem, e mensagem nao e
+       contrato aqui; o M10 era buraco real. Cobrir um e recusar o outro e a
+       distincao, nao incoerencia.
 
   MongoDB, uma linha e fora de toda contagem: emite
   {"delete":"logs","deletes":[{"q":{},"limit":0}]}, descartando o modificador.
@@ -742,14 +762,25 @@
            Common e MySQL .TestTruncateTable_MySQL_GeneratesExpected)
     M9    quebra o ramo ALTER TABLE ... TRUNCATE PARTITION 2
           (Common e MySQL .TestTruncateTable_MySQL_Partition_GeneratesExpected)
-    M10   faz o PostgreSQL EMITIR ' PARTITION (...)' em vez  0  <- SOBREVIVE
-          de levantar                                           (lacuna real de
-          cobertura, declarada no ITEM 3 - nao ha celula alguma que trave as
-          guardas de PARTICAO de PostgreSQL, Firebird, MSSQL, Oracle e SQLite)
     M1b   remove a guarda multi-tabela do MySQL, ja com o   3
           item 3 aplicado
           (Common.TestTruncateTable_MySQL_MultiTableWithPartition_RaisesNotSupported,
            Common e MySQL .TestTruncateTable_MySQL_MultiTable_RaisesNotSupported)
+
+    -- as cinco guardas de PARTICAO dos dialetos que NAO tem particao. Cada
+    -- mutante faz o seu dialeto EMITIR em vez de levantar, e cada um mata
+    -- EXATAMENTE a sua celula e nenhuma outra:
+    M10   PostgreSQL emite ' PARTITION (...)'               1
+          (Common.TestTruncateTable_PostgreSQL_Partition_RaisesNotSupported)
+          ANTES das cinco celulas este mutante SOBREVIVIA - era a lacuna.
+    M11   Firebird deixa de olhar PartitionName na guarda   1
+          (Common.TestTruncateTable_Firebird_Partition_RaisesNotSupported)
+    M12   MSSQL deixa de olhar PartitionName na guarda      1
+          (Common.TestTruncateTable_MSSQL_Partition_RaisesNotSupported)
+    M13   Oracle deixa de olhar PartitionName na guarda     1
+          (Common.TestTruncateTable_Oracle_Partition_RaisesNotSupported)
+    M14   SQLite deixa de olhar PartitionName na guarda     1
+          (Common.TestTruncateTable_SQLite_Partition_RaisesNotSupported)
 
   M1b RESPONDE A PERGUNTA "a celula MultiTableWithPartition ainda e alcancavel
   pela razao certa?". O par M1b/M9 mede a resposta em vez de argumenta-la: M1b
@@ -759,11 +790,17 @@
   test_esp074_unit.pas, e ela nao foi desligada - o que ela afirma continua
   verdadeiro: a chamada levanta.
 
-  M4, M5b, M6, M7 e M10 sao as mutacoes ANTI-COLATERAL: elas perguntam se a
-  suite gritaria caso esta correcao tivesse alcancado PostgreSQL, MySQL, SQLite
-  ou o proprio serializador base. Quatro responderam que sim. M10 respondeu que
-  NAO, e essa resposta esta declarada como lacuna em vez de escondida - fecha-la
-  e decisao de quem manda ampliar cobertura.
+  M4, M5b, M6, M7 e M10..M14 sao as mutacoes ANTI-COLATERAL: elas perguntam se a
+  suite gritaria caso esta correcao tivesse alcancado PostgreSQL, MySQL, SQLite,
+  MSSQL, Oracle, Firebird ou o proprio serializador base. Hoje TODAS respondem
+  que sim. O M10 respondeu NAO na primeira passagem, e em vez de esconder isso o
+  achado subiu como recomendacao; autorizado, virou as cinco celulas de particao
+  e o M10 passou a morrer.
+
+  O UNICO mutante que ainda sobrevive e o M2, e sobrevive DE PROPOSITO: ele troca
+  so a MENSAGEM de um raise, e mensagem nao e contrato nesta suite - nenhuma
+  celula a assere. Cobri-lo seria decoracao. A distincao entre M2 e M10 e o que
+  decide qual buraco vira celula e qual nao vira.
 
   O diff nominal de vermelhos entre ffb5701 e o HEAD e VAZIO nas duas
   configuracoes: os 46 (config A) e os 35 (config B) sao nome a nome os mesmos.

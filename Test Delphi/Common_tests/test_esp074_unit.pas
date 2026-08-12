@@ -45,6 +45,23 @@ type
     procedure TestTruncateTable_Oracle_SingleTable_GeneratesExpected;
     [Test]
     procedure TestTruncateTable_Oracle_MultiTable_RaisesNotSupported;
+    // T35: as cinco abaixo travam o contrato que esta rodada TORNOU
+    // significativo - "PARTITION e so do MySQL". Antes delas, o modificador nao
+    // produzia SQL valido em lugar nenhum e o comportamento dos outros cinco
+    // dialetos era indiferente; agora um dialeto emite de verdade, e o que os
+    // outros fazem passou a ser contrato. Nenhuma celula travava isso: provado
+    // por mutacao - trocar o raise do PostgreSQL por uma emissao de
+    // ' PARTITION (...)' passava pela suite inteira sem derrubar nada.
+    [Test]
+    procedure TestTruncateTable_PostgreSQL_Partition_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_Firebird_Partition_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_MSSQL_Partition_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_Oracle_Partition_RaisesNotSupported;
+    [Test]
+    procedure TestTruncateTable_SQLite_Partition_RaisesNotSupported;
   end;
 
 implementation
@@ -220,6 +237,80 @@ begin
       FluentSQL.Schema(dbnPostgreSQL).TruncateTable('   ').AsString;
     end,
     System.SysUtils.EArgumentException);
+end;
+
+{ T35 - AS CINCO GUARDAS DE PARTICAO.
+
+  Por que existem, e por que so agora: ate esta rodada o .Partition(...) nao
+  produzia SQL valido em dialeto NENHUM - o MySQL emitia sintaxe Oracle, que o
+  motor recusa com ERROR 1064, e os outros cinco levantavam. Nesse mundo, o que
+  os cinco faziam era indiferente. Esta rodada fez o MySQL emitir a forma que o
+  motor aceita (ALTER TABLE t TRUNCATE PARTITION p, verificada ponta a ponta), e
+  com isso nasceu um CONTRATO: particao e so do MySQL. Guarda de contrato que
+  ninguem mede e guarda que alguem remove por acidente.
+
+  Que nao havia medicao nenhuma foi provado por mutacao, nao suposto: trocar o
+  raise do PostgreSQL por 'Result := Result + '' PARTITION ('' + ...' passava
+  pela suite INTEIRA sem derrubar uma celula. Os unicos usos de .Partition( na
+  suite eram os tres do MySQL.
+
+  Estas cinco asserem a CLASSE da excecao, nao a mensagem - de proposito, e no
+  padrao das celulas de multi-tabela logo acima. Mensagem nao e contrato aqui. }
+
+procedure TTestDDLTruncateTable.TestTruncateTable_PostgreSQL_Partition_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnPostgreSQL).TruncateTable('logs').Partition('p2023').AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_Firebird_Partition_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnFirebird).TruncateTable('logs').Partition('p2023').AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_MSSQL_Partition_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnMSSQL).TruncateTable('logs').Partition('p2023').AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
+end;
+
+// O Oracle TEM a construcao - ALTER TABLE t TRUNCATE PARTITION p - e mesmo
+// assim o serializador recusa. Esta celula NAO afirma que o dialeto nao sabe
+// particionar: afirma o que o build ENTREGA hoje, que e recusa, e recusa nao
+// produz texto invalido. Se essa lacuna de CAPACIDADE deve ser preenchida e
+// decisao de produto, catalogada e fora desta tarefa; no dia em que for, e esta
+// celula que avisa que o contrato mudou.
+procedure TTestDDLTruncateTable.TestTruncateTable_Oracle_Partition_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnOracle).TruncateTable('logs').Partition('p2023').AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
+end;
+
+procedure TTestDDLTruncateTable.TestTruncateTable_SQLite_Partition_RaisesNotSupported;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FluentSQL.Schema(dbnSQLite).TruncateTable('logs').Partition('p2023').AsString;
+    end,
+    System.SysUtils.ENotSupportedException);
 end;
 
 procedure TTestDDLTruncateTable.TestTruncateTable_MSSQL_MultiTable_RaisesNotSupported;
