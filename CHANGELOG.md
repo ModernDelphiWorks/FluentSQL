@@ -50,6 +50,65 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   **Quem é atingido:** quem chamava `CaseExpr` fora de uma coluna — ou seja, **quem já produzia SQL que motor nenhum aceitava, ou já estourava**. Não há comportamento correto a preservar nesse conjunto. **O que fazer:** chame `CaseExpr` onde há projeção — depois de `Select`/`Column(...)`, ou depois de `OrderBy(...)`. Transcrição literal, com massa e contagem antes/depois, em `Test Delphi\Common_tests\test.caseexpr.anchor.matrix.sql`. **InterBase não foi medido** — não existe imagem pública, e não foi inferido do Firebird.
 
 - **`IFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression)` deixou de levantar `EAccessViolation` — a sobrecarga era pública e 100% inalcançável.** O corpo era `TFluentSQLCriteriaCase.Create(Self, '')` seguido de `Result.AndOpe(AExpression)`, e `TFluentSQLCriteriaCase.AndOpe` lê `FLastExpression`, que **só** é preenchido por `When`. Recém-criado o campo é `nil`, então a chamada estourava em **qualquer** estado — medido em três (com `Column` antes, depois de `From`, com `When` encadeado depois): `EAccessViolation` lendo `00000000` nos três. Não havia um único teste que a exercitasse. Agora ela se alinha às outras duas sobrecargas: o argumento é o **operando** do `CASE` simples, e ela obedece à mesma regra de ancoragem. **Aditivo na prática** — não existe programa que dependesse do comportamento anterior, porque o comportamento anterior era estourar.
+- **BREAKING CHANGE (API) — `Schema(dbnMySQL).TruncateTable([…])` com mais de uma tabela deixou de emitir SQL e passou a levantar `ENotSupportedException`.** Antes saía ``TRUNCATE TABLE `T1`, `T2` ``, e **duas** células verdes fixavam esse texto (`test_esp074_unit.pas` e `test.ddl.mysql.pas`). O MySQL recusa: medido em `mysql:8.4` (`sha256:b3b90af2…fd3fb`, `SELECT VERSION()` = **8.4.11**), o enunciado devolve `ERROR 1064 (42000) … near ', `T2`'`. **Controle positivo na mesma sessão:** ``TRUNCATE TABLE `T1` `` executou e esvaziou a tabela (3 → 0).
+
+  **Isto não é convenção nova — é a convenção que o próprio framework já aplicava a todos menos ao MySQL.** `TFluentDDLSerializerMSSQL.TruncateTable`, `…Oracle.TruncateTable`, `…SQLite.TruncateTable`, `…Firebird.TruncateTable` e `TFluentDDLSerializeAbstract.TruncateTable` já levantavam `ENotSupportedException` nesta mesma construção desde o ESP-074. A lista de tabelas num único `TRUNCATE` é **exclusividade do PostgreSQL** entre os 6 relacionais ativos, e isso foi medido nos seis: PostgreSQL 16.14 executa (`a1`: 2 → 0, `a2`: 2 → 0); SQL Server 2022 devolve `Msg 102 … Incorrect syntax near ','`; Oracle 23.26 devolve `ORA-03291: Invalid truncate option - missing STORAGE keyword`; SQLite e Firebird não têm `TRUNCATE`.
+
+  **Não há forma equivalente numa instrução, e "emita dois `TRUNCATE`" não é equivalente:** no MySQL o `TRUNCATE` faz **commit implícito** — medido: dentro de `START TRANSACTION`, um `INSERT` seguido de `TRUNCATE` e `ROLLBACK` deixou a tabela vazia — logo duas instruções são duas transações, enquanto o multi-tabela do PostgreSQL é atômico. O contrato declarado do builder é *one command per `AsString`* (ESP-029).
+
+  **O que fazer:** emitir uma chamada por tabela. Quem comparava o SQL gerado com string fixa troca a expectativa por `Assert.WillRaise(…, ENotSupportedException)`. **Efeito colateral declarado e medido:** `TruncateTable([…]).Partition(…)` continua levantando `ENotSupportedException`, mas agora é a guarda de **multi-tabela** que a atende — a de `PARTITION` não é mais alcançada por ela. Provado por mutação, não argumentado: remover a guarda de multi-tabela mata aquela célula; mexer no ramo de `PARTITION` não a toca. Ela virou uma **segunda medição da guarda de multi-tabela**, e isso está escrito na própria célula. A **classe** não mudou, e nenhuma célula assere a mensagem.
+
+- **BREAKING CHANGE (SQL emitido) — `Schema(dbnMySQL).TruncateTable(t).Partition(p)` deixou de emitir `TRUNCATE TABLE` e passou a emitir `ALTER TABLE`.**
+
+  | | texto emitido |
+  |---|---|
+  | Antes | ``TRUNCATE TABLE `logs` PARTITION (p2023)`` |
+  | Depois | ``ALTER TABLE `logs` TRUNCATE PARTITION `p2023` `` |
+
+  O texto anterior é **sintaxe Oracle** e o MySQL o recusa: medido em `mysql:8.4` (`sha256:b3b90af2…fd3fb`, `SELECT VERSION()` = **8.4.11**), devolve `ERROR 1064 (42000) … near 'PARTITION (p2023)'`. **Não é superfície nova:** a API já oferecia `TRUNCATE … PARTITION` e já emitia texto que o motor recusa — fazê-la emitir a forma válida é **conserto**.
+
+  **`ALTER TABLE … TRUNCATE PARTITION` não é substituto aproximado: é a única forma que o MySQL tem para a operação** — não existe `TRUNCATE TABLE … PARTITION` no dialeto para comparar contra ela, logo **não há desvio de semântica a declarar**. Aceita com e sem crase no nome da partição; as duas foram submetidas.
+
+  **Verificação ponta a ponta, com massa em duas partições para que "esvaziou a certa" seja verificável:** três linhas, duas em `p2023` e uma em `pmax`; submetido **verbatim** o texto que o HEAD emite — `p2023` **2 → 0**, `pmax` **1 → 1**, e o `SELECT` final devolveu **exatamente** a linha de 2025. **Controle negativo:** o texto anterior devolve `ERROR 1064` na mesma sessão.
+
+  **Nenhum dos outros cinco relacionais emite texto inválido nesta chamada** — medido no HEAD final, `.TruncateTable('logs').Partition('p2023')` **levanta** `ENotSupportedException` em PostgreSQL, Firebird, SQL Server, Oracle e SQLite. Fica declarado que o **Oracle tem** a construção (`ALTER TABLE t TRUNCATE PARTITION p`) e ainda assim recusa: é **lacuna de capacidade**, não texto inválido, e preenchê-la é decisão de produto, catalogada e fora desta entrega.
+
+  **Essa enumeração é dos cinco relacionais e NÃO é exaustiva — falta o sexto dialeto ativo, e a omissão fica declarada:** `Schema(dbnMongoDB).TruncateTable('c').Partition('p2023')` **descarta o modificador em silêncio**, devolvendo `{"delete":"c","deletes":[{"q":{},"limit":0}]}` — **byte a byte igual à chamada sem `Partition`**. Quem pede para esvaziar uma partição recebe um comando que **apaga a coleção inteira**. O texto é JSON válido, e é por isso que a frase "não emite texto inválido" não o alcançava. **Não foi corrigido nem ganhou célula, de propósito:** é pré-existente, o MongoDB está fora da promessa relacional, e célula ali **congelaria um descarte silencioso destrutivo**.
+
+  **Esta mudança criou um contrato — "partição é só do MySQL" — e ele passou a ser medido.** Antes dela o modificador não produzia SQL válido em dialeto nenhum, e o que os outros cinco faziam era indiferente; **nenhuma célula travava isso**, e a lacuna foi provada por mutação: fazer o PostgreSQL emitir `' PARTITION (…)'` em vez de levantar **passava pela suíte inteira sem derrubar nada**. Foram acrescentadas **cinco** células `TestTruncateTable_<dialeto>_Partition_RaisesNotSupported` em `test_esp074_unit.pas` — PostgreSQL, Firebird, SQL Server, Oracle e SQLite — cada uma medida *load-bearing* pela mutação que faz o **seu** dialeto emitir em vez de levantar, e cada mutante matando **exatamente a sua** célula e nenhuma outra. Nenhuma célula foi desligada para isso.
+
+  **Contagem consolidada das três entradas de `TRUNCATE` acima, para que o delta não precise ser somado de cabeça:** contra a base, `Found` **696 → 701** e `Passed` **630 → 636** — **`+6`**, e não `+5`: as **cinco** guardas novas **mais** a célula religada. `Ignored` **20 → 19** (a religada), `Failed+Errored` **46 → 46** e vermelhos idênticos nome a nome. Com `-DDB2 -DINTERBASE`: `Found` **698 → 703**, `Passed` **643 → 649**, `Ignored` **20 → 19**, `Failed+Errored` **35 → 35**.
+
+  **O que fazer:** quem comparava o SQL gerado com string fixa atualiza a expectativa. **A célula que fixava o texto certo já existia na suíte, desligada** — `test.ddl.mysql.pas`, `[Ignore]` da T6 dizendo *"emite sintaxe Oracle …; MySQL exige ALTER TABLE t TRUNCATE PARTITION p"* — e foi **religada sem uma vírgula de ajuste**, porque o texto que ela já assertava casa com o que o HEAD passou a emitir. Isso move os números: `Ignored` **20 → 19**, `Passed` **630 → 631**.
+
+- **BREAKING CHANGE (API) — `Schema(dbnFirebird).Table(…).Rename(…)` deixou de emitir SQL e passou a levantar `ENotSupportedException`.** Antes saía `ALTER TABLE "TAB_A" TO "TAB_B"`, fixado verde em `test.ddl.firebird.pas`. **O Firebird não tem DDL de renomear tabela — nenhuma forma, não apenas esta.** Medido em `firebirdsql/firebird:5.0.4` (`sha256:85d0f9bf…d040d`, `ENGINE_VERSION` perguntado ao motor = **5.0.4**), as três candidatas:
+
+  | Enunciado submetido | Resposta do motor |
+  |---|---|
+  | `ALTER TABLE "TAB_A" TO "TAB_B"` | `-104 -Token unknown - line 1, column 21 -TO` |
+  | `ALTER TABLE "TAB_A" RENAME TO "TAB_B"` | `-104 -Token unknown - line 1, column 21 -RENAME` |
+  | `RENAME TABLE "TAB_A" TO "TAB_B"` | `-104 -Token unknown - line 1, column 1 -RENAME` |
+
+  **Controle positivo na mesma sessão:** o vizinho que renomeia **coluna** — `ALTER TABLE "TAB_A" ALTER "LEGADO" TO "NOVO_NOME"`, que o driver também emite — executou, `RDB$RELATION_FIELDS` passou a listar `NOVO_NOME` e o dado da coluna sobreviveu. **Esse não foi tocado.**
+
+  Fora do Firebird nada muda: `AlterTableRenameTable` do serializador **base** continua emitindo `ALTER TABLE … RENAME TO …` para MySQL, PostgreSQL e SQLite, e as três células que fixam isso continuam verdes — provado por mutação dirigida no serializador base, que mata exatamente essas três. Dos 6, o Firebird é o único sem nenhuma forma; o SQL Server também recusa o `ALTER TABLE` (`Msg 102 … near 'RENAME'`) mas resolve por `sp_rename`, que executou.
+
+  **O que fazer:** no Firebird, recriar a tabela e migrar as linhas na aplicação — não é uma instrução. Recusar segue a convenção que `FluentSQL.DDL.Serialize.Firebird.pas` já aplica ao que o dialeto não expressa (`DropTable` com `IfExists`, `CreateSchema`, `DropSchema`, sequências).
+
+- **BREAKING CHANGE (API) — `Schema(dbnFirebird).DropIndex(…).IfExists` deixou de emitir SQL e passou a levantar `ENotSupportedException`.** Antes saía `DROP INDEX IF EXISTS "IX_CLI_NOME"`, fixado verde em `test.ddl.firebird.pas`. Medido em `firebirdsql/firebird:5.0.4` com índice **existente** e índice **ausente** — o **mesmo** erro nos dois, o que prova que a recusa é de **sintaxe** e não de alvo:
+
+  | Enunciado submetido | Resposta do motor |
+  |---|---|
+  | `DROP INDEX IF EXISTS "IX_CLI_NOME"` (índice existia) | `-104 -Token unknown - line 1, column 15 -EXISTS` |
+  | `DROP INDEX IF EXISTS "IX_NAO_EXISTE"` (índice não existia) | `-104 -Token unknown - line 1, column 15 -EXISTS` |
+
+  **Controle positivo:** `DROP INDEX "IX_TMP2"` — a forma nua, que o HEAD continua emitindo — executou e o índice sumiu de `RDB$INDICES` (1 → 0). **Controle negativo:** sobre índice ausente a forma nua devolve `-607 … -Index not found`, que é o que a aplicação passa a ter de tratar no lugar do `IF EXISTS`.
+
+  **Isto é incoerência interna corrigida, não decisão de produto:** o método `DropTable` do **mesmo arquivo** já recusava o **mesmo modificador** no **mesmo dialeto**. Dos 6, PostgreSQL, SQL Server, SQLite e Oracle aceitam `DROP INDEX IF EXISTS` (medido nos quatro); o **MySQL também recusa** (`ERROR 1064 … near 'IF EXISTS …'`) e o serializador MySQL já levantava por isso; o Firebird recusava no motor e agora recusa no builder.
+
+  **O que fazer:** chamar `DropIndex(…)` sem `IfExists` e tratar `-607` na aplicação.
+
+  Matriz completa das **sete** construções apontadas pela varredura do PR #163 — com digest de imagem, versão perguntada ao motor, transcrição literal, controle positivo e negativo, verificação ponta a ponta do texto que o HEAD emite e tabela de mutação dirigida — em `Test Delphi\Common_tests\test.dialect.unsupported.matrix.sql`. **Quatro das sete foram corrigidas; três ficaram medidas e declaradas, sem conserto**, por convergirem numa mesma pergunta de convenção que subiu ao dono: `TRUNCATE TABLE` do Firebird (há **duas convenções em conflito dentro do próprio repositório** — o SQLite emite `DELETE FROM`, com célula verde; todo o resto levanta — e a semântica difere de forma medida: o identity seguiu em **3** e não em 1, e `ROLLBACK` desfez), o **`INSERT` em lote** no Firebird (feature publicada em `[1.0.9]` que não funciona num dialeto ativo; há duas formas de lote que o motor aceita, ambas medidas ponta a ponta, mas ambas exigem o **tipo SQL de cada coluna**, que o construtor não tem) e o **`INTERSECT`** no Firebird (retirá-lo tira da API algo que o `ROADMAP` lista como entregue). **InterBase não foi medido** — não existe imagem pública.
 
 - **BREAKING CHANGE (API) — `JOIN` dentro de um `DELETE` deixou de emitir SQL e passou a levantar `EFluentSQLConstructNotSupported`.** Atinge os **quatro** tipos: `Delete.From(…).InnerJoin(…)`, `.LeftJoin(…)`, `.RightJoin(…)` e `.FullJoin(…)`, com ou sem apelido, com ou sem `OnCond`, **e em qualquer ordem da cadeia fluente** — inclusive com `Where`, `OrderBy` ou `GroupBy` intercalados entre o `From` e o join.
 

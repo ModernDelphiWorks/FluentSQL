@@ -237,30 +237,48 @@ begin
   Result := 'DROP INDEX ' + Quote(ADef.IndexName) + ' ON ' + Quote(LTable);
 end;
 
+// T35: a lista de tabelas num unico TRUNCATE e exclusividade do PostgreSQL entre
+// os relacionais que este build serve. O MySQL recusa: medido em mysql:8.4
+// (VERSION() = 8.4.11), 'TRUNCATE TABLE `T1`, `T2`' devolve
+// ERROR 1064 (42000) ... near ', `T2`'. A regra ja existia no framework - MSSQL
+// (FluentSQL.DDL.Serialize.MSSQL.pas, TruncateTable), Oracle, SQLite, Firebird e
+// o proprio serializador base levantam ENotSupportedException nesta mesma
+// construcao desde o ESP-074. O que faltava era aplica-la ao MySQL, que ate aqui
+// montava a lista em silencio e entregava texto que o motor rejeita.
+//
+// A guarda entrou ANTES da de PARTITION porque agora a torna inalcancavel:
+// multi-tabela ja nao chega ali. A mensagem muda para quem pedia
+// TruncateTable([...]).Partition(...), a classe da excecao nao.
+//
+// T35, SEGUNDA CORRECAO NESTE METODO - a PARTICAO. 'TRUNCATE TABLE t PARTITION
+// (p)' e sintaxe Oracle e o MySQL a recusa: medido no mesmo motor,
+//   ERROR 1064 (42000) ... near 'PARTITION (p2023)' at line 1.
+// A UNICA forma que o MySQL tem para a operacao e ALTER TABLE ... TRUNCATE
+// PARTITION - nao existe 'TRUNCATE TABLE ... PARTITION' no dialeto para servir
+// de alternativa, de modo que nao ha desvio de semantica a declarar: e a
+// operacao pedida, na unica grafia que a exprime. Verificada ponta a ponta numa
+// tabela particionada por RANGE - a particao p2023 foi de 1 para 0 linhas e a
+// pmax ficou intacta com 1 - e aceita com e sem crase no nome da particao, o
+// que torna o Quote seguro.
+//
+// Por isso o enunciado com particao NAO e 'TRUNCATE TABLE' com um sufixo: e
+// outro comando, e monta-se separado em vez de concatenar sobre o primeiro.
 function TFluentDDLSerializerMySQL.TruncateTable(const ADef: IFluentDDLTruncateTableDef): string;
-var
-  LI: Integer;
 begin
   if not Assigned(ADef) then
     Exit('');
 
-  Result := 'TRUNCATE TABLE ';
-  for LI := 0 to Length(ADef.TableNames) - 1 do
-  begin
-    if LI > 0 then Result := Result + ', ';
-    Result := Result + Quote(ADef.TableNames[LI]);
-  end;
-
-  if ADef.PartitionName <> '' then
-  begin
-    if Length(ADef.TableNames) > 1 then
-      raise ENotSupportedException.Create('DDL MySQL: PARTITION clause is only supported for single-table TRUNCATE.');
-    Result := Result + ' PARTITION (' + ADef.PartitionName + ')';
-  end;
+  if Length(ADef.TableNames) > 1 then
+    raise ENotSupportedException.Create('DDL MySQL: multiple tables in a single TRUNCATE are not supported.');
 
   if ADef.RestartIdentity or ADef.ContinueIdentity or ADef.Cascade then
     raise ENotSupportedException.Create(
       'DDL TRUNCATE TABLE: identity management and CASCADE are PostgreSQL-specific in this build (ESP-074).');
+
+  if ADef.PartitionName <> '' then
+    Result := 'ALTER TABLE ' + Quote(ADef.TableName) + ' TRUNCATE PARTITION ' + Quote(ADef.PartitionName)
+  else
+    Result := 'TRUNCATE TABLE ' + Quote(ADef.TableName);
 end;
 
 function TFluentDDLSerializerMySQL.CreateView(const ADef: IFluentDDLCreateViewDef): string;
