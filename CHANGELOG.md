@@ -81,11 +81,26 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | `INSERT` sem `Into` | `Insert.GroupBy('')` | `EAccessViolation` | `GROUP BY (CASE …)` |
   | **`SELECT` sem projeção** (não é DML) | `Select.GroupBy('')` | `EAccessViolation` | `GROUP BY (CASE …)` |
 
-  As quatro perguntas, cada uma com célula própria e partição medida: **(1)** há enunciado aberto? **(2)** a espécie é `SELECT`? — *uma* resposta para `INSERT`, `UPDATE` e `DELETE`, porque é a mesma; **(3)** há lista de colunas? **(4)** se a lista é **acessória** (`GROUP BY`/`ORDER BY`), existe projeção que ela qualifique? A (4) vale **nos dois caminhos** — âncora e coluna nova —, e foi a varredura que mostrou por quê: `Select.GroupBy('').Column('K')` põe a coluna *dentro* do `GROUP BY`, o cursor ancora nela, e não havia coluna nova a criar. **Após a correção: 0 defeitos em 300 cadeias.**
+  As quatro perguntas, cada uma com célula própria e partição medida: **(1)** há enunciado aberto? **(2)** a espécie é `SELECT`? — *uma* resposta para `INSERT`, `UPDATE` e `DELETE`, porque é a mesma; **(3)** há lista de colunas? **(4)** se a lista é **acessória** (`GROUP BY`/`ORDER BY`), existe projeção que ela qualifique? A (4) vale **nos dois caminhos** — âncora e coluna nova —, e foi a varredura que mostrou por quê: `Select.GroupBy('').Column('K')` põe a coluna *dentro* do `GROUP BY`, o cursor ancora nela, e não havia coluna nova a criar. **Após a correção: 0 defeitos em 300 cadeias** — pelo critério da varredura, que é *"o texto emitido é um enunciado?"*. **O zero é qualificado:** ele **não** cobre o `FROM` pendurado, que é pré-existente e independente do `CaseExpr` (ver *Catalogado e NÃO consertado*).
 
-  **A guarda anterior lia DUAS coisas.** É a forma que o **PR #167** já aplicou ao `JOIN` em `DELETE`, estendida aqui — **convenção existente aplicada onde faltava**, não convenção nova. Ela lê a **marca durável** (`not FAST.Delete.IsEmpty` / `not FAST.Update.IsEmpty`, que sobrevive à troca de seção porque `Where`/`GroupBy`/`OrderBy`/`Having` **não** chamam `ClearAll`) **e** a **seção ativa** (`FActiveSection in [secDelete, secUpdate]`, que cobre o enunciado ainda sem relação alvo). Nenhuma cobre a outra — **partição medida por mutação**: apagar a marca durável derruba as 4 células de seção intercalada; apagar a seção ativa derruba `TestDeleteSemFromRecusa`.
+  **A partição real das quatro perguntas, medida em `Common`, com o sítio que cada número mutou:**
 
-  **Sem ela, esta entrega introduziria `loud→mute` — e duas dessas linhas seriam regressão nossa, não herdada:**
+  | pergunta | sítio mutado | células que caem |
+  |---|---|---|
+  | (1) há enunciado aberto? | corpo da guarda | **1** |
+  | (2) a espécie é `SELECT`? | corpo da guarda | **4** |
+  | (3) há lista de colunas? | corpo da guarda | **7** |
+  | (4) a acessória tem projeção? | **corpo** da guarda | **5** |
+  | | só o sítio da **coluna nova** | 4 |
+  | | só o sítio da **âncora** | 1 |
+
+  Os dois sítios da (4) são **disjuntos e somam o corpo** (4 + 1 = 5); publicar só o "4" deixaria de fora `TestColunaCaindoDentroDoGroupBySemProjecaoRecusa`, a única que o sítio de âncora derruba.
+
+  **A não-redundância da (1) é DE MENSAGEM, não de aceitar/recusar** — e a distinção é medida: apagando-a, a cadeia **continua recusada e com a mesma classe**, porque a (4) responde no lugar. O que muda é a **prescrição**, e a alternativa realmente falha: `Query(d).GroupBy('').Column('K')` + `CaseExpr` **continua levantando**, logo quem recebesse *"chame `Column(...)`"* naquele estado seguiria a prescrição e falharia de novo.
+
+  **ESTA ENTREGA SUBSTITUIU a forma do PR #167, não a estendeu.** Uma versão intermediária desta branch usava a forma de lá — **marca durável** (`not FAST.Delete.IsEmpty`) **mais seção ativa** (`FActiveSection`) — e ela **não embarca**: no HEAD, `FAST.Delete.IsEmpty` aparece **duas vezes em todo o `Source\`** — `FluentSQL.pas:1248`, em código, e `:1232`, no comentário da mesma rotina —, **ambas dentro do `_CreateJoin`**, que é a guarda do #167 e não faz parte desta entrega. **No caminho do `CaseExpr` não há marca durável nem leitura de `FActiveSection`: quem responde é `FStatementKind`.** O motivo da troca é medido: a forma do #167 pergunta sobre **verbos DML**, e **`Select.GroupBy('')` não é DML** — ela não alcançaria a terceira família de defeitos, que é justamente a que nenhuma revisão tinha nomeado.
+
+  **Sem as perguntas (2) e (4), esta entrega introduziria `loud→mute` — e duas dessas linhas seriam regressão nossa, não herdada:**
 
   | cadeia | base `d867cad` | sem a guarda | com a guarda |
   |---|---|---|---|
@@ -94,9 +109,14 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | `Update('T').Values(…).GroupBy('')` | **`EAccessViolation`** | `UPDATE T SET A = :p1 GROUP BY (CASE …)` calado | recusa |
   | `Update('T').Values(…).OrderBy('')` | **`EAccessViolation`** | `… ORDER BY (CASE …) ASC` calado | recusa |
 
-  **As duas naturezas são diferentes e o texto as distingue:** no `DELETE` a base já emitia texto inválido, então é **inválido → recusado**, melhora sem regressão; no `UPDATE` a base **estourava**, e sem a guarda a entrega trocaria **crash por texto inválido calado** — exatamente a regressão que esta tarefa existe para não cometer. **Continua liberado** trocar para `SELECT` na mesma instância, que limpa a marca e devolve o `CaseExpr` (duas células travam isso).
+  **As duas naturezas são diferentes e o texto as distingue:** no `DELETE` a base já emitia texto inválido, então é **inválido → recusado**, melhora sem regressão; no `UPDATE` a base **estourava**, e sem a guarda a entrega trocaria **crash por texto inválido calado** — exatamente a regressão que esta tarefa existe para não cometer. **Continua liberado** trocar para `SELECT` na mesma instância, que reabre a espécie e devolve o `CaseExpr` (duas células travam isso).
 
-  **Catalogado e NÃO consertado:** dois `CaseExpr` seguidos sobre a mesma coluna — o segundo descarta o primeiro em silêncio. É **pré-existente**, medido idêntico antes e depois, consequência direta do idioma "substitui a última coluna".
+  ⚠️ **As quatro linhas da tabela acima são cobertas EM DOBRO por (2) e (4)**, e por isso **nenhuma mutação individual as derruba** — medido, `q1=q2=q3=q4` devolvem zero para elas; caem sob o par **(2)+(4)**. Com a espécie neutralizada, a pergunta da acessória responde no lugar, porque `Select.Columns` está vazia. Isso não enfraquece a correção — as células estão verdes —, mas **cobertura em dobro não é partição**, e a diferença só aparece rodando.
+
+  **Catalogado e NÃO consertado**, dois itens, os dois **pré-existentes** e medidos nas duas árvores:
+
+  1. **Dois `CaseExpr` seguidos sobre a mesma coluna** — o segundo descarta o primeiro em silêncio. Consequência direta do idioma "substitui a última coluna".
+  2. **`FROM` pendurado num `SELECT` sem relação** — `.Select.Column('K')` + `CaseExpr`, sem `From`, emite `SELECT (CASE K …) FROM`. **É independente do `CaseExpr`**: `Select.Column('K').AsString` já devolve `SELECT K FROM` **nas duas árvores**. É defeito do serializador do `FROM` vazio, com porta própria. Esta entrega não o cria nem o piora — apenas passou a alcançá-lo em cadeias que antes estouravam antes de chegar lá.
 
 - **BREAKING CHANGE (API) — `IFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression)` passou a levantar `EArgumentException` nomeada.** A sobrecarga era pública e **100% inalcançável**: o corpo fazia `TFluentSQLCriteriaCase.Create(Self, '')` seguido de `Result.AndOpe(AExpression)`, e `AndOpe` lê `FLastExpression`, que **só** é preenchido por `When`. Recém-criado o campo é `nil`, então a chamada estourava com `EAccessViolation` em **qualquer** estado — medido em três. Não havia um único teste que a exercitasse.
 

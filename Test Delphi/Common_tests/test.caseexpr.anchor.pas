@@ -78,6 +78,21 @@
       ramo GroupBy     ->   2 nos 11 runners,  2 em Common
       ramo OrderBy     ->   2 nos 11 runners,  2 em Common
 
+  E a particao das QUATRO PERGUNTAS da guarda, medida em Common, com o SITIO que
+  cada numero mutou dito por extenso:
+
+      (1) ha enunciado aberto?      corpo da guarda ............ 1 celula
+      (2) a especie e secSelect?    corpo da guarda ............ 4 celulas
+      (3) ha lista de colunas?      corpo da guarda ............ 7 celulas
+      (4) acessoria tem projecao?   CORPO da guarda ............ 5 celulas
+                                    so o sitio da COLUNA NOVA .. 4 celulas
+                                    so o sitio da ANCORA ....... 1 celula
+
+  Os dois sitios da (4) sao DISJUNTOS e somam o corpo: 4 + 1 = 5. Publicar so o
+  "4" subdeclararia, porque deixaria de fora TestColunaCaindoDentroDoGroupBy-
+  SemProjecaoRecusa, que e a unica que o sitio de ancora derruba - e foi ela que
+  mostrou que a pergunta (4) tem de valer nos DOIS caminhos.
+
   Os dois numeros de cada linha existem porque publicar so um confunde, e TODOS
   foram REMEDIDOS NO HEAD FINAL: numero de rodada anterior nao sobrevive a
   mudanca de codigo, e publicar um que nao reproduz e o mesmo defeito da citacao
@@ -173,8 +188,25 @@
   antes" era item deste catalogo ate a rodada anterior. Ele foi CONSERTADO por
   esta entrega - Update('T').Values('A','1').OrderBy('') + CaseExpr levanta
   EArgumentException, e TestUpdateComOrderByIntercaladoRecusa assere essa cadeia
-  exata e morre sob a mutacao da guarda de especie. Mante-lo seria descrever
-  como aberto um buraco fechado.
+  exata. Mante-lo seria descrever como aberto um buraco fechado.
+
+  ⚠️ E ESSA CELULA E COBERTA EM DOBRO, o que importa saber antes de mexer nela:
+  ela NAO cai sob nenhuma das quatro mutacoes individuais - medido, q1=q2=q3=q4
+  devolvem zero para ela - e cai sob o PAR (2)+(4). Com a especie neutralizada,
+  a pergunta da clausula acessoria responde no lugar, porque Select.Columns esta
+  vazia; com a acessoria neutralizada, a especie responde. Duas guardas cobrem a
+  mesma cadeia.
+  Isto NAO enfraquece a retirada do item: o que sustenta a retirada e a celula
+  estar VERDE, e ela esta. O que nao se pode dizer e que ela "morre sob a
+  mutacao da guarda de especie" - essa frase estava aqui, foi INFERIDA de qual
+  guarda dispara primeiro, e nao reproduz.
+
+  A LICAO DE METODO, que vale para todo este arquivo: inferir qual guarda
+  responde NAO e medir qual mutacao derruba a celula. Quando duas guardas cobrem
+  a mesma cadeia, apagar uma nao derruba nada - a outra responde. Cobertura em
+  dobro se parece com particao quando lida no codigo, e so a execucao as
+  distingue. Toda frase de mutacao neste arquivo veio de um resultado com o nome
+  da celula no conjunto de vermelhos daquele mutante.
   ------------------------------------------------------------------------------
 }
 
@@ -1193,10 +1225,12 @@ procedure TTestCaseExprAnchor.TestSemEnunciadoAPrescricaoEhAbrirSelectENaoProjet
 var
   LSemEnunciado, LSemProjecao: String;
 begin
-  // ⭐ A CELULA QUE TORNA A PERGUNTA "HA ENUNCIADO?" LOAD-BEARING, e ela existe
-  // porque apagar aquela pergunta NAO derruba nenhuma celula de WillRaise: a
-  // pergunta seguinte - "a clausula acessoria tem projecao?" - responde no lugar
-  // dela e levanta a MESMA classe. Medido.
+  // ⭐ A CELULA QUE TORNA A PERGUNTA "HA ENUNCIADO?" LOAD-BEARING, e o TIPO de
+  // nao-redundancia dela precisa ficar escrito com precisao: e DE MENSAGEM, e
+  // nao de aceitar/recusar. Medido: apagando aquela pergunta, a cadeia CONTINUA
+  // sendo recusada, e com a MESMA classe - quem responde no lugar e a pergunta
+  // (4), "a clausula acessoria tem projecao?". Nenhuma celula de WillRaise cai.
+  // O que muda e a PRESCRICAO que o chamador recebe.
   //
   // O que muda e a PRESCRICAO, e as duas nao sao intercambiaveis:
   //
@@ -1341,6 +1375,9 @@ begin
   Assert.DoesNotContain(LAcessoria, 'GroupBy(', False,
     'A mensagem da clausula acessoria nao pode prescrever a propria clausula ' +
     'acessoria. Recebido: ' + LAcessoria);
+  // MEDIDO: esta celula cai sob as mutacoes (2), (3) e (4) - NAO sob a (1).
+  // Sao tres, e nomeadas, porque cada uma dessas tres apaga a mensagem que uma
+  // das quatro chamadas acima espera receber.
   // E o positivo: todas tem de apontar a projecao, que e a saida real.
   Assert.Contains(LSemEnunciado, 'Select', False, 'Recebido: ' + LSemEnunciado);
   Assert.Contains(LDml, 'Select', False, 'Recebido: ' + LDml);
