@@ -29,11 +29,25 @@
    emite - sem apelido acrescentado, sem AS, sem reordenar. Onde um motor
    recusa, a recusa esta transcrita.
 
-   Isto corrige uma versao anterior deste arquivo, em que o enunciado do Oracle
-   levava "P.*" com apelido "P" que o FluentSQL NAO emite - e a nota de rodape
-   que confessava a adaptacao existia so aqui dentro, enquanto o CHANGELOG e a
-   doutrina afirmavam "verbatim" sem qualificar. A adaptacao escondia uma
-   RECUSA REAL, que agora esta medida e transcrita (ORA-00923).
+   Isto corrige DUAS versoes anteriores deste arquivo:
+
+     rodada 2 - o enunciado do Oracle levava "P.*" com apelido "P" que o
+       FluentSQL NAO emite, e a nota que confessava a adaptacao existia so aqui
+       dentro enquanto o CHANGELOG e a doutrina afirmavam "verbatim". A
+       adaptacao escondia uma RECUSA REAL, hoje transcrita (ORA-00923).
+     rodada 3 - os blocos T1b do MySQL e do SQL Server mostravam uma coluna "R"
+       que o enunciado declarado NAO tem. Era apelido acrescentado na captura,
+       no mesmo arquivo que promete literalidade, logo abaixo do paragrafo que
+       promete te-la corrigido. Ressubmetidos: o MySQL devolve como cabecalho a
+       EXPRESSAO INTEIRA, e o SQL Server devolve CABECALHO VAZIO - que entra
+       como esta, porque cabecalho vazio e DADO e nao falha de captura.
+
+   COMO A LITERALIDADE FOI CONFERIDA NESTA RODADA, e nao apenas afirmada: os
+   SETE motores foram ressubmetidos na mesma sessao, com os enunciados exatos de
+   :56-57, e a caixa devolvida foi comparada com a transcrita bloco a bloco. Os
+   cinco que ja eram literais reproduziram byte a byte; os dois do T1b acima nao
+   reproduziam, e e por isso que foram trocados. Nenhum bloco deste arquivo
+   contem apelido, AS, reordenacao ou recorte que o enunciado nao tenha.
 
    ---------------------------------------------------------------------------
    MASSA, identica nos sete
@@ -190,13 +204,13 @@ near 'CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)' at line 1
 +------+-------+------+------------------------------------------------------+
 
 -- T1b
-+------+--------+
-| TIPO | R      |
-+------+--------+
-| X    | BARATO |
-| Y    | CARO   |
-| Y    | CARO   |
-+------+--------+
++------+------------------------------------------------------+
+| TIPO | (CASE WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END) |
++------+------------------------------------------------------+
+| X    | BARATO                                               |
+| Y    | CARO                                                 |
+| Y    | CARO                                                 |
++------+------------------------------------------------------+
 
 -- T2
 ERROR 1055 (42000) at line 1: Expression #1 of SELECT list is not in GROUP BY
@@ -230,7 +244,7 @@ massa_antes
           3
 
 -- HEAD
-Msg 156, Level 15, State 1, Server d540df4bd287, Line 1
+Msg 156, Level 15, State 1, Server d3dd98ce1abe, Line 1
 Incorrect syntax near the keyword 'CASE'.
 
 -- T1
@@ -241,16 +255,19 @@ ID          PRICE        TIPO
           3        25.00 Y          CARO
 (3 rows affected)
 
--- T1b
-TIPO       R
+-- T1b   << o cabecalho da segunda coluna vem VAZIO: o SQL Server nao nomeia
+--           expressao sem apelido, e o enunciado nao tem apelido. Cabecalho
+--           vazio e DADO, nao falha de captura.
+TIPO             
 ---------- ------
 X          BARATO
-Y          CARO
-Y          CARO
+Y          CARO  
+Y          CARO  
+
 (3 rows affected)
 
 -- T2
-Msg 8120, Level 16, State 1, Server d540df4bd287, Line 1
+Msg 8120, Level 16, State 1, Server d3dd98ce1abe, Line 1
 Column 'PRODUCTS.TIPO' is invalid in the select list because it is not contained
 in either an aggregate function or the GROUP BY clause.
 

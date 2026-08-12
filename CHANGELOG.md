@@ -19,7 +19,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - **BREAKING CHANGE (SQL emitido e API) — `CaseExpr` passou a perguntar se o nó do cursor é uma COLUNA antes de se ancorar nele.** `IFluentSQL.CaseExpr` decide **duas** coisas: o operando do `CASE` (o que vem entre `CASE` e o primeiro `WHEN`) e **em que nó da árvore o `CASE` vai morar**. Ele decidia as duas lendo `FAST.ASTName` — um **cursor** que aponta para o último nó tocado pela cadeia fluente — **sem perguntar que nó é aquele**.
 
-  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **31 células verdes nos 11 runners** (24 em `Common`, 11 delas da suíte do slot de valor) — e apagar o **anexo** derruba **39 nos mesmos 11 runners**, porque sem ele o `CASE` não chega ao `SELECT`. **Toda contagem publicada aqui usa a mesma base: células que passam a falhar nos 11 runners, com `-DDB2 -DINTERBASE`**. `CaseExpr('COLUNA')` explícito também não muda.
+  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **35 células nos 11 runners**, das quais **24 em `Common`** (11 destas da suíte do slot de valor) — e apagar o **anexo** derruba **39 nos mesmos 11 runners**, porque sem ele o `CASE` não chega ao `SELECT`. **Toda contagem publicada aqui usa a mesma base: células que passam a falhar nos 11 runners, com `-DDB2 -DINTERBASE`**. `CaseExpr('COLUNA')` explícito também não muda.
 
   **E a pergunta é de NÓ, não de seção** — a distinção não é acadêmica, e é o motivo de a primeira versão desta entrega ter sido rejeitada. `FAST.ASTName` é **durável** e atravessa a troca de seção; `FAST.ASTColumns` é **trocado por baixo do cursor** (vira `nil` no `WHERE` e no `HAVING`, vira outra lista no `GROUP BY` e no `ORDER BY`). Duas cadeias com as **mesmas seções** e ordens diferentes são caminhos distintos:
 
@@ -32,13 +32,13 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   | Cursor em / seção | Antes | Depois |
   |---|---|---|
-  | relação do `FROM`, seção `SELECT` | `SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 …)` | `SELECT *, (CASE WHEN PRICE > 10 …) FROM PRODUCTS` |
+  | relação do `FROM`, seção `SELECT` | `SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 …)` — **recusado pelos 7** | `SELECT *, (CASE WHEN PRICE > 10 …) FROM PRODUCTS` — ⚠️ **2 dos 6 dialetos ATIVOS (Firebird e Oracle) recusam este texto**, pela vírgula depois da estrela; ver a nota do `All` abaixo |
   | relação, seção `GROUP BY` | `SELECT TIPO FROM (CASE T …)` | `SELECT TIPO FROM T GROUP BY (CASE …)` |
   | relação, seção `ORDER BY` | `SELECT TIPO FROM (CASE T …)` | `SELECT TIPO FROM T ORDER BY (CASE …) ASC` |
   | relação do `JOIN` | `… INNER JOIN (CASE U …) ON` | `EArgumentException` |
   | seção `WHERE` / `HAVING` | `SELECT … FROM (CASE T …) WHERE …` | `EArgumentException` |
-  | seção `DELETE` | `DELETE FROM (CASE T …)` | `EArgumentException` |
-  | seção `UPDATE`, **sem lista de colunas aberta antes** | **`EAccessViolation`** | `EArgumentException` |
+  | seção `DELETE`, **com ou sem seção intercalada** | `DELETE FROM (CASE T …)` — inválido | `EArgumentException` |
+  | seção `UPDATE`, **com ou sem seção intercalada** | **`EAccessViolation`** | `EArgumentException` |
   | `Insert.Into('T')` | **`EAccessViolation`** | `EArgumentException` |
   | `Insert.Into('T').Column('A')` | `INSERT INTO T ( (CASE A …) )` | `EArgumentException` |
   | `nil` (`Select` sem coluna, ou nem `Select`) | **`EAccessViolation`** | emite, ou recusa nomeada |
@@ -68,12 +68,25 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   **O texto antigo é recusado por SETE de sete.** Mas **a forma nova não passa em todos, e esta entrada não afirma que passa:**
 
   - **projeção sem estrela e `ORDER BY`: 7 de 7 aceitam**, com o dado certo;
-  - **projeção com estrela: 5 de 7.** Firebird e Oracle recusam — e **a causa não é a ancoragem, é a vírgula depois da estrela**: o Firebird aponta a coluna 9 (a vírgula) e a Oracle devolve `ORA-00923`. `SELECT *, <expr>` **já saía da base** por `Select.All` seguido de `Column`; é defeito **pré-existente** do `All`, com porta própria, fora do escopo desta tarefa. O que mudou foi trocar um texto que **7 de 7** recusam por um que **5 de 7** aceitam, e nos outros 2 a recusa passou a ser de outra causa, já catalogada.
+  - **projeção com estrela: 5 de 7 submetidos — e, na unidade que importa para decidir, 4 dos 6 ATIVOS.** Firebird e Oracle recusam, e são **dois dos seis dialetos ativos**, não dois de sete. **A causa não é a ancoragem, é a vírgula depois da estrela**: o Firebird aponta a coluna 9 (a vírgula) e a Oracle devolve `ORA-00923`. `SELECT *, <expr>` **já saía da base** por `Select.All` seguido de `Column`; é defeito **pré-existente** do `All`, com porta própria, fora do escopo desta tarefa. O que mudou foi trocar um texto que **7 de 7** recusam por um que **5 de 7** aceitam, e nos outros 2 a recusa passou a ser de outra causa, já catalogada.
   - **`GROUP BY`: 1 de 7.** Os seis recusam porque **projetar uma coluna agrupando por outra expressão viola a regra de `GROUP BY`** — causa da **cadeia do usuário**, não da ancoragem. O SQLite aceita por não aplicar a regra estrita.
 
   **Quem é atingido:** quem chamava `CaseExpr` com o cursor fora de uma coluna — ou seja, **quem já produzia SQL que motor nenhum aceitava, ou já estourava**. As cadeias que emitiam SQL válido continuam emitindo o mesmo texto. **O que fazer:** chame `CaseExpr` com uma coluna corrente (`Column(...)` antes), ou numa seção que projete (`Select`, `GroupBy`, `OrderBy`). Transcrição literal, com massa e contagem antes/depois, em `Test Delphi\Common_tests\test.caseexpr.anchor.matrix.sql`. **InterBase não foi medido** — não existe imagem pública, e não foi inferido do Firebird.
 
-  **Catalogado e NÃO consertado**, dois itens. (1) Dois `CaseExpr` seguidos sobre a mesma coluna: o segundo descarta o primeiro em silêncio — **pré-existente**, medido idêntico antes e depois, consequência direta do idioma "substitui a última coluna". (2) `Update('T').Values('A','1').OrderBy('')` seguido de `CaseExpr` **emite calado** `UPDATE T SET A = :p1 ORDER BY (CASE …) ASC`, onde a base levantava `EAccessViolation` — é **loud→mute** numa cadeia absurda, e o que falta é uma guarda de *builder* que recuse `OrderBy` depois de `Update`, que é outra porta e outra tarefa. **É por isso que a linha do `UPDATE` na tabela acima está qualificada.**
+  **`CASE` em `DELETE` e em `UPDATE` passou a ser recusado, e a guarda lê DUAS coisas.** É a forma que o **PR #167** já aplicou ao `JOIN` em `DELETE`, estendida aqui — **convenção existente aplicada onde faltava**, não convenção nova. Ela lê a **marca durável** (`not FAST.Delete.IsEmpty` / `not FAST.Update.IsEmpty`, que sobrevive à troca de seção porque `Where`/`GroupBy`/`OrderBy`/`Having` **não** chamam `ClearAll`) **e** a **seção ativa** (`FActiveSection in [secDelete, secUpdate]`, que cobre o enunciado ainda sem relação alvo). Nenhuma cobre a outra — **partição medida por mutação**: apagar a marca durável derruba as 4 células de seção intercalada; apagar a seção ativa derruba `TestDeleteSemFromRecusa`.
+
+  **Sem ela, esta entrega introduziria `loud→mute` — e duas dessas linhas seriam regressão nossa, não herdada:**
+
+  | cadeia | base `d867cad` | sem a guarda | com a guarda |
+  |---|---|---|---|
+  | `Delete.From('T').GroupBy('')` | `DELETE FROM (CASE T …)` inválido | `DELETE FROM T GROUP BY (CASE …)` calado | recusa |
+  | `Delete.From('T').OrderBy('')` | `DELETE FROM (CASE T …)` inválido | `DELETE FROM T ORDER BY (CASE …) ASC` calado | recusa |
+  | `Update('T').Values(…).GroupBy('')` | **`EAccessViolation`** | `UPDATE T SET A = :p1 GROUP BY (CASE …)` calado | recusa |
+  | `Update('T').Values(…).OrderBy('')` | **`EAccessViolation`** | `… ORDER BY (CASE …) ASC` calado | recusa |
+
+  **As duas naturezas são diferentes e o texto as distingue:** no `DELETE` a base já emitia texto inválido, então é **inválido → recusado**, melhora sem regressão; no `UPDATE` a base **estourava**, e sem a guarda a entrega trocaria **crash por texto inválido calado** — exatamente a regressão que esta tarefa existe para não cometer. **Continua liberado** trocar para `SELECT` na mesma instância, que limpa a marca e devolve o `CaseExpr` (duas células travam isso).
+
+  **Catalogado e NÃO consertado:** dois `CaseExpr` seguidos sobre a mesma coluna — o segundo descarta o primeiro em silêncio. É **pré-existente**, medido idêntico antes e depois, consequência direta do idioma "substitui a última coluna".
 
 - **BREAKING CHANGE (API) — `IFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression)` passou a levantar `EArgumentException` nomeada.** A sobrecarga era pública e **100% inalcançável**: o corpo fazia `TFluentSQLCriteriaCase.Create(Self, '')` seguido de `Result.AndOpe(AExpression)`, e `AndOpe` lê `FLastExpression`, que **só** é preenchido por `When`. Recém-criado o campo é `nil`, então a chamada estourava com `EAccessViolation` em **qualquer** estado — medido em três. Não havia um único teste que a exercitasse.
 

@@ -73,6 +73,7 @@ type
     procedure _AssertHaveName;
     function _NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
     function _CaseExprAncoraNoNoCorrente: Boolean;
+    procedure _AssertCaseExprNaoEstaEmDeleteOuUpdate;
     procedure _RecusaCaseExprNoInsert;
     procedure _AssertCaseExprTemOndeAncorar;
     procedure _AssertCaseExprTemOndeAncorarSeNaoAncora;
@@ -470,6 +471,7 @@ function TFluentSQL.CaseExpr(const AExpression: String): IFluentSQLCriteriaCase;
 var
   LExpression: String;
 begin
+  _AssertCaseExprNaoEstaEmDeleteOuUpdate;
   LExpression := AExpression;
   if _CaseExprAncoraNoNoCorrente then
   begin
@@ -526,6 +528,60 @@ begin
   Result := (Assigned(FAST.Select)  and _NoCorrenteEstaNaLista(FAST.Select.Columns))
          or (Assigned(FAST.GroupBy) and _NoCorrenteEstaNaLista(FAST.GroupBy.Columns))
          or (Assigned(FAST.OrderBy) and _NoCorrenteEstaNaLista(FAST.OrderBy.Columns));
+end;
+
+/// <summary>
+///   O CASE nao existe em DELETE nem em UPDATE, e a guarda le DUAS coisas pela
+///   mesma razao que a guarda de JOIN em DELETE le (TFluentSQL._CreateJoin, nesta
+///   unit, PR #167): nenhuma das duas cobre a outra.
+///
+///     marca DURAVEL ... not FAST.Delete.IsEmpty / not FAST.Update.IsEmpty.
+///       Quem a estabelece e _DefineSectionDelete/_DefineSectionUpdate via
+///       From/Update, e quem a limpa e ClearAll - chamado por
+///       _DefineSectionSelect, Insert e Update. Ela SOBREVIVE a Where, GroupBy,
+///       OrderBy e Having, que trocam a secao e NAO chamam ClearAll.
+///     secao ATIVA .... FActiveSection in [secDelete, secUpdate]. Cobre o
+///       enunciado que ainda nao tem relacao alvo, onde a marca duravel ainda
+///       nao existe.
+///
+///   POR QUE AS DUAS, E NAO SO A SECAO: e a licao da T30, e ela custou uma
+///   rodada la e ia custar outra aqui. Where('') nao emite UMA LETRA e mesmo
+///   assim TROCA a secao ativa. Sem a marca duravel, bastava intercalar
+///   GroupBy('') ou OrderBy('') para o CASE voltar a passar - e passar CALADO,
+///   porque aquelas secoes TEM lista de colunas e a coluna nova nasceria nelas:
+///
+///     Delete.From('T').GroupBy('') + CaseExpr
+///       -> DELETE FROM T GROUP BY (CASE WHEN 1 THEN 1 END)
+///     Update('T').Values('A','1').OrderBy('') + CaseExpr
+///       -> UPDATE T SET A = :p1 ORDER BY (CASE WHEN 1 THEN 1 END) ASC
+///
+///   POR QUE AS DUAS, E NAO SO A MARCA: Delete.CaseExpr direto, sem From
+///   nenhum, nao tem marca a ler.
+///
+///   AS DUAS NATUREZAS SAO DIFERENTES, e o registro importa porque a gravidade e:
+///     no DELETE a base ja emitia texto invalido ("DELETE FROM (CASE T ...)"),
+///       entao e invalido -> recusado: melhora sem regressao.
+///     no UPDATE a base levantava EAccessViolation, e sem esta guarda a entrega
+///       trocaria CRASH por TEXTO INVALIDO CALADO - loud->mute, exatamente a
+///       regressao que esta tarefa existe para nao cometer. Foi introduzida por
+///       esta entrega e e fechada por esta guarda, nao catalogada como ressalva.
+///
+///   O QUE CONTINUA LIBERADO, e tem de continuar: trocar para SELECT na mesma
+///   instancia limpa a marca e devolve o CaseExpr.
+/// </summary>
+procedure TFluentSQL._AssertCaseExprNaoEstaEmDeleteOuUpdate;
+begin
+  if (FActiveSection in [secDelete, secUpdate]) or
+     (Assigned(FAST) and Assigned(FAST.Delete) and (not FAST.Delete.IsEmpty)) or
+     (Assigned(FAST) and Assigned(FAST.Update) and (not FAST.Update.IsEmpty)) then
+    raise EArgumentException.Create(
+      'IFluentSQL.CaseExpr chamado dentro de um DELETE ou de um UPDATE: nem um ' +
+      'nem outro projeta colunas, e um CASE nao tem onde morar ali. O que sairia ' +
+      'nao e aceito por motor nenhum - "DELETE FROM (CASE ...)" com a relacao ' +
+      'substituida, ou, se uma secao com lista de colunas tiver sido aberta no ' +
+      'meio, um "GROUP BY"/"ORDER BY" pendurado num DELETE ou num UPDATE. Se o ' +
+      'CASE e o VALOR a gravar, ele vai no lado dos valores; se e para escolher ' +
+      'as linhas, ele vai na condicao do WHERE; se e para projetar, num SELECT.');
 end;
 
 /// <summary>
@@ -647,6 +703,7 @@ end;
 /// </summary>
 function TFluentSQL.CaseExpr(const AExpression: array of const): IFluentSQLCriteriaCase;
 begin
+  _AssertCaseExprNaoEstaEmDeleteOuUpdate;
   _AssertCaseExprTemOndeAncorarSeNaoAncora;
   Result := CaseExpr(TUtils.SqlArrayOfConstToParameterizedSql(AExpression, FAST.Params));
 end;

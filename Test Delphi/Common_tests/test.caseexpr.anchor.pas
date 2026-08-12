@@ -72,8 +72,13 @@
   Medido por mutacao, e a base de contagem e SEMPRE a mesma - celulas que passam
   a falhar nos 11 RUNNERS, com -DDB2 -DINTERBASE:
 
-      apagar o ATALHO  ->  31 celulas (24 em Common, 11 delas da T13)
-      apagar o ANEXO   ->  39 celulas (28 em Common)
+      apagar o ATALHO  ->  35 celulas nos 11 runners, das quais 24 em Common
+                           (11 destas da T13)
+      apagar o ANEXO   ->  39 celulas nos 11 runners, das quais 28 em Common
+
+  Os dois numeros de cada linha existem porque publicar so um confunde: "24" e
+  o de Common e "35" e o dos 11 runners, e a decisao que o dono toma depende de
+  saber qual e qual.
 
   Sem o anexo o CASE nao chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T", com
   o CASE inteiro perdido. Nenhuma das duas linhas podia sair.
@@ -239,6 +244,23 @@ type
     { --- secoes que nao projetam -------------------------------------------- }
     [Test]
     procedure TestUpdateRecusa;
+    { ⭐ CASE em DML: as duas ordens, e a guarda do #167 aplicada aqui }
+    [Test]
+    procedure TestDeleteComGroupByIntercaladoRecusa;
+    [Test]
+    procedure TestDeleteComOrderByIntercaladoRecusa;
+    [Test]
+    procedure TestUpdateComGroupByIntercaladoRecusa;
+    [Test]
+    procedure TestUpdateComOrderByIntercaladoRecusa;
+    [Test]
+    procedure TestDeleteSemFromRecusa;
+    [Test]
+    procedure TestSelectDepoisDeDeleteLiberaOCaseExpr;
+    [Test]
+    procedure TestSelectDepoisDeUpdateLiberaOCaseExpr;
+    [Test]
+    procedure TestAMensagemDoDmlNomeiaAsTresSaidas;
     [Test]
     procedure TestDeleteRecusa;
     [Test]
@@ -456,17 +478,23 @@ procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_ColunaDoOrderBy;
 var
   LQuery: IFluentSQL;
 begin
-  // O RAMO OrderBy DA VARREDURA - e esta e a UNICA celula que o cobre. Apagar a
-  // linha "or (Assigned(FAST.OrderBy) and ...)" do predicado deixava a suite
-  // INTEIRA verde antes desta celula existir, nos 11 runners, e mesmo assim o
-  // ramo muda comportamento: sem ele o CASE deixa de SUBSTITUIR a coluna do
-  // ORDER BY e passa a ACRESCENTAR outra -
+  // O RAMO OrderBy DA VARREDURA. Antes desta celula existir, apagar a linha
+  // "or (Assigned(FAST.OrderBy) and ...)" do predicado deixava a suite INTEIRA
+  // verde nos 11 runners - e mesmo assim o ramo muda comportamento: sem ele o
+  // CASE deixa de SUBSTITUIR a coluna do ORDER BY e passa a ACRESCENTAR outra -
   //
   //     com     ORDER BY (CASE B WHEN 1 THEN 1 END) ASC
   //     sem     ORDER BY B ASC, (CASE WHEN 1 THEN 1 END) ASC
   //
   // Os outros dois ramos ja tinham celula; este embarcou sem oraculo numa
   // entrega cuja tese e que lacuna de enumeracao mata rodada.
+  //
+  // NAO E A UNICA celula que o cobre, e a afirmacao de unicidade que estava
+  // aqui nasceu vencida DENTRO do commit que criou a segunda:
+  // TestIdentidadeDoNoSobreviveNasTresColecoes tambem cai quando o ramo e
+  // apagado. Medido no HEAD final: apagar o ramo OrderBy derruba DUAS celulas,
+  // esta e aquela. Afirmacao de unicidade tem de ser medida no HEAD, e nao
+  // escrita de memoria - e a mesma disciplina da citacao arquivo:linha.
   LQuery := FluentSQL.Query(dbnFirebird).Select.Column('A').From('T').OrderBy('B');
   LQuery.CaseExpr.When('1').IfThen('1');
   Assert.AreEqual(
@@ -706,6 +734,135 @@ begin
     'saida que nao descarta a chamada em silencio');
 end;
 
+procedure TTestCaseExprAnchor.TestDeleteComGroupByIntercaladoRecusa;
+begin
+  // ⭐ A LICAO DA T30, APLICADA AQUI. GroupBy('') nao emite uma letra e mesmo
+  // assim TROCA a secao ativa - e a secao do GROUP BY TEM lista de colunas.
+  // Sem a marca DURAVEL, a coluna nova nasceria nela e sairia, calado:
+  //     DELETE FROM T GROUP BY (CASE WHEN 1 THEN 1 END)
+  // Na base saia "DELETE FROM (CASE T ...)", tambem invalido: aqui a mudanca e
+  // invalido -> RECUSADO, sem regressao.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.From('T').GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestDeleteComOrderByIntercaladoRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Delete.From('T').OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestUpdateComGroupByIntercaladoRecusa;
+begin
+  // NATUREZA DIFERENTE DA DO DELETE, e por isso celula propria: aqui a base
+  // levantava EAccessViolation. Sem esta guarda a entrega trocaria CRASH por
+  // "UPDATE T SET A = :p1 GROUP BY (CASE ...)" CALADO - loud->mute, a regressao
+  // que esta tarefa existe para nao cometer, e que ela mesma introduziria.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Update('T').Values('A', '1').GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestUpdateComOrderByIntercaladoRecusa;
+begin
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Update('T').Values('A', '1').OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestDeleteSemFromRecusa;
+var
+  LMsg: String;
+begin
+  // A METADE "SECAO ATIVA" da guarda, isolada: sem From nao ha marca duravel a
+  // ler, e so FActiveSection responde. E o gemeo do que o PR #167 fez para o
+  // JOIN em DELETE.
+  //
+  // ⚠️ ESTA CELULA ASSERE A MENSAGEM, E NAO SO A CLASSE - e a diferenca foi
+  // MEDIDA, nao suposta. Apagando a metade "secao ativa" da guarda, a chamada
+  // continua levantando EArgumentException, porque cai na guarda GENERICA
+  // (_AssertCaseExprTemOndeAncorar: no DELETE nao ha lista de colunas). Ou seja
+  // um WillRaise pela classe daria VERDE sobre a metade apagada, e a mutacao
+  // nao teria quem a derrubasse. O que a metade muda e QUAL guarda responde, e
+  // portanto a MENSAGEM que o chamador le: a do DML, que nomeia as tres saidas,
+  // em vez da generica, que fala em projecao.
+  LMsg := _MensagemDe(
+    procedure
+    begin
+      FluentSQL.Query(dbnFirebird).Delete.CaseExpr;
+    end);
+  Assert.Contains(LMsg, 'DELETE', False,
+    'Sem From, quem tem de responder e a guarda de DML pela SECAO ATIVA - e a ' +
+    'mensagem dela nomeia o DELETE. Recebido: ' + LMsg);
+end;
+
+procedure TTestCaseExprAnchor.TestSelectDepoisDeDeleteLiberaOCaseExpr;
+var
+  LQuery: IFluentSQL;
+begin
+  // O QUE CONTINUA LIBERADO. Trocar para SELECT chama ClearAll, que limpa a
+  // marca duravel - e o CaseExpr volta. Sem esta celula a guarda poderia virar
+  // permanente por engano.
+  LQuery := FluentSQL.Query(dbnFirebird).Delete.From('X');
+  LQuery := LQuery.Select.Column('TIPO');
+  LQuery.CaseExpr.When('1').IfThen('''A''');
+  Assert.AreEqual('SELECT (CASE TIPO WHEN 1 THEN ''A'' END) FROM T',
+    LQuery.From('T').AsString, False);
+end;
+
+procedure TTestCaseExprAnchor.TestSelectDepoisDeUpdateLiberaOCaseExpr;
+var
+  LQuery: IFluentSQL;
+begin
+  LQuery := FluentSQL.Query(dbnFirebird).Update('X').Values('A', '1');
+  LQuery := LQuery.Select.Column('TIPO');
+  LQuery.CaseExpr.When('1').IfThen('''A''');
+  Assert.AreEqual('SELECT (CASE TIPO WHEN 1 THEN ''A'' END) FROM T',
+    LQuery.From('T').AsString, False);
+end;
+
+procedure TTestCaseExprAnchor.TestAMensagemDoDmlNomeiaAsTresSaidas;
+var
+  LMsg: String;
+begin
+  LMsg := _MensagemDe(
+    procedure
+    begin
+      FluentSQL.Query(dbnFirebird).Delete.From('T').CaseExpr;
+    end);
+  Assert.Contains(LMsg, 'CaseExpr', False,
+    'A mensagem tem de nomear a chamada. Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'DELETE', False,
+    'A mensagem tem de dizer onde a chamada caiu. Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'WHERE', False,
+    'A mensagem tem de apontar a saida de quem queria escolher linhas. ' +
+    'Recebido: ' + LMsg);
+  Assert.Contains(LMsg, 'SELECT', False,
+    'E a saida de quem queria projetar. Recebido: ' + LMsg);
+end;
+
 procedure TTestCaseExprAnchor.TestQueryPuroRecusaEmVezDeAccessViolation;
 begin
   // A guarda ANTERIOR formatava FAST.ASTSection.Name DENTRO do raise, e ali
@@ -725,10 +882,17 @@ procedure TTestCaseExprAnchor.TestAMensagemDaRecusaNomeiaAChamadaEASaida;
 var
   LMsg: String;
 begin
+  // O caso do DELETE tem guarda PROPRIA desde que o CASE em DML passou a ser
+  // recusado, e mensagem propria - ver TestAMensagemDoDmlNomeiaAsTresSaidas.
+  // Esta celula mede a mensagem GENERICA, e por isso usa um caminho que ainda
+  // cai nela: cursor na relacao, secao WHERE.
   LMsg := _MensagemDe(
     procedure
+    var LQuery: IFluentSQL;
     begin
-      FluentSQL.Query(dbnPostgreSQL).Delete.From('T').CaseExpr;
+      LQuery := FluentSQL.Query(dbnPostgreSQL).Select.Column('TIPO').From('T')
+        .Where('ID').Equal(1);
+      LQuery.CaseExpr;
     end);
   Assert.Contains(LMsg, 'CaseExpr', False,
     'A mensagem tem de nomear a chamada que falhou. Recebido: ' + LMsg);
