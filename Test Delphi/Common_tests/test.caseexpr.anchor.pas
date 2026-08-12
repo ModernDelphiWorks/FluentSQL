@@ -69,10 +69,14 @@
       .CaseExpr.When('1').IfThen('''A''').EndCase.Alias('R').From('T')
       -> SELECT ID, (CASE TIPO WHEN 1 THEN 'A' END) AS R FROM T
 
-  Medido por mutacao: apagar o atalho derruba 27 celulas, 10 delas da suite do
-  slot de valor (T13); apagar o ANEXO derruba 25, porque sem ele o CASE nao
-  chega ao SELECT - sai "SELECT ID, TIPO AS R FROM T", com o CASE inteiro
-  perdido. Nenhuma das duas linhas podia sair.
+  Medido por mutacao, e a base de contagem e SEMPRE a mesma - celulas que passam
+  a falhar nos 11 RUNNERS, com -DDB2 -DINTERBASE:
+
+      apagar o ATALHO  ->  31 celulas (24 em Common, 11 delas da T13)
+      apagar o ANEXO   ->  39 celulas (28 em Common)
+
+  Sem o anexo o CASE nao chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T", com
+  o CASE inteiro perdido. Nenhuma das duas linhas podia sair.
 
   ============================================================================
   O ORACULO DE MOTOR REAL
@@ -83,15 +87,30 @@
 
       SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
 
-    PostgreSQL 16                     ERROR: syntax error at or near "CASE"
-    MySQL 8.4                         ERROR 1064 (42000)
+    PostgreSQL 16.14                  ERROR: syntax error at or near "CASE"
+    MySQL 8.4.11                      ERROR 1064 (42000)
     SQL Server 2022 16.0.4265.3       Msg 156 Incorrect syntax near 'CASE'
     Firebird 5.0.4                    -104 / Token unknown - CASE
     Oracle AI 26ai Free 23.26.2.0.0   ORA-00907: missing right parenthesis
     DB2 v12.1.5.0                     SQL0104N ... SQLSTATE=42601
+    SQLite 3.53.4                     Parse error near "CASE"
     InterBase                         NAO MEDIDO - nao ha imagem publica
 
-  SEIS de sete RECUSAM, e a forma nova devolve o DADO certo nos seis.
+  SUBMETIDOS 7: seis ATIVOS (com o SQLite) e um SOB DEFINE (o DB2, desligado no
+  FluentSQL.inc). SETE de sete RECUSAM o texto antigo.
+
+  E A FORMA NOVA NAO PASSA EM TODOS - a entrega nao afirma isso. Medido:
+
+    projecao SEM estrela   "SELECT TIPO, (CASE ...) FROM PRODUCTS"
+                           7 de 7 ACEITAM, dado certo
+    projecao COM estrela   "SELECT *, (CASE ...) FROM PRODUCTS"
+                           5 de 7. Firebird e Oracle RECUSAM, e a causa e a
+                           VIRGULA depois da ESTRELA - defeito PRE-EXISTENTE do
+                           All seguido de Column, fora do escopo desta tarefa
+    ORDER BY               7 de 7 ACEITAM
+    GROUP BY               1 de 7. Os outros seis recusam porque projetar TIPO
+                           agrupando por outra expressao viola a regra de GROUP
+                           BY - causa da CADEIA DO USUARIO, nao da ancoragem
 
   ============================================================================
   A REGRA
@@ -108,6 +127,18 @@
   silencio. E PRE-EXISTENTE - medido identico na base e depois desta entrega - e
   e consequencia direta do idioma "substitui a ultima coluna". Nao ha celula
   aqui, e nao foi consertado: se virar tarefa, e decisao do dono.
+
+  UPDATE COM LISTA DE COLUNAS ABERTA ANTES. A recusa do UPDATE vale quando
+  nenhuma lista de colunas foi aberta - que e o caso de Update('T') direto. Mas
+
+      Update('T').Values('A','1').OrderBy('') + CaseExpr
+      -> UPDATE T SET A = :p1 ORDER BY (CASE WHEN 1 THEN 1 END) ASC
+
+  emite CALADO, e na base levantava EAccessViolation: e loud->mute, a regressao
+  que esta tarefa existe para nao cometer. A cadeia e absurda - OrderBy depois de
+  Update - e o que falta e uma guarda de BUILDER que recuse OrderBy ali, que e
+  outra tarefa e outra porta. Fica REGISTRADO e nao consertado, e a tabela do
+  CHANGELOG diz que a linha do UPDATE so vale sem lista aberta.
   ------------------------------------------------------------------------------
 }
 
@@ -152,6 +183,8 @@ type
     procedure TestDepoisDeFromViraSearchedCaseEmColunaNova(const AIdx: Integer);
 
     [Test]
+    procedure TestProjecaoSemEstrelaEhAFormaAceitaPelosSete;
+    [Test]
     procedure TestOFromNaoEMaisSubstituido;
     [Test]
     procedure TestSelectSemColunaNaoLevantaMaisAccessViolation;
@@ -170,6 +203,12 @@ type
     procedure TestOrdemA_ColunaCorrente_Having;
     [Test]
     procedure TestOrdemA_ColunaCorrente_InnerJoin;
+    { o ramo OrderBy da varredura, que so ESTA celula cobre }
+    [Test]
+    procedure TestOrdemA_ColunaCorrente_ColunaDoOrderBy;
+    { identidade do no nas TRES colecoes varridas }
+    [Test]
+    procedure TestIdentidadeDoNoSobreviveNasTresColecoes;
     { B = From por ultimo -> cursor na RELACAO                                 }
     [Test]
     procedure TestOrdemB_RelacaoCorrente_Where;
@@ -191,6 +230,11 @@ type
     procedure TestInsertComArrayOfConstRecusaSemGravarParametro;
     [Test]
     procedure TestAMensagemDoInsertExplicaOQueAListaDoInsertE;
+    { o contra-exemplo que a guarda DE SECAO deixava passar }
+    [Test]
+    procedure TestInsertComColunaEDepoisGroupByTambemRecusa;
+    [Test]
+    procedure TestInsertComColunaEDepoisOrderByTambemRecusa;
 
     { --- secoes que nao projetam -------------------------------------------- }
     [Test]
@@ -242,8 +286,8 @@ procedure TTestCaseExprAnchor.TestIdiomaDaColunaCorrenteSobrevive(const AIdx: In
 var
   LQuery: IFluentSQL;
 begin
-  // A CELULA MAIS IMPORTANTE DESTE ARQUIVO, em cada dialeto. Sao as 27 que a
-  // mutacao "apague o atalho" derruba.
+  // A CELULA MAIS IMPORTANTE DESTE ARQUIVO, em cada dialeto. Faz parte das 31
+  // que a mutacao "apague o atalho" derruba nos 11 runners.
   LQuery := FluentSQL.Query(cDIALETOS[AIdx])
     .Select.Column('ID').Column('TIPO')
     .CaseExpr
@@ -272,6 +316,29 @@ begin
     LQuery.AsString, False,
     'Sem coluna corrente o CASE tem de nascer SEARCHED numa coluna nova, e nao ' +
     'adotar o nome da relacao como operando');
+end;
+
+procedure TTestCaseExprAnchor.TestProjecaoSemEstrelaEhAFormaAceitaPelosSete;
+var
+  LQuery: IFluentSQL;
+begin
+  // A celula acima usa .All, e o texto que sai dela carrega "SELECT *," - forma
+  // que o Firebird e a Oracle RECUSAM, e nao por causa do CASE: o Firebird
+  // aponta a VIRGULA (coluna 9) e a Oracle devolve ORA-00923. "SELECT *, <expr>"
+  // ja saia da base por All seguido de Column, e e defeito PRE-EXISTENTE do All,
+  // com porta propria e fora do escopo desta tarefa.
+  //
+  // ESTA celula e o teste LIMPO da ancoragem: projetando coluna nomeada, o texto
+  // novo e aceito pelos SETE motores submetidos, com o dado certo. Ela existe
+  // para que a entrega nao seja lida como "a forma nova passa em todos" - passa
+  // nesta forma; na forma com estrela, dois recusam por outra causa.
+  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('TIPO').From('PRODUCTS');
+  LQuery.CaseExpr
+    .When('PRICE > 10').IfThen('''CARO''')
+    .ElseIf('''BARATO''');
+  Assert.AreEqual(
+    'SELECT TIPO, (CASE WHEN PRICE > 10 THEN ''CARO'' ELSE ''BARATO'' END) FROM PRODUCTS',
+    LQuery.AsString, False);
 end;
 
 procedure TTestCaseExprAnchor.TestOFromNaoEMaisSubstituido;
@@ -383,6 +450,69 @@ begin
       LQuery.CaseExpr.When('1').IfThen('''A''');
     end,
     EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestOrdemA_ColunaCorrente_ColunaDoOrderBy;
+var
+  LQuery: IFluentSQL;
+begin
+  // O RAMO OrderBy DA VARREDURA - e esta e a UNICA celula que o cobre. Apagar a
+  // linha "or (Assigned(FAST.OrderBy) and ...)" do predicado deixava a suite
+  // INTEIRA verde antes desta celula existir, nos 11 runners, e mesmo assim o
+  // ramo muda comportamento: sem ele o CASE deixa de SUBSTITUIR a coluna do
+  // ORDER BY e passa a ACRESCENTAR outra -
+  //
+  //     com     ORDER BY (CASE B WHEN 1 THEN 1 END) ASC
+  //     sem     ORDER BY B ASC, (CASE WHEN 1 THEN 1 END) ASC
+  //
+  // Os outros dois ramos ja tinham celula; este embarcou sem oraculo numa
+  // entrega cuja tese e que lacuna de enumeracao mata rodada.
+  LQuery := FluentSQL.Query(dbnFirebird).Select.Column('A').From('T').OrderBy('B');
+  LQuery.CaseExpr.When('1').IfThen('1');
+  Assert.AreEqual(
+    'SELECT A FROM T ORDER BY (CASE B WHEN 1 THEN 1 END) ASC',
+    LQuery.AsString, False,
+    'Com o cursor sobre a coluna do ORDER BY, o CASE SUBSTITUI aquela coluna - ' +
+    'nao acrescenta uma segunda');
+end;
+
+procedure TTestCaseExprAnchor.TestIdentidadeDoNoSobreviveNasTresColecoes;
+var
+  LSelect, LGroupBy, LOrderBy: IFluentSQL;
+begin
+  // ⭐ A MINA QUE ESTA CELULA VIGIA.
+  //
+  // _NoCorrenteEstaNaLista compara IFluentSQLNames[i] com FAST.ASTName por
+  // IDENTIDADE de interface. Em Delphi, obter IFluentSQLName por UPCAST de uma
+  // interface derivada - IFluentSQLOrderByColumn, por exemplo - devolve um
+  // PONTEIRO DIFERENTE do mesmo objeto (medido: ...78C contra ...794). Hoje
+  // nenhum dos produtores de FAST.ASTName usa esse caminho, entao a comparacao
+  // acerta. Se algum dia um deles passar a usar, o predicado responde False em
+  // silencio e o defeito que esta tarefa consertou VOLTA sem alarme nenhum.
+  //
+  // Nao ha como comparar ponteiros a partir da API publica, e nao e preciso: a
+  // identidade e OBSERVAVEL pelo SQL. Se o no e reencontrado, o CASE SUBSTITUI
+  // a coluna; se nao e, ele ACRESCENTA outra. As tres cadeias abaixo fazem o
+  // ida-e-volta - poe o no na colecao, deixa o cursor nele, e exige que
+  // CaseExpr o reencontre - uma por colecao varrida.
+  LSelect := FluentSQL.Query(dbnFirebird).Select.Column('A').Column('B');
+  LSelect.CaseExpr.When('1').IfThen('1');
+  Assert.AreEqual('SELECT A, (CASE B WHEN 1 THEN 1 END) FROM T',
+    LSelect.From('T').AsString, False,
+    'Select.Columns: o no tem de ser reencontrado, senao sairia "A, B, (CASE...)"');
+
+  LGroupBy := FluentSQL.Query(dbnFirebird).Select.Column('A').From('T').GroupBy('B');
+  LGroupBy.CaseExpr.When('1').IfThen('1');
+  Assert.AreEqual('SELECT A FROM T GROUP BY (CASE B WHEN 1 THEN 1 END)',
+    LGroupBy.AsString, False,
+    'GroupBy.Columns: idem, senao sairia "GROUP BY B, (CASE...)"');
+
+  LOrderBy := FluentSQL.Query(dbnFirebird).Select.Column('A').From('T').OrderBy('B');
+  LOrderBy.CaseExpr.When('1').IfThen('1');
+  Assert.AreEqual('SELECT A FROM T ORDER BY (CASE B WHEN 1 THEN 1 END) ASC',
+    LOrderBy.AsString, False,
+    'OrderBy.Columns: e a colecao de MAIOR risco, porque e a unica cujos itens ' +
+    'sao IFluentSQLOrderByColumn - a derivada de onde o upcast viria');
 end;
 
 { --- ORDEM B: From por ultimo, cursor na RELACAO ---------------------------- }
@@ -498,6 +628,41 @@ begin
   Assert.AreEqual(0, LQuery.Params.Count,
     'A recusa do INSERT corre ANTES de o array virar :pN - senao o parametro ' +
     'ficaria na colecao sem nada no SQL que o citasse');
+end;
+
+procedure TTestCaseExprAnchor.TestInsertComColunaEDepoisGroupByTambemRecusa;
+begin
+  // ⭐ O CONTRA-EXEMPLO. Houve uma versao desta entrega em que a recusa do
+  // INSERT era escrita como FAST.ASTColumns = FAST.Insert.Columns - pergunta de
+  // SECAO, o mesmo padrao que ja tinha derrubado a primeira rodada, agora dentro
+  // do conserto dela. Ela deixava passar, calado:
+  //
+  //     INSERT INTO T ( A ) GROUP BY (CASE WHEN 1 THEN 1 END)
+  //
+  // porque o cursor estava numa coluna do INSERT enquanto a lista CORRENTE ja
+  // era a do GROUP BY. A recusa e um ramo da varredura de NO justamente para
+  // que a troca de secao nao a contorne.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T').Column('A').GroupBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
+end;
+
+procedure TTestCaseExprAnchor.TestInsertComColunaEDepoisOrderByTambemRecusa;
+begin
+  // O gemeo do anterior pela outra lista que _DefineSectionX troca.
+  Assert.WillRaise(
+    procedure
+    var LQuery: IFluentSQL;
+    begin
+      LQuery := FluentSQL.Query(dbnFirebird).Insert.Into('T').Column('A').OrderBy('');
+      LQuery.CaseExpr.When('1').IfThen('1');
+    end,
+    EArgumentException);
 end;
 
 procedure TTestCaseExprAnchor.TestAMensagemDoInsertExplicaOQueAListaDoInsertE;

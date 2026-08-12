@@ -73,7 +73,7 @@ type
     procedure _AssertHaveName;
     function _NoCorrenteEstaNaLista(const ALista: IFluentSQLNames): Boolean;
     function _CaseExprAncoraNoNoCorrente: Boolean;
-    procedure _AssertCaseExprNaoEAlvoDeInsert;
+    procedure _RecusaCaseExprNoInsert;
     procedure _AssertCaseExprTemOndeAncorar;
     procedure _AssertCaseExprTemOndeAncorarSeNaoAncora;
     procedure _SetSection(ASection: TSection);
@@ -355,11 +355,15 @@ end;
 ///       -> SELECT ID, (CASE TIPO WHEN 1 THEN ... END) ...
 ///
 ///   Sobre qualquer OUTRO no, as mesmas duas linhas produziam lixo em silencio.
-///   MEDIDO POR MUTACAO, e as duas metades sao load-bearing: apagar o atalho
-///   derruba 27 celulas verdes (10 delas da suite do slot de valor, a T13);
-///   apagar o anexo derruba 25, porque sem ele o CASE nao chega ao SELECT
-///   ("SELECT ID, TIPO AS R FROM T" - o CASE some inteiro). Nenhuma das duas
-///   linhas podia sair. O que faltava era a PERGUNTA.
+///   MEDIDO POR MUTACAO, e as duas metades sao load-bearing. A base de contagem
+///   e SEMPRE a mesma - celulas que passam a falhar nos 11 RUNNERS, com
+///   -DDB2 -DINTERBASE:
+///     apagar o ATALHO  -> 31 celulas (24 em Common, 11 delas da suite do slot
+///                         de valor, a T13)
+///     apagar o ANEXO   -> 39 celulas (28 em Common), porque sem ele o CASE nao
+///                         chega ao SELECT: sai "SELECT ID, TIPO AS R FROM T",
+///                         com o CASE inteiro perdido
+///   Nenhuma das duas linhas podia sair. O que faltava era a PERGUNTA.
 ///
 ///   ==========================================================================
 ///   A PERGUNTA E DE NO, NAO DE SECAO - E ESSA DISTINCAO CUSTOU UMA RODADA
@@ -418,16 +422,42 @@ end;
 ///   O ORACULO DE MOTOR
 ///   ==========================================================================
 ///
-///   O texto que saia com o cursor na relacao, submetido VERBATIM com massa
-///   (test.caseexpr.anchor.matrix.sql):
-///     PostgreSQL 16                   ERROR: syntax error at or near "CASE"
-///     MySQL 8.4                       ERROR 1064 (42000)
+///   Transcricao literal em test.caseexpr.anchor.matrix.sql. SUBMETIDOS 7: seis
+///   ATIVOS (PostgreSQL, MySQL, SQL Server, Firebird, Oracle, SQLite) e um SOB
+///   DEFINE (DB2, desligado no FluentSQL.inc). InterBase NAO MEDIDO - nao ha
+///   imagem publica, e nao foi inferido do Firebird.
+///
+///   O texto que saia com o cursor na relacao,
+///     SELECT * FROM (CASE PRODUCTS WHEN PRICE > 10 THEN 'CARO' ELSE 'BARATO' END)
+///   e RECUSADO por SETE de sete:
+///     PostgreSQL 16.14                ERROR: syntax error at or near "CASE"
+///     MySQL 8.4.11                    ERROR 1064 (42000)
 ///     SQL Server 2022 16.0.4265.3     Msg 156 Incorrect syntax near 'CASE'
 ///     Firebird 5.0.4                  -104 / Token unknown - CASE
 ///     Oracle AI 26ai Free 23.26.2.0.0 ORA-00907: missing right parenthesis
 ///     DB2 v12.1.5.0                   SQL0104N / SQLSTATE=42601
-///     InterBase                       NAO MEDIDO - nao ha imagem publica
-///   SEIS de sete RECUSAM, e a forma nova devolve o dado certo nos seis.
+///     SQLite 3.53.4                   Parse error near "CASE"
+///
+///   E A FORMA NOVA NAO PASSA EM TODOS - esta doutrina nao afirma isso, e a
+///   distincao e o motivo de o oraculo ter sido reexecutado:
+///     projecao SEM estrela ... 7 de 7 aceitam, dado certo
+///     projecao COM estrela ... 5 de 7. Firebird e Oracle recusam pela VIRGULA
+///                              depois da ESTRELA (o Firebird aponta a coluna 9;
+///                              a Oracle devolve ORA-00923), e nao pelo CASE.
+///                              "SELECT *, <expr>" ja saia da base por All
+///                              seguido de Column: defeito PRE-EXISTENTE, porta
+///                              propria, fora do escopo desta tarefa
+///     ORDER BY ............... 7 de 7 aceitam
+///     GROUP BY ............... 1 de 7. Os outros recusam porque projetar uma
+///                              coluna agrupando por outra expressao viola a
+///                              regra de GROUP BY - causa da CADEIA DO USUARIO,
+///                              e nao da ancoragem
+///
+///   Uma versao anterior deste oraculo submeteu a Oracle um enunciado COM
+///   apelido ("SELECT P.* ... FROM PRODUCTS P") que o FluentSQL nao emite, e a
+///   ressalva ficava so dentro do .sql enquanto aqui se afirmava "verbatim". A
+///   adaptacao escondia a recusa real. Agora todos os enunciados vao como sao
+///   emitidos, e onde o motor recusa a recusa esta transcrita.
 ///
 ///   ==========================================================================
 ///   A REGRA
@@ -440,7 +470,6 @@ function TFluentSQL.CaseExpr(const AExpression: String): IFluentSQLCriteriaCase;
 var
   LExpression: String;
 begin
-  _AssertCaseExprNaoEAlvoDeInsert;
   LExpression := AExpression;
   if _CaseExprAncoraNoNoCorrente then
   begin
@@ -479,47 +508,58 @@ end;
 ///   da secao corrente. A razao de varrer todas esta na doutrina de CaseExpr,
 ///   logo acima: o cursor e duravel e a lista corrente nao.
 ///
-///   Insert.Columns NAO entra na varredura, e a ausencia e deliberada: ver
-///   _AssertCaseExprNaoEAlvoDeInsert, que recusa aquela secao inteira antes de
-///   esta pergunta ser feita. Incluir a lista aqui daria a resposta certa para a
-///   pergunta errada.
-///
 ///   Responde False - e nao levanta - quando nao ha AST ou nao ha cursor. Quem
 ///   decide o que fazer com o False e o chamador.
+///
+///   A UNICA saida por excecao daqui e o ramo do INSERT, e ela e deliberada: ver
+///   _RecusaCaseExprNoInsert.
 /// </summary>
 function TFluentSQL._CaseExprAncoraNoNoCorrente: Boolean;
 begin
   Result := False;
   if (not Assigned(FAST)) or (not Assigned(FAST.ASTName)) then
     Exit;
+  // A QUARTA colecao entra na MESMA varredura, e nao numa guarda a parte: o no
+  // ancora nela como ancoraria em qualquer outra, so que ancorar ali nao pode.
+  if Assigned(FAST.Insert) and _NoCorrenteEstaNaLista(FAST.Insert.Columns) then
+    _RecusaCaseExprNoInsert;
   Result := (Assigned(FAST.Select)  and _NoCorrenteEstaNaLista(FAST.Select.Columns))
          or (Assigned(FAST.GroupBy) and _NoCorrenteEstaNaLista(FAST.GroupBy.Columns))
          or (Assigned(FAST.OrderBy) and _NoCorrenteEstaNaLista(FAST.OrderBy.Columns));
 end;
 
 /// <summary>
-///   O INSERT tem lista de colunas, e e por isso que ele precisa de recusa
-///   PROPRIA: sem ela, o CASE seria ancorado ali como em qualquer outra lista e
-///   sairia
+///   A recusa do INSERT, chamada de DOIS pontos porque sao DUAS perguntas
+///   diferentes, e as duas precisam dela:
 ///
-///       INSERT INTO T ( (CASE WHEN 1 THEN 'A' END) )
+///     _CaseExprAncoraNoNoCorrente ... "o NO do cursor e uma coluna do INSERT?"
+///     _AssertCaseExprTemOndeAncorar  "a lista onde eu CRIARIA a coluna nova e
+///                                     a do INSERT?"
 ///
-///   As colunas do INSERT sao NOMES DE DESTINO - as celulas onde o dado vai ser
-///   gravado - e nao expressoes projetadas. Um CASE nao pode ser alvo de
-///   gravacao em dialeto nenhum, e a lista se parecer com as outras e
-///   coincidencia de REPRESENTACAO, nao de significado.
+///   A primeira e de NO e a segunda e de DESTINO, e nenhuma cobre a outra.
+///   Houve uma versao desta entrega em que existia so a segunda, escrita como
+///   FAST.ASTColumns = FAST.Insert.Columns - ou seja, pergunta de SECAO, o mesmo
+///   padrao que ja tinha derrubado a primeira rodada. Ela deixava passar, medido:
+///
+///       Insert.Into('T').Column('A').GroupBy('') + CaseExpr
+///       -> INSERT INTO T ( A ) GROUP BY (CASE WHEN 1 THEN 1 END)
+///
+///   porque o cursor estava numa coluna do INSERT enquanto a lista corrente ja
+///   era a do GROUP BY. Com a pergunta de no no lugar, o contra-exemplo morre.
+///
+///   POR QUE O INSERT E DIFERENTE DAS OUTRAS TRES LISTAS: as colunas do INSERT
+///   sao NOMES DE DESTINO - as celulas onde o dado vai ser gravado - e nao
+///   expressoes projetadas. Um CASE nao pode ser alvo de gravacao em dialeto
+///   nenhum. A lista se parecer com as outras e coincidencia de REPRESENTACAO,
+///   nao de significado.
 ///
 ///   METADE DISTO NAO E REGRESSAO DESTA ENTREGA, e o registro importa:
-///   Insert.Into('T').Column('A') seguido de CaseExpr JA emitia
-///   "INSERT INTO T ( (CASE A WHEN 1 THEN 'X' END) )" na base, calado. O que a
-///   entrega acrescentaria sem esta guarda seria so o caso sem Column, que antes
-///   dela levantava EAccessViolation.
+///   Insert.Into('T').Column('A') seguido de CaseExpr JA emitia, calado,
+///   "INSERT INTO T ( (CASE A WHEN 1 THEN 'X' END) )" na base. O caso sem Column
+///   levantava EAccessViolation. Nenhum dos dois tinha comportamento a preservar.
 /// </summary>
-procedure TFluentSQL._AssertCaseExprNaoEAlvoDeInsert;
+procedure TFluentSQL._RecusaCaseExprNoInsert;
 begin
-  if (not Assigned(FAST)) or (not Assigned(FAST.Insert)) or
-     (FAST.ASTColumns <> FAST.Insert.Columns) then
-    Exit;
   raise EArgumentException.Create(
     'IFluentSQL.CaseExpr chamado dentro de um INSERT: as colunas do INSERT sao ' +
     'NOMES DE DESTINO, as celulas onde o dado sera gravado, e um CASE nao pode ' +
@@ -530,9 +570,15 @@ begin
 end;
 
 /// <summary>
-///   Recusa quando nao ha NENHUMA lista de colunas onde ancorar - o que acontece
-///   nas secoes que nao projetam (WHERE, JOIN, HAVING, DELETE, UPDATE) e num
-///   enunciado que ainda nao abriu secao nenhuma.
+///   Recusa quando nao ha ONDE criar a coluna nova. Sao dois motivos, e o
+///   segundo e de DESTINO e nao de no:
+///
+///   1. nao ha lista de colunas nenhuma - as secoes que nao projetam (WHERE,
+///      JOIN, HAVING, DELETE, UPDATE) e o enunciado que ainda nao abriu secao.
+///   2. a lista corrente e a do INSERT, onde a coluna nova nao pode nascer. Esta
+///      metade NAO e coberta pela pergunta de no: no Insert.Into('T') sem Column
+///      nenhuma, o cursor esta na relacao e nao ha no de coluna a encontrar - o
+///      que impede o "INSERT INTO T ( (CASE ...) )" e esta linha aqui.
 ///
 ///   Por que recusar em vez de simplesmente nao anexar: nao anexar DESCARTA o
 ///   CASE em silencio - o chamador montou um CASE inteiro, com WHEN e THEN, e
@@ -553,6 +599,9 @@ end;
 /// </summary>
 procedure TFluentSQL._AssertCaseExprTemOndeAncorar;
 begin
+  if Assigned(FAST) and Assigned(FAST.Insert) and
+     (FAST.ASTColumns = FAST.Insert.Columns) then
+    _RecusaCaseExprNoInsert;
   if Assigned(FAST) and Assigned(FAST.ASTColumns) then
     Exit;
   raise EArgumentException.Create(
@@ -598,7 +647,6 @@ end;
 /// </summary>
 function TFluentSQL.CaseExpr(const AExpression: array of const): IFluentSQLCriteriaCase;
 begin
-  _AssertCaseExprNaoEAlvoDeInsert;
   _AssertCaseExprTemOndeAncorarSeNaoAncora;
   Result := CaseExpr(TUtils.SqlArrayOfConstToParameterizedSql(AExpression, FAST.Params));
 end;

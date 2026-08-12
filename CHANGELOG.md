@@ -19,7 +19,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 - **BREAKING CHANGE (SQL emitido e API) — `CaseExpr` passou a perguntar se o nó do cursor é uma COLUNA antes de se ancorar nele.** `IFluentSQL.CaseExpr` decide **duas** coisas: o operando do `CASE` (o que vem entre `CASE` e o primeiro `WHEN`) e **em que nó da árvore o `CASE` vai morar**. Ele decidia as duas lendo `FAST.ASTName` — um **cursor** que aponta para o último nó tocado pela cadeia fluente — **sem perguntar que nó é aquele**.
 
-  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **27 células verdes**, 10 delas da suíte do slot de valor. `CaseExpr('COLUNA')` explícito também não muda.
+  **O que NÃO mudou, e é a maior parte do uso:** com o cursor sobre uma **coluna**, `CaseExpr` sem argumento continua herdando o nome dela e continua substituindo aquela coluna. `.Select.Column('ID').Column('TIPO').CaseExpr.When('1')…` continua emitindo `SELECT ID, (CASE TIPO WHEN 1 THEN … END) …`, byte a byte. É um idioma **deliberado e público** — *"transforme a última coluna num `CASE` simples sobre ela"* —, e é a forma dominante da suíte: medido por mutação, apagá-lo derruba **31 células verdes nos 11 runners** (24 em `Common`, 11 delas da suíte do slot de valor) — e apagar o **anexo** derruba **39 nos mesmos 11 runners**, porque sem ele o `CASE` não chega ao `SELECT`. **Toda contagem publicada aqui usa a mesma base: células que passam a falhar nos 11 runners, com `-DDB2 -DINTERBASE`**. `CaseExpr('COLUNA')` explícito também não muda.
 
   **E a pergunta é de NÓ, não de seção** — a distinção não é acadêmica, e é o motivo de a primeira versão desta entrega ter sido rejeitada. `FAST.ASTName` é **durável** e atravessa a troca de seção; `FAST.ASTColumns` é **trocado por baixo do cursor** (vira `nil` no `WHERE` e no `HAVING`, vira outra lista no `GROUP BY` e no `ORDER BY`). Duas cadeias com as **mesmas seções** e ordens diferentes são caminhos distintos:
 
@@ -38,7 +38,7 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
   | relação do `JOIN` | `… INNER JOIN (CASE U …) ON` | `EArgumentException` |
   | seção `WHERE` / `HAVING` | `SELECT … FROM (CASE T …) WHERE …` | `EArgumentException` |
   | seção `DELETE` | `DELETE FROM (CASE T …)` | `EArgumentException` |
-  | seção `UPDATE` | **`EAccessViolation`** | `EArgumentException` |
+  | seção `UPDATE`, **sem lista de colunas aberta antes** | **`EAccessViolation`** | `EArgumentException` |
   | `Insert.Into('T')` | **`EAccessViolation`** | `EArgumentException` |
   | `Insert.Into('T').Column('A')` | `INSERT INTO T ( (CASE A …) )` | `EArgumentException` |
   | `nil` (`Select` sem coluna, ou nem `Select`) | **`EAccessViolation`** | emite, ou recusa nomeada |
@@ -53,20 +53,27 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
   **A regra que decide todos os casos:** *converter SQL inválido silencioso em SQL **válido** quando o sentido é inequívoco, e em **erro nomeado** quando não é. Nunca em descarte silencioso.*
 
-  **O texto antigo é recusado por SEIS dos sete motores**, submetido verbatim com massa de 3 linhas; o texto novo passa nos seis **e devolve o dado certo**, contagem 3 antes e 3 depois:
+  **O oráculo de motor: 7 submetidos — 6 ativos (PostgreSQL, MySQL, SQL Server, Firebird, Oracle, **SQLite**) e 1 sob define (**DB2**, desligado no `FluentSQL.inc`).** Todos os enunciados foram submetidos **como o FluentSQL os emite** — sem apelido acrescentado, sem `AS`, sem reordenar; onde o motor recusa, a recusa está transcrita. Massa de 3 linhas, contagem 3 antes e 3 depois.
 
-  | Motor | `SELECT * FROM (CASE PRODUCTS WHEN …)` | forma nova |
-  |---|---|---|
-  | PostgreSQL 16 | `ERROR: syntax error at or near "CASE"` | 3 linhas, `BARATO`/`CARO`/`CARO` |
-  | MySQL 8.4 | `ERROR 1064 (42000)` | idem |
-  | SQL Server 2022 16.0.4265.3 | `Msg 156 Incorrect syntax near the keyword 'CASE'` | idem |
-  | Firebird 5.0.4 | `-104` / `Token unknown - CASE` | idem |
-  | Oracle AI 26ai Free 23.26.2.0.0 | `ORA-00907: missing right parenthesis` | idem |
-  | DB2 v12.1.5.0 | `SQL0104N` / `SQLSTATE=42601` | idem |
+  | Motor | texto antigo | projeção **sem** estrela | projeção **com** estrela | `ORDER BY` | `GROUP BY` |
+  |---|---|---|---|---|---|
+  | PostgreSQL 16.14 | `syntax error at or near "CASE"` | 3 linhas ✔ | 3 linhas ✔ | 3 ✔ | `42803` |
+  | MySQL 8.4.11 | `ERROR 1064 (42000)` | 3 ✔ | 3 ✔ | 3 ✔ | `ERROR 1055` |
+  | SQL Server 16.0.4265.3 | `Msg 156` | 3 ✔ | 3 ✔ | 3 ✔ | `Msg 8120` |
+  | Firebird 5.0.4 | `-104 Token unknown - CASE` | 3 ✔ | **`-104` na vírgula** | 3 ✔ | `-104` |
+  | Oracle AI 26ai 23.26.2.0.0 | `ORA-00907` | 3 ✔ | **`ORA-00923`** | 3 ✔ | `ORA-00979` |
+  | DB2 v12.1.5.0 | `SQL0104N` | 3 ✔ | 3 ✔ | 3 ✔ | `SQL0119N` |
+  | SQLite 3.53.4 | `Parse error near "CASE"` | 3 ✔ | 3 ✔ | 3 ✔ | 2 linhas |
+
+  **O texto antigo é recusado por SETE de sete.** Mas **a forma nova não passa em todos, e esta entrada não afirma que passa:**
+
+  - **projeção sem estrela e `ORDER BY`: 7 de 7 aceitam**, com o dado certo;
+  - **projeção com estrela: 5 de 7.** Firebird e Oracle recusam — e **a causa não é a ancoragem, é a vírgula depois da estrela**: o Firebird aponta a coluna 9 (a vírgula) e a Oracle devolve `ORA-00923`. `SELECT *, <expr>` **já saía da base** por `Select.All` seguido de `Column`; é defeito **pré-existente** do `All`, com porta própria, fora do escopo desta tarefa. O que mudou foi trocar um texto que **7 de 7** recusam por um que **5 de 7** aceitam, e nos outros 2 a recusa passou a ser de outra causa, já catalogada.
+  - **`GROUP BY`: 1 de 7.** Os seis recusam porque **projetar uma coluna agrupando por outra expressão viola a regra de `GROUP BY`** — causa da **cadeia do usuário**, não da ancoragem. O SQLite aceita por não aplicar a regra estrita.
 
   **Quem é atingido:** quem chamava `CaseExpr` com o cursor fora de uma coluna — ou seja, **quem já produzia SQL que motor nenhum aceitava, ou já estourava**. As cadeias que emitiam SQL válido continuam emitindo o mesmo texto. **O que fazer:** chame `CaseExpr` com uma coluna corrente (`Column(...)` antes), ou numa seção que projete (`Select`, `GroupBy`, `OrderBy`). Transcrição literal, com massa e contagem antes/depois, em `Test Delphi\Common_tests\test.caseexpr.anchor.matrix.sql`. **InterBase não foi medido** — não existe imagem pública, e não foi inferido do Firebird.
 
-  **Catalogado e NÃO consertado:** dois `CaseExpr` seguidos sobre a mesma coluna — o segundo descarta o primeiro em silêncio. É **pré-existente**, medido idêntico antes e depois, e é consequência direta do idioma "substitui a última coluna".
+  **Catalogado e NÃO consertado**, dois itens. (1) Dois `CaseExpr` seguidos sobre a mesma coluna: o segundo descarta o primeiro em silêncio — **pré-existente**, medido idêntico antes e depois, consequência direta do idioma "substitui a última coluna". (2) `Update('T').Values('A','1').OrderBy('')` seguido de `CaseExpr` **emite calado** `UPDATE T SET A = :p1 ORDER BY (CASE …) ASC`, onde a base levantava `EAccessViolation` — é **loud→mute** numa cadeia absurda, e o que falta é uma guarda de *builder* que recuse `OrderBy` depois de `Update`, que é outra porta e outra tarefa. **É por isso que a linha do `UPDATE` na tabela acima está qualificada.**
 
 - **BREAKING CHANGE (API) — `IFluentSQL.CaseExpr(const AExpression: IFluentSQLCriteriaExpression)` passou a levantar `EArgumentException` nomeada.** A sobrecarga era pública e **100% inalcançável**: o corpo fazia `TFluentSQLCriteriaCase.Create(Self, '')` seguido de `Result.AndOpe(AExpression)`, e `AndOpe` lê `FLastExpression`, que **só** é preenchido por `When`. Recém-criado o campo é `nil`, então a chamada estourava com `EAccessViolation` em **qualquer** estado — medido em três. Não havia um único teste que a exercitasse.
 
