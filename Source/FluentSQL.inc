@@ -57,7 +57,9 @@
 // Banco de dados utiliza��o
 // Cada simbolo abaixo tem que corresponder a um membro de TFluentSQLDriver
 // (FluentSQL.Interfaces.pas) e a uma implementacao real em Source\Drivers.
-// A reciproca NAO vale: TFluentSQLDriver tem 15 membros e aqui ha 9 simbolos.
+// A reciproca NAO vale: TFluentSQLDriver tem 15 membros e aqui ha 9 linhas
+// de driver, das quais 7 definem simbolo (INTERBASE e DB2 estao desligados
+// com {.$DEFINE}).
 // Informix, ADS, ASA, AbsoluteDB, ElevateDB e NexusDB continuam SEM simbolo -
 // nao ha unit deles em Source\Drivers para ligar. Eles existem no enum como
 // superficie publica (ordinal serializavel, consumidores externos que os
