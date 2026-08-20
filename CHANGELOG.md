@@ -9,11 +9,23 @@ Versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
-- **BREAKING CHANGE — `TFluentSQLDriver` perdeu 6 valores.** Foram removidos da enum pública (`FluentSQL.Interfaces.pas`), do `FluentSQL.Register.pas`, do `FluentSQL.Utils.pas` e do `FluentSQL.inc`:
-  `dbnInformix`, `dbnADS`, `dbnASA`, `dbnAbsoluteDB`, `dbnElevateDB`, `dbnNexusDB`.
-  Nenhum deles jamais teve implementação: as units `FluentSQL.Serialize*`, `FluentSQL.Select*` e `FluentSQL.Functions*` correspondentes não existem no repositório, e o `uses` condicional do `Register` referenciava ficheiros inexistentes. Qualquer chamada com esses valores terminava em `EAccessViolation`.
-  **O que fazer:** código que nomeie qualquer um dos 6 deixa de compilar (`E2003 Undeclared identifier`). Não há substituto — migre para um dos 9 dialetos restantes (`dbnMSSQL`, `dbnMySQL`, `dbnFirebird`, `dbnSQLite`, `dbnInterbase`, `dbnDB2`, `dbnOracle`, `dbnPostgreSQL`, `dbnMongoDB`). `dbnInterbase` e `dbnDB2` **permanecem**: têm implementação real, apenas continuam desligados por omissão no `FluentSQL.inc`.
+- ~~**BREAKING CHANGE — `TFluentSQLDriver` perdeu 6 valores.**~~ **REVERTIDO antes de sair em versão** — ver *Added* abaixo. O `cd9e71d` tinha removido `dbnInformix`, `dbnADS`, `dbnASA`, `dbnAbsoluteDB`, `dbnElevateDB` e `dbnNexusDB` do enum público; os valores **voltaram**, na posição original. Nenhuma versão publicada chegou a sair sem eles, então **não há BREAKING CHANGE a anunciar em nenhuma direção**.
 - Removidos overrides mortos e inalcançáveis de `Round`, `Floor` e `Abs` em `FluentSQL.Functions{MSSQL,MySQL,PostgreSQL}.pas`, e os overrides de agregação de `FluentSQL.FunctionsMongoDB.pas`.
+- **Permanecem removidos** — e não voltam com os 6 valores: as `_RegisterInformix/ADS/ASA/AbsoluteDB/ElevateDB/NexusDB` de `FluentSQL.Register.pas`, as entradas correspondentes no `uses` condicional (apontavam para ficheiros que **nunca** existiram no repositório) e os `{$DEFINE}` deles em `FluentSQL.inc`. O enum voltou; o registo, não.
+
+### Added
+
+- **`TFluentSQLDriver` recuperou os 6 valores, na posição e ordem originais:** `dbnInformix` (ordinal 7), `dbnADS` (9), `dbnASA` (10), `dbnAbsoluteDB` (11), `dbnElevateDB` (13) e `dbnNexusDB` (14) — o enum volta a ter 15 membros, e `dbnPostgreSQL` (8) e `dbnMongoDB` (12) voltam aos ordinais que tinham antes do `cd9e71d`. A ordem foi restaurada, e não apenas a lista: o valor é serializável e consumidores externos nomeiam os membros.
+
+  **Por que voltaram:** a remoção partiu do diagnóstico de que eram "drivers fantasma" — e a parte do diagnóstico sobre o **FluentSQL** continua verdadeira (não há unit deles em `Source\Drivers`). O que o diagnóstico não previu é que **consumidores nomeiam esses valores no próprio código**: `TDMLGeneratorAbstract.ResolveFluentSQLDriver`, em `Janus.DML.Generator.pas:641,643,645,656`, devolve `dbnADS`, `dbnAbsoluteDB`, `dbnElevateDB` e `dbnNexusDB` — e um identificador que deixa de existir no enum é `E2003 Undeclared identifier` em quem o nomeia (medido nesta árvore removendo `dbnADS` de novo: `FluentSQL.Utils.pas(383)` e `(418)`). Restaurar a superfície é decisão do dono do projeto.
+
+  **O que NÃO voltou, e é o ponto:** continua sem existir unit `FluentSQL.Serialize*`/`Select*`/`Functions*` desses 6, sem `_Register*` e sem `{$DEFINE}`. Pedir deles algo **que passe pelo registo** levanta **`EFluentSQLDriverNotRegistered`** — a exceção nomeada que o `cd9e71d` criou —, e **não** `EAccessViolation` nem `EAbstractError`. Medido em `Test Delphi\Common_tests\test.driver.functions.matrix.pas`: 6 dialetos × 4 portas de entrada (`Register.Functions`, `Register.Select`, `Register.Serialize` e a chamada de função do padrão B), 24 células, todas com a exceção nomeada; e a varredura da matriz inteira passou de 9 × 26 = 234 células para **15 × 26 = 390**, sem nenhuma falha não nomeada.
+
+  **Nem tudo levanta, e a afirmação acima é qualificada de propósito.** Das 156 células dos 6 dialetos (26 funções cada), **90 levantam** `EFluentSQLDriverNotRegistered` — as 15 funções do **padrão B**, que consultam o driver — e **66 devolvem texto ANSI** — as 11 do **padrão A** (`Count`, `Sum`, `Min`, `Max`, `Average`, `Abs`, `Cast(String)`, `Upper`, `Lower`, `Round`, `Floor`), que o núcleo emite **sem** consultar o driver: `Func(dbnADS).Count('C')` devolve `COUNT(C)`, exatamente como devolvia antes do `cd9e71d`. Nenhuma das 156 devolve `nil`, `EAccessViolation` ou `EAbstractError`. O ponto cego do padrão A já estava descrito no cabeçalho do ficheiro de teste e **não** foi introduzido nem alargado aqui.
+
+  **Uma exceção diferente, catalogada e não tocada aqui:** `TFluentSQLRegister.DDLSerialize` levanta `ENotSupportedException` (e não `EFluentSQLDriverNotRegistered`) para dialeto sem registo — comportamento anterior a esta mudança, igual para `dbnInterbase` e `dbnDB2`.
+
+  `FluentSQL.Utils.pas` recuperou os ramos de formatação de data dos 6, com a **mesma** formatação de antes do `cd9e71d`: `dbnAbsoluteDB` com `mm/dd/yyyy` (junto de Firebird e Interbase) e os outros cinco com `yyyy-mm-dd`.
 
 ### Changed
 

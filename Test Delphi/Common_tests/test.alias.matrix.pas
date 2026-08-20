@@ -127,9 +127,13 @@ uses
   FluentSQL;
 
 const
+  // Os seis sem unit em Source\Drivers (Informix, ADS, ASA, AbsoluteDB,
+  // ElevateDB, NexusDB) estao aqui so para a tabela cobrir o enum inteiro: _Medivel
+  // os descarta em runtime, porque _EstaRegistrado pega EFluentSQLDriverNotRegistered.
   cDIALETO: array[TFluentSQLDriver] of String = (
     'dbnMSSQL', 'dbnMySQL', 'dbnFirebird', 'dbnSQLite', 'dbnInterbase',
-    'dbnDB2', 'dbnOracle', 'dbnPostgreSQL', 'dbnMongoDB'
+    'dbnDB2', 'dbnOracle', 'dbnInformix', 'dbnPostgreSQL', 'dbnADS', 'dbnASA',
+    'dbnAbsoluteDB', 'dbnMongoDB', 'dbnElevateDB', 'dbnNexusDB'
   );
 
   /// <summary>
@@ -154,8 +158,14 @@ const
     {dbnInterbase}  'AS',
     {dbnDB2}        'AS',
     {dbnOracle}     '',
+    {dbnInformix}   '',  // sem driver: nunca medido (_Medivel filtra)
     {dbnPostgreSQL} 'AS',
-    {dbnMongoDB}    ''   // nao usado: MongoDB nao passa por esta matriz
+    {dbnADS}        '',  // sem driver
+    {dbnASA}        '',  // sem driver
+    {dbnAbsoluteDB} '',  // sem driver
+    {dbnMongoDB}    '',  // nao usado: MongoDB nao passa por esta matriz
+    {dbnElevateDB}  '',  // sem driver
+    {dbnNexusDB}    ''   // sem driver
   );
 
 /// <summary>

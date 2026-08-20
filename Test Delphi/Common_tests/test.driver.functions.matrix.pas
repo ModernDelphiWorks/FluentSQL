@@ -69,6 +69,28 @@
   por contrato. Quem quer a garantia do framework chama Cast(x, dftInteger), que
   em MySQL emite SIGNED.
 
+  OS SEIS DIALETOS SEM DRIVER - por que a matriz tem 15 linhas e nao 9.
+
+  TFluentSQLDriver tem 15 membros, e SEIS deles (dbnInformix, dbnADS, dbnASA,
+  dbnAbsoluteDB, dbnElevateDB, dbnNexusDB) nao tem unit em Source\Drivers nem
+  _Register* no FluentSQL.Register.pas. Eles existem no enum porque a superficie e
+  a ORDEM dele sao contrato publico - consumidores externos nomeiam esses valores
+  e o ordinal e serializavel.
+
+  As 156 celulas deles NAO se comportam todas igual, e a diferenca e a mesma dos
+  padroes A e B descritos acima. Medido: 90 celulas levantam
+  EFluentSQLDriverNotRegistered (as 15 funcoes do padrao B, que passam pelo
+  Register) e 66 devolvem TEXTO ANSI (as 11 do padrao A - Count, Sum, Min, Max,
+  Average, Abs, Cast(String), Upper, Lower, Round, Floor -, que o core emite sem
+  consultar o driver: Count('C') devolve 'COUNT(C)' para dbnADS como devolve para
+  qualquer outro). Nenhuma das 156 levanta AV ou EAbstractError.
+
+  Quem afirma isso e TestDriverSemImplementacaoLevantaErroNomeado, nas quatro
+  portas de entrada (Register.Functions/Select/Serialize e a chamada de funcao do
+  padrao B - Trim, deliberadamente, porque padrao A nao chegaria ao Register). O
+  contrato do enum em si - ordinal e nome - esta em
+  TestOrdinalENomeDeCadaDialetoSaoContrato.
+
   Adicionou uma funcao nova em IFluentSQLFunctions? Acrescente-a em _Invoke e em
   cFUNCTIONS. Se ela for do padrao B (delega ao driver), a matriz vai ficar
   vermelha ate voce implementa-la em CADA Source\Drivers\FluentSQL.Functions*.pas
@@ -118,6 +140,23 @@ type
     [Test]
     procedure TestLengthRespeitaODialeto;
     /// <summary>
+    ///   Os SEIS membros de TFluentSQLDriver que nao tem unit em Source\Drivers
+    ///   (dbnInformix, dbnADS, dbnASA, dbnAbsoluteDB, dbnElevateDB, dbnNexusDB)
+    ///   EXISTEM no enum e, ao serem pedidos, levantam a excecao NOMEADA - nunca
+    ///   EAccessViolation, nunca EAbstractError, nunca Exception crua. E a prova
+    ///   de que restaurar a superficie do enum nao trouxe de volta o modo de
+    ///   falha opaco que cd9e71d matou.
+    /// </summary>
+    [Test]
+    procedure TestDriverSemImplementacaoLevantaErroNomeado;
+    /// <summary>
+    ///   O ORDINAL de cada membro e o nome que ele carrega sao contrato: o valor
+    ///   e serializavel e consumidores externos nomeiam os membros. Reordenar,
+    ///   remover ou desalinhar CDriverNames tem de ficar vermelho AQUI.
+    /// </summary>
+    [Test]
+    procedure TestOrdinalENomeDeCadaDialetoSaoContrato;
+    /// <summary>
     ///   Pega COLISAO de nome em TStrDBEngineName (duas entradas iguais fazem um
     ///   driver sobrescrever o outro no registo). Nao pega permutacao, que e
     ///   invisivel por o array ser chave simetrica; cardinalidade e pega pelo
@@ -136,6 +175,19 @@ uses
   FluentSQL.Register;
 
 const
+  /// <summary>
+  ///   Os membros de TFluentSQLDriver que NAO tem implementacao: nao existe
+  ///   FluentSQL.Serialize*/Select*/Functions* deles em Source\Drivers, nem
+  ///   _Register* em FluentSQL.Register.pas, nem {$DEFINE} em FluentSQL.inc.
+  ///   Estao no enum como superficie publica (consumidores externos nomeiam
+  ///   quatro deles) e sao cobrados aqui pelo comportamento honesto.
+  ///   Nomea-los um a um e proposital: sumir com qualquer um do enum para a
+  ///   COMPILACAO deste arquivo.
+  /// </summary>
+  cSEM_DRIVER: array[0..5] of TFluentSQLDriver = (
+    dbnInformix, dbnADS, dbnASA, dbnAbsoluteDB, dbnElevateDB, dbnNexusDB
+  );
+
   cFUNCTIONS: array[0..25] of String = (
     'Count', 'Sum', 'Min', 'Max', 'Average', 'Abs', 'Cast',
     'Year', 'Month', 'Day', 'Date', 'Upper', 'Lower', 'Length',
@@ -256,6 +308,21 @@ begin
                               'LTrim', 'RTrim', 'Concat', 'SubString', 'Ceil',
                               'Modulus', 'Coalesce', 'CurrentDate',
                               'CurrentTimestamp'];
+
+    // OS SEIS SEM DRIVER. Nao ha unit FluentSQL.Functions* deles em
+    // Source\Drivers e nao ha _Register* no FluentSQL.Register.pas - nao ha
+    // {$DEFINE} que os ligue. A lista vazia aqui NAO afirma "suporta as 26":
+    // nenhuma chamada chega ao driver, porque TFluentSQLRegister.Functions
+    // levanta EFluentSQLDriverNotRegistered antes. Quem os cobre e
+    // TestDriverSemImplementacaoLevantaErroNomeado, que os nomeia um a um; esta
+    // linha existe porque TestTabelaDeSuporteNaoCitaFuncaoInexistente percorre
+    // o enum INTEIRO, inclusive os nao registrados.
+    dbnInformix,
+    dbnADS,
+    dbnASA,
+    dbnAbsoluteDB,
+    dbnElevateDB,
+    dbnNexusDB:    Result := [];
   else
     raise Exception.Create('Dialeto sem linha na TABELA DE SUPORTE. ' +
       'Todo membro de TFluentSQLDriver precisa declarar o que suporta.');
@@ -326,7 +393,11 @@ begin
     LRegister.Free;
   end;
 
-  Assert.AreEqual(9 * 26, LCelulas,
+  // 15 dialetos x 26 funcoes. Sao 15 e nao 9 porque o enum tem SEIS membros sem
+  // driver (ver TestDriverSemImplementacaoLevantaErroNomeado): eles entram na
+  // varredura e as 156 celulas deles tem de sair por EFluentSQLDriverNotRegistered,
+  // que e uma das duas excecoes que o "except" acima aceita.
+  Assert.AreEqual(15 * 26, LCelulas,
     'A matriz mudou de tamanho. Atualize cFUNCTIONS/_Invoke junto com o enum.');
   Assert.AreEqual('', LFalhas,
     'Celulas da matriz levantaram excecao NAO nomeada (indice do driver/funcao):' + LFalhas);
@@ -576,6 +647,104 @@ begin
   finally
     LRegister.Free;
   end;
+end;
+
+procedure TTestDriverFunctionsMatrix.TestDriverSemImplementacaoLevantaErroNomeado;
+var
+  LRegister: TFluentSQLRegister;
+  LFunctions: IFluentSQLFunctions;
+  LDriver: TFluentSQLDriver;
+  LIdx: Integer;
+  LVerbo: Integer;
+  LClasse: String;
+  LFalhas: String;
+  LMedidas: Integer;
+begin
+  LFalhas := '';
+  LMedidas := 0;
+  LRegister := TFluentSQLRegister.Create;
+  try
+    for LIdx := Low(cSEM_DRIVER) to High(cSEM_DRIVER) do
+    begin
+      LDriver := cSEM_DRIVER[LIdx];
+      // Quatro portas de entrada: as tres do Register mais a chamada de funcao
+      // do padrao B, que e a que o usuario faz e a que produzia a AV opaca.
+      for LVerbo := 0 to 3 do
+      begin
+        Inc(LMedidas);
+        LClasse := '<nao levantou>';
+        try
+          case LVerbo of
+            0: LRegister.Functions(LDriver);
+            1: LRegister.Select(LDriver);
+            2: LRegister.Serialize(LDriver);
+            3: begin
+                 LFunctions := TFluentSQLFunctions.Create(LDriver, LRegister);
+                 LFunctions.Trim('C');
+               end;
+          end;
+        except
+          on E: Exception do
+            LClasse := E.ClassName;
+        end;
+        LFunctions := nil;
+        if LClasse <> 'EFluentSQLDriverNotRegistered' then
+          LFalhas := LFalhas + sLineBreak + '  ' + DriverName(LDriver) +
+            ' (ordinal ' + IntToStr(Ord(LDriver)) + ') verbo ' + IntToStr(LVerbo) +
+            ' -> ' + LClasse;
+      end;
+    end;
+  finally
+    LRegister.Free;
+  end;
+
+  Assert.AreEqual(6 * 4, LMedidas,
+    'Esperado 6 dialetos sem driver x 4 portas de entrada.');
+  Assert.AreEqual('', LFalhas,
+    'Dialeto sem implementacao tem que levantar EFluentSQLDriverNotRegistered, ' +
+    'e nao AV/EAbstractError/Exception crua:' + LFalhas);
+end;
+
+procedure TTestDriverFunctionsMatrix.TestOrdinalENomeDeCadaDialetoSaoContrato;
+begin
+  // O ordinal e serializavel e a superficie e publica: consumidores externos
+  // nomeiam membros deste enum no proprio codigo. Reordenar ou remover nao e
+  // refatoracao cosmetica - e BREAKING CHANGE, e tem de sair vermelho aqui.
+  // Esta e tambem a UNICA assercao que pega PERMUTACAO de CDriverNames:
+  // TestEnumEArrayDeNomesEstaoAlinhados nao pega, pelo motivo escrito no corpo dele.
+  Assert.AreEqual(15, Ord(High(TFluentSQLDriver)) + 1, 'TFluentSQLDriver mudou de tamanho.');
+
+  Assert.AreEqual(0,  Ord(dbnMSSQL),      'dbnMSSQL');
+  Assert.AreEqual(1,  Ord(dbnMySQL),      'dbnMySQL');
+  Assert.AreEqual(2,  Ord(dbnFirebird),   'dbnFirebird');
+  Assert.AreEqual(3,  Ord(dbnSQLite),     'dbnSQLite');
+  Assert.AreEqual(4,  Ord(dbnInterbase),  'dbnInterbase');
+  Assert.AreEqual(5,  Ord(dbnDB2),        'dbnDB2');
+  Assert.AreEqual(6,  Ord(dbnOracle),     'dbnOracle');
+  Assert.AreEqual(7,  Ord(dbnInformix),   'dbnInformix');
+  Assert.AreEqual(8,  Ord(dbnPostgreSQL), 'dbnPostgreSQL');
+  Assert.AreEqual(9,  Ord(dbnADS),        'dbnADS');
+  Assert.AreEqual(10, Ord(dbnASA),        'dbnASA');
+  Assert.AreEqual(11, Ord(dbnAbsoluteDB), 'dbnAbsoluteDB');
+  Assert.AreEqual(12, Ord(dbnMongoDB),    'dbnMongoDB');
+  Assert.AreEqual(13, Ord(dbnElevateDB),  'dbnElevateDB');
+  Assert.AreEqual(14, Ord(dbnNexusDB),    'dbnNexusDB');
+
+  Assert.AreEqual('MSSQL',      DriverName(dbnMSSQL),      'nome de dbnMSSQL');
+  Assert.AreEqual('MySQL',      DriverName(dbnMySQL),      'nome de dbnMySQL');
+  Assert.AreEqual('Firebird',   DriverName(dbnFirebird),   'nome de dbnFirebird');
+  Assert.AreEqual('SQLite',     DriverName(dbnSQLite),     'nome de dbnSQLite');
+  Assert.AreEqual('Interbase',  DriverName(dbnInterbase),  'nome de dbnInterbase');
+  Assert.AreEqual('DB2',        DriverName(dbnDB2),        'nome de dbnDB2');
+  Assert.AreEqual('Oracle',     DriverName(dbnOracle),     'nome de dbnOracle');
+  Assert.AreEqual('Informix',   DriverName(dbnInformix),   'nome de dbnInformix');
+  Assert.AreEqual('PostgreSQL', DriverName(dbnPostgreSQL), 'nome de dbnPostgreSQL');
+  Assert.AreEqual('ADS',        DriverName(dbnADS),        'nome de dbnADS');
+  Assert.AreEqual('ASA',        DriverName(dbnASA),        'nome de dbnASA');
+  Assert.AreEqual('AbsoluteDB', DriverName(dbnAbsoluteDB), 'nome de dbnAbsoluteDB');
+  Assert.AreEqual('MongoDB',    DriverName(dbnMongoDB),    'nome de dbnMongoDB');
+  Assert.AreEqual('ElevateDB',  DriverName(dbnElevateDB),  'nome de dbnElevateDB');
+  Assert.AreEqual('NexusDB',    DriverName(dbnNexusDB),    'nome de dbnNexusDB');
 end;
 
 procedure TTestDriverFunctionsMatrix.TestEnumEArrayDeNomesEstaoAlinhados;

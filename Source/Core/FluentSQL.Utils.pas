@@ -363,8 +363,13 @@ end;
 class function TUtils.DateTimeToSQLFormat(const ADriverName: TFluentSQLDriver;
   const AValue: TDateTime): String;
 begin
+  // Os quinze membros de TFluentSQLDriver estao cobertos, e e por isso que nao ha
+  // "else" aqui: membro novo do enum que ficasse de fora sairia com Result vazio,
+  // e a falha muda seria QuotedStr('') = ''''''. Se algum dia um membro deixar de
+  // ter linha, ponha-a; nao ponha um else generico.
   case ADriverName of
     dbnFirebird,
+    dbnAbsoluteDB,
     dbnInterbase: Result := FormatDateTime('mm/dd/yyyy hh:nn:ss', AValue);
 
     dbnMSSQL,
@@ -372,8 +377,13 @@ begin
     dbnSQLite,
     dbnDB2,
     dbnOracle,
+    dbnInformix,
     dbnPostgreSQL,
-    dbnMongoDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
+    dbnADS,
+    dbnASA,
+    dbnMongoDB,
+    dbnElevateDB,
+    dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd hh:nn:ss', AValue);
   end;
   Result := QuotedStr(Result);
   // Ver DateToSQLFormat: o Oracle exige o literal ANSI tipado. Medido no
@@ -391,8 +401,10 @@ end;
 class function TUtils.DateToSQLFormat(const ADriverName: TFluentSQLDriver;
   const AValue: TDate): String;
 begin
+  // Ver a nota sobre a ausencia de "else" em DateTimeToSQLFormat, logo acima.
   case ADriverName of
     dbnFirebird,
+    dbnAbsoluteDB,
     dbnInterbase: Result := FormatDateTime('mm/dd/yyyy', AValue);
 
     dbnMSSQL,
@@ -400,8 +412,13 @@ begin
     dbnSQLite,
     dbnDB2,
     dbnOracle,
+    dbnInformix,
     dbnPostgreSQL,
-    dbnMongoDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
+    dbnADS,
+    dbnASA,
+    dbnMongoDB,
+    dbnElevateDB,
+    dbnNexusDB: Result := FormatDateTime('yyyy-mm-dd', AValue);
   end;
   Result := QuotedStr(Result);
   // O Oracle e o UNICO dos sete que recusa o literal cru: com o
