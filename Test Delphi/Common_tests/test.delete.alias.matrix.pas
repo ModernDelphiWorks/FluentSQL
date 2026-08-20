@@ -99,7 +99,8 @@ uses
 const
   cDIALETO: array[TFluentSQLDriver] of String = (
     'dbnMSSQL', 'dbnMySQL', 'dbnFirebird', 'dbnSQLite', 'dbnInterbase',
-    'dbnDB2', 'dbnOracle', 'dbnPostgreSQL', 'dbnMongoDB'
+    'dbnDB2', 'dbnOracle', 'dbnInformix', 'dbnPostgreSQL', 'dbnADS', 'dbnASA',
+    'dbnAbsoluteDB', 'dbnMongoDB', 'dbnElevateDB', 'dbnNexusDB'
   );
 
 type
@@ -135,8 +136,17 @@ const
     {dbnInterbase}  fdFromComAS,
     {dbnDB2}        fdFromComAS,
     {dbnOracle}     fdFromSemAS,
+    // Os seis sem unit em Source\Drivers nunca chegam a ser medidos: _Medivel
+    // os descarta porque _EstaRegistrado pega EFluentSQLDriverNotRegistered. A
+    // celula existe para a tabela cobrir o enum inteiro (array[TFluentSQLDriver]).
+    {dbnInformix}   fdFromComAS,  // sem driver: nao medido
     {dbnPostgreSQL} fdFromComAS,
-    {dbnMongoDB}    fdFromComAS  // nao usado: MongoDB nao passa por esta matriz
+    {dbnADS}        fdFromComAS,  // sem driver: nao medido
+    {dbnASA}        fdFromComAS,  // sem driver: nao medido
+    {dbnAbsoluteDB} fdFromComAS,  // sem driver: nao medido
+    {dbnMongoDB}    fdFromComAS,  // nao usado: MongoDB nao passa por esta matriz
+    {dbnElevateDB}  fdFromComAS,  // sem driver: nao medido
+    {dbnNexusDB}    fdFromComAS   // sem driver: nao medido
   );
 
 /// <summary>

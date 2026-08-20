@@ -30,13 +30,33 @@ type
   TOperator = (opeNone, opeWhere, opeAND, opeOR);
   TOperators = set of TOperator;
   /// <summary>
-  ///   Dialetos suportados. Todo membro DEVE ter uma implementacao real em
-  ///   Source\Drivers e uma entrada em DriverName (abaixo), que e declarado sobre
-  ///   array[TFluentSQLDriver] justamente para que qualquer membro novo quebre a
-  ///   compilacao ate ser nomeado la.
+  ///   Dialetos enderecaveis. Todo membro DEVE ter uma entrada em DriverName
+  ///   (abaixo), que e declarado sobre array[TFluentSQLDriver] justamente para que
+  ///   qualquer membro novo quebre a compilacao ate ser nomeado la.
+  ///
+  ///   NEM TODO MEMBRO TEM IMPLEMENTACAO. Nove tem unit em Source\Drivers
+  ///   (dbnMSSQL, dbnMySQL, dbnFirebird, dbnSQLite, dbnInterbase, dbnDB2,
+  ///   dbnOracle, dbnPostgreSQL, dbnMongoDB - destes, dbnInterbase e dbnDB2 estao
+  ///   com o {$DEFINE} desligado no FluentSQL.inc). Os SEIS restantes -
+  ///   dbnInformix, dbnADS, dbnASA, dbnAbsoluteDB, dbnElevateDB e dbnNexusDB -
+  ///   NAO tem: nao ha FluentSQL.Serialize*/Select*/Functions* deles no
+  ///   repositorio, e nao ha _Register* no FluentSQL.Register.pas.
+  ///
+  ///   Eles ficam no enum porque a ORDEM e a SUPERFICIE dele sao contrato publico:
+  ///   consumidores (o Janus mapeia TDriverName para dbnADS, dbnAbsoluteDB,
+  ///   dbnElevateDB e dbnNexusDB em Janus.DML.Generator.pas:641,643,645,656)
+  ///   nomeiam esses valores no proprio codigo, e o ordinal e serializavel.
+  ///   Removidos em cd9e71d, foram restaurados na posicao original - reordenar
+  ///   valeria tanto quanto remover.
+  ///
+  ///   Pedir deles algo que nao esta registrado NAO da EAccessViolation: da
+  ///   EFluentSQLDriverNotRegistered, a excecao nomeada que cd9e71d criou. E o que
+  ///   Test Delphi\Common_tests\test.driver.functions.matrix.pas afirma, celula a
+  ///   celula, em TestDriverSemImplementacaoLevantaErroNomeado.
   /// </summary>
   TFluentSQLDriver = (dbnMSSQL, dbnMySQL, dbnFirebird, dbnSQLite, dbnInterbase, dbnDB2,
-                   dbnOracle, dbnPostgreSQL, dbnMongoDB);
+                   dbnOracle, dbnInformix, dbnPostgreSQL, dbnADS, dbnASA,
+                   dbnAbsoluteDB, dbnMongoDB, dbnElevateDB, dbnNexusDB);
 
   /// <summary>
   ///   O dialeto pedido nao tem implementacao registrada. Substitui o retorno
@@ -1917,7 +1937,8 @@ implementation
 const
   CDriverNames: array[TFluentSQLDriver] of string = (
     'MSSQL', 'MySQL', 'Firebird', 'SQLite', 'Interbase', 'DB2',
-    'Oracle', 'PostgreSQL', 'MongoDB'
+    'Oracle', 'Informix', 'PostgreSQL', 'ADS', 'ASA', 'AbsoluteDB',
+    'MongoDB', 'ElevateDB', 'NexusDB'
   );
 
 function DriverName(const ADriver: TFluentSQLDriver): String;

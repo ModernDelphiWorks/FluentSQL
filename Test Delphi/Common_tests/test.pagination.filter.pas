@@ -357,7 +357,8 @@ const
 
   cDIALETO: array[TFluentSQLDriver] of String = (
     'dbnMSSQL', 'dbnMySQL', 'dbnFirebird', 'dbnSQLite', 'dbnInterbase',
-    'dbnDB2', 'dbnOracle', 'dbnPostgreSQL', 'dbnMongoDB'
+    'dbnDB2', 'dbnOracle', 'dbnInformix', 'dbnPostgreSQL', 'dbnADS', 'dbnASA',
+    'dbnAbsoluteDB', 'dbnMongoDB', 'dbnElevateDB', 'dbnNexusDB'
   );
 
 /// <summary>Monta a consulta da celula (dialeto, combinacao). Sempre com filtro.</summary>
@@ -539,8 +540,18 @@ const
     {dbnInterbase}  '',
     {dbnDB2}        '',
     {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) FETCH NEXT 10 ROWS ONLY',
+    // A linha vazia significa "nao ha forma medida": _ConfereTabela so a tolera
+    // enquanto o dialeto NAO estiver registrado, e levanta no dia em que estiver.
+    // Informix, ADS, ASA, AbsoluteDB, ElevateDB e NexusDB nao tem unit em
+    // Source\Drivers - estao no enum como superficie publica, nao como driver.
+    {dbnInformix}   '',
     {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 10',
-    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"limit":10}'
+    {dbnADS}        '',
+    {dbnASA}        '',
+    {dbnAbsoluteDB} '',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"limit":10}',
+    {dbnElevateDB}  '',
+    {dbnNexusDB}    ''
   );
 
   cSKIP_SOZINHO: array[TFluentSQLDriver] of String = (
@@ -554,9 +565,15 @@ const
     {dbnInterbase}  '',
     {dbnDB2}        '',
     {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20 ROWS',
+    {dbnInformix}   '',
     // PostgreSQL: o unico com OFFSET como clausula independente. Sem teto.
     {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20',
-    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":20}'
+    {dbnADS}        '',
+    {dbnASA}        '',
+    {dbnAbsoluteDB} '',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":20}',
+    {dbnElevateDB}  '',
+    {dbnNexusDB}    ''
   );
 
 /// <summary>Percorre os dialetos registrados comparando string exata, com caixa.</summary>
@@ -669,8 +686,14 @@ const
     {dbnInterbase}  '',
     {dbnDB2}        '',
     {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) FETCH NEXT 0 ROWS ONLY',
+    {dbnInformix}   '',
     {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0',
-    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}'
+    {dbnADS}        '',
+    {dbnASA}        '',
+    {dbnAbsoluteDB} '',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}',
+    {dbnElevateDB}  '',
+    {dbnNexusDB}    ''
   );
 
   /// <summary>Skip(0) = "nao pule nada". Medido correto nos 7 antes e depois.</summary>
@@ -682,8 +705,14 @@ const
     {dbnInterbase}  '',
     {dbnDB2}        '',
     {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 0 ROWS',
+    {dbnInformix}   '',
     {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 0',
-    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":0}'
+    {dbnADS}        '',
+    {dbnASA}        '',
+    {dbnAbsoluteDB} '',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":0}',
+    {dbnElevateDB}  '',
+    {dbnNexusDB}    ''
   );
 
   /// <summary>
@@ -699,8 +728,14 @@ const
     {dbnInterbase}  '',
     {dbnDB2}        '',
     {dbnOracle}     'SELECT * FROM T WHERE (ATIVO = :p1) OFFSET 20 ROWS FETCH NEXT 0 ROWS ONLY',
+    {dbnInformix}   '',
     {dbnPostgreSQL} 'SELECT * FROM T WHERE (ATIVO = :p1) LIMIT 0 OFFSET 20',
-    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}'
+    {dbnADS}        '',
+    {dbnASA}        '',
+    {dbnAbsoluteDB} '',
+    {dbnMongoDB}    '{"find":"T","filter":{"ATIVO":1},"projection":{},"skip":9223372036854775807}',
+    {dbnElevateDB}  '',
+    {dbnNexusDB}    ''
   );
 
 procedure TTestPaginationWithFilter.TestSqlExatoFirstZero;

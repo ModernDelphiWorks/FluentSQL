@@ -57,8 +57,13 @@
 // Banco de dados utiliza��o
 // Cada simbolo abaixo tem que corresponder a um membro de TFluentSQLDriver
 // (FluentSQL.Interfaces.pas) e a uma implementacao real em Source\Drivers.
-// Informix, ADS, ASA, AbsoluteDB, ElevateDB e NexusDB foram removidos: estavam
-// no enum e no Register sem que as units existissem.
+// A reciproca NAO vale: TFluentSQLDriver tem 15 membros e aqui ha 9 simbolos.
+// Informix, ADS, ASA, AbsoluteDB, ElevateDB e NexusDB continuam SEM simbolo -
+// nao ha unit deles em Source\Drivers para ligar. Eles existem no enum como
+// superficie publica (ordinal serializavel, consumidores externos que os
+// nomeiam) e pedir deles algo nao registrado levanta
+// EFluentSQLDriverNotRegistered. Nao acrescente {$DEFINE} para eles sem que a
+// unit exista: o Register nao compilaria.
 {$DEFINE FIREBIRD}
 {$DEFINE MSSQL}
 {$DEFINE MYSQL}

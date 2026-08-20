@@ -105,7 +105,8 @@ uses
 const
   cDIALETO: array[TFluentSQLDriver] of String = (
     'dbnMSSQL', 'dbnMySQL', 'dbnFirebird', 'dbnSQLite', 'dbnInterbase',
-    'dbnDB2', 'dbnOracle', 'dbnPostgreSQL', 'dbnMongoDB'
+    'dbnDB2', 'dbnOracle', 'dbnInformix', 'dbnPostgreSQL', 'dbnADS', 'dbnASA',
+    'dbnAbsoluteDB', 'dbnMongoDB', 'dbnElevateDB', 'dbnNexusDB'
   );
 
 /// <summary>
